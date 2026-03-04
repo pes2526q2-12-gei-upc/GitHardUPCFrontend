@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+echo "====================================================="
+echo "🔍 Ejecutando Pre-commit Hook: Análisis de Linters"
+echo "====================================================="
+
+# Ejecutar el linter de Gradle (Spotless, Checkstyle o ktlint según el repo)
+# Si el linter falla, el comando devolverá un código de salida distinto de 0
+./gradlew check --daemon
+
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+  echo "❌ ERROR: El código no cumple con las reglas de formato o sintaxis."
+  echo "Por favor, revisa los errores del linter (o SonarLint local) y vuelve a intentarlo."
+  echo "====================================================="
+  exit 1
+fi
+
+echo "✅ Análisis de formato superado. Procediendo con el commit..."
+exit 0
