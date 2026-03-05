@@ -4,9 +4,12 @@ echo "====================================================="
 echo "🔍 Ejecutando Pre-commit Hook: Análisis de Linters"
 echo "====================================================="
 
-# Ejecutar el linter de Gradle (Spotless, Checkstyle o ktlint según el repo)
-# Si el linter falla, el comando devolverá un código de salida distinto de 0
-./gradlew check --daemon
+# Busquem el directori arrel del projecte Git
+PROJECT_ROOT=$(git rev-parse --show-toplevel)
+
+# Executar el linter de Gradle fent servir la ruta absoluta al gradlew
+# Això evita l'error de "Unable to access jarfile"
+"$PROJECT_ROOT/gradlew" -p "$PROJECT_ROOT" check --daemon
 
 EXIT_CODE=$?
 
