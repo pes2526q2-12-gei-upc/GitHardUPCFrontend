@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Regex: Empieza por feat:, fix:, o docs:, seguido de un espacio, [TG-Números], espacio, y el texto.
+REGEX="^(feat|fix|docs):\s\[TG-[0-9]+\]\s.+"
+
+if [[ ! $COMMIT_MSG =~ $REGEX ]]; then
+  echo "=================================================================="
+  echo "❌ ERROR: El mensaje del commit no cumple con la nomenclatura."
+  echo "La metodología exige la siguiente sintaxis estricta:"
+  echo "  <tipo>: [TG-<ID>] <mensaje explicativo>"
+  echo ""
+  echo "Tipos permitidos: feat, fix, docs"
+  echo "Ejemplo válido: feat: [TG-45] missatge_explicatiu"
+  echo "=================================================================="
+  exit 1
+fi
+
+exit 0
