@@ -25,3 +25,71 @@ replay_pid*
 
 # Kotlin Gradle plugin data, see https://kotlinlang.org/docs/whatsnew20.html#new-directory-for-kotlin-data-in-gradle-projects
 .kotlin/
+
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+
+# ==========================================
+# 1. Android Studio i IntelliJ
+# ==========================================
+*.iml
+.idea/
+/.idea/
+# Ignorem la configuració de l'espai de treball, excepte els diccionaris compartits si en tens
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+
+# ==========================================
+# 2. Arxius de Gradle i Compilació
+# ==========================================
+.gradle/
+/.gradle/
+build/
+/build/
+*/build/
+# Mai ignorem el wrapper de Gradle, aquest SÍ que s'ha de pujar:
+!gradle/wrapper/gradle-wrapper.jar
+
+# ==========================================
+# 3. Configuracions Locals (Molt Important)
+# ==========================================
+# Aquest arxiu conté la ruta del teu SDK de Windows, mai s'ha de pujar!
+local.properties
+/local.properties
+
+# ==========================================
+# 4. SonarQube Server
+# ==========================================
+# Arxius temporals i catxé generats pels escàners de SonarQube
+.sonar/
+/.scannerwork/
+*.sonar_lock
+
+# ==========================================
+# 5. Sistema Operatiu i altres
+# ==========================================
+# Arxius temporals de Windows
+Thumbs.db
+# Arxius de compilació nativa de C++ (per si en el futur n'hi ha)
+.externalNativeBuild/
+.cxx/
+captures/
+/captures/
