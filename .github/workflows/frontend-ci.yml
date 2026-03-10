@@ -25,6 +25,9 @@ jobs:
       - name: Configurar caché de Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Dar permisos de ejecución al Wrapper
+        run: chmod +x ./gradlew
+
       - name: Verificación de Código, Tests y Cobertura (Lint & JaCoCo)
         run: ./gradlew lint jacocoTestReport
 
