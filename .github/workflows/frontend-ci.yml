@@ -2,9 +2,21 @@ name: SafeSteps Frontend CI
 
 on:
   push:
-    branches: [ main, develop, config/Integracio_Continua ]
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
   pull_request:
-    branches: [ main, develop, config/Integracio_Continua ]
+    branches: [ main, develop ]
+    paths:
+      - 'app/**'
+      - '**.kts'
+      - 'gradle.properties'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-test:
@@ -29,7 +41,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Verificación de Código, Tests y Cobertura (Lint & JaCoCo)
-        run: ./gradlew lint jacocoTestReport --no-daemon
+        run: ./gradlew lint jacocoTestReport --no-daemon --parallel --build-cache
 
       - name: Análisis Estático con SonarQube CLI
         uses: SonarSource/sonarqube-scan-action@v4
