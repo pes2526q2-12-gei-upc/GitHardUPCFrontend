@@ -1,0 +1,39 @@
+name: SafeSteps Frontend CI
+
+on:
+  push:
+    branches: [ main, develop, config/Integracio_Continua ]
+  pull_request:
+    branches: [ main, develop, config/Integracio_Continua ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fundamental para que SonarQube analice el historial completo
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17' # Android suele requerir Java 17 para Gradle 8+. Cámbialo a 21 si tu build.gradle.kts lo exige.
+          distribution: 'temurin'
+
+      - name: Configurar caché de Gradle
+        uses: gradle/actions/setup-gradle@v3
+        # Esto es Clean Code en CI: no descargamos las dependencias en cada ejecución, ahorrando tiempo y recursos.
+
+      - name: Dar permisos de ejecución al Wrapper
+        run: chmod +x ./gradlew
+
+      - name: Verificación de Código, Tests y Cobertura (Lint & JaCoCo)
+        run: ./gradlew lint jacocoTestReport
+
+      - name: Análisis Estático con SonarQube
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        # Exigimos que el código sea evaluado contra nuestras "Quality Gates".
+        run: ./gradlew sonar -Dsonar.login=$SONAR_TOKEN
