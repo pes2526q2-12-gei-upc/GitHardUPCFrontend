@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,6 +24,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -105,6 +110,31 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
             }
         )
 
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .align(Alignment.TopCenter),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+            shape = RoundedCornerShape(50)
+        ) {
+            TextField(
+                value = textoBusqueda,
+                onValueChange = { textoBusqueda = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Buscar en el mapa...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent
+                )
+            )
+        }
+
         AnimatedVisibility(
             visible = destinoSeleccionado != null,
             enter = slideInVertically(initialOffsetY = { it }),
@@ -150,7 +180,7 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Cerrar y eliminar marcador"
+                                contentDescription = null
                             )
                         }
                     }
