@@ -1,0 +1,58 @@
+name: SafeSteps Frontend CI
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'docs/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'app/**'
+      - '**.kts'
+      - 'gradle.properties'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necesario para que SonarQube analice todo el historial
+
+      - name: Configurar JDK 17 (Para ejecutar Gradle)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Configurar caché de Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Dar permisos de ejecución al Wrapper
+        run: chmod +x ./gradlew
+
+      - name: Verificación de Código, Tests y Cobertura (Lint & JaCoCo)
+        run: ./gradlew lint jacocoTestReport --no-daemon --parallel --build-cache
+
+      - name: Análisis Estático con SonarQube CLI
+        uses: SonarSource/sonarqube-scan-action@v4
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: "http://nattech.fib.upc.edu:40380"
+        with:
+          args: >
+            -Dsonar.projectKey=GitHardUPCFrontend
+            -Dsonar.projectName="GitHardUPC Frontend"
+            -Dsonar.sources=app/src/main/java
+            -Dsonar.tests=app/src/test/java,app/src/androidTest/java
+            -Dsonar.java.binaries=app/build/tmp/kotlin-classes/debug
+            -Dsonar.coverage.jacoco.xmlReportPaths=app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
