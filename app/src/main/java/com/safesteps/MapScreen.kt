@@ -456,6 +456,13 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
                                 map.clear()
                                 map.addMarker(MarkerOptions().position(point))
                                 destinoSeleccionado = point
+                                textoDestino = String.format(
+                                    Locale.US,
+                                    "%.4f, %.4f",
+                                    point.latitude,
+                                    point.longitude
+                                )
+                                mostrarOrigen = true
                                 true
                             }
                         }
