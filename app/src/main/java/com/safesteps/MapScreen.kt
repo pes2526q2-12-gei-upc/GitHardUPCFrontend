@@ -14,6 +14,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,11 +24,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -35,9 +45,8 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -47,7 +56,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -201,12 +212,173 @@ private fun stopAndroidLocationUpdates(context: Context, listener: LocationListe
 }
 
 @Composable
+private fun SearchBarItem(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    leadingIcon: @Composable () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .border(
+                width = 1.dp,
+                color = Color(0xFFE4ECE8),
+                shape = RoundedCornerShape(26.dp)
+            )
+            .background(Color.White, RoundedCornerShape(26.dp))
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            leadingIcon()
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (value.isBlank()) {
+                    Text(
+                        text = placeholder,
+                        color = Color(0xFF9AA7A0),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = Color(0xFF3D4A45)
+                    ),
+                    cursorBrush = SolidColor(Color(0xFF5AC98B)),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopSearchPanel(
+    origen: String,
+    onOrigenChange: (String) -> Unit,
+    destino: String,
+    onDestinoChange: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(24.dp),
+                clip = false
+            ),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(34.dp),
+                    shape = CircleShape,
+                    color = Color(0xFFF4F6F5)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Menú",
+                            tint = Color(0xFF66716C),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(
+                    text = "SafeSteps",
+                    color = Color(0xFF33413B),
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Surface(
+                    modifier = Modifier.size(36.dp),
+                    shape = CircleShape,
+                    color = Color(0xFF6DD29A)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Perfil",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            SearchBarItem(
+                value = origen,
+                onValueChange = onOrigenChange,
+                placeholder = "Ubicació actual",
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color(0xFF74D3A2),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            SearchBarItem(
+                value = destino,
+                onValueChange = onDestinoChange,
+                placeholder = "Destí",
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = Color(0xFFFF8A80),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
 fun MapLibreScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val mapView = rememberMapViewWithLifecycle()
 
     var destinoSeleccionado by remember { mutableStateOf<LatLng?>(null) }
-    var textoBusqueda by remember { mutableStateOf("") }
+    var textoOrigen by remember { mutableStateOf("") }
+    var textoDestino by remember { mutableStateOf("") }
     var mapaListo by remember { mutableStateOf(false) }
     var locationGranted by remember { mutableStateOf(hasLocationPermission(context)) }
 
@@ -274,27 +446,12 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxSize()
         )
 
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .align(Alignment.TopCenter),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            shape = RoundedCornerShape(50)
-        ) {
-            TextField(
-                value = textoBusqueda,
-                onValueChange = { textoBusqueda = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Buscar en el mapa...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
-                colors = TextFieldDefaults.colors(
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                )
-            )
-        }
+        TopSearchPanel(
+            origen = textoOrigen,
+            onOrigenChange = { textoOrigen = it },
+            destino = textoDestino,
+            onDestinoChange = { textoDestino = it }
+        )
 
         AnimatedVisibility(
             visible = destinoSeleccionado != null,
@@ -369,10 +526,13 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
                 .padding(
                     end = 16.dp,
                     bottom = if (destinoSeleccionado != null) 200.dp else 16.dp
-                )
+                ),
+            containerColor = Color.White,
+            contentColor = Color(0xFF49B97E)
         ) {
             Icon(Icons.Default.LocationOn, contentDescription = "Mi ubicación")
         }
