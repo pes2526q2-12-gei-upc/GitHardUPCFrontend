@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
@@ -217,7 +220,8 @@ private fun SearchBarItem(
     onValueChange: (String) -> Unit,
     placeholder: String,
     leadingIcon: @Composable () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onFocus: (() -> Unit)? = null
 ) {
     Box(
         modifier = modifier
@@ -260,7 +264,13 @@ private fun SearchBarItem(
                         color = Color(0xFF3D4A45)
                     ),
                     cursorBrush = SolidColor(Color(0xFF5AC98B)),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onFocusChanged {
+                            if (it.isFocused) {
+                                onFocus?.invoke()
+                            }
+                        }
                 )
             }
         }
@@ -272,7 +282,9 @@ private fun TopSearchPanel(
     origen: String,
     onOrigenChange: (String) -> Unit,
     destino: String,
-    onDestinoChange: (String) -> Unit
+    onDestinoChange: (String) -> Unit,
+    mostrarOrigen: Boolean,
+    onDestinoFocus: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -338,21 +350,25 @@ private fun TopSearchPanel(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            SearchBarItem(
-                value = origen,
-                onValueChange = onOrigenChange,
-                placeholder = "Ubicació actual",
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = Color(0xFF74D3A2),
-                        modifier = Modifier.size(18.dp)
+            AnimatedVisibility(visible = mostrarOrigen) {
+                Column {
+                    SearchBarItem(
+                        value = origen,
+                        onValueChange = onOrigenChange,
+                        placeholder = "Ubicació actual",
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = Color(0xFF74D3A2),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     )
-                }
-            )
 
-            Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
 
             SearchBarItem(
                 value = destino,
@@ -365,7 +381,8 @@ private fun TopSearchPanel(
                         tint = Color(0xFFFF8A80),
                         modifier = Modifier.size(18.dp)
                     )
-                }
+                },
+                onFocus = onDestinoFocus
             )
         }
     }
@@ -381,6 +398,8 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
     var textoDestino by remember { mutableStateOf("") }
     var mapaListo by remember { mutableStateOf(false) }
     var locationGranted by remember { mutableStateOf(hasLocationPermission(context)) }
+    var estiloSatelite by remember { mutableStateOf(false) }
+    var mostrarOrigen by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -450,7 +469,9 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
             origen = textoOrigen,
             onOrigenChange = { textoOrigen = it },
             destino = textoDestino,
-            onDestinoChange = { textoDestino = it }
+            onDestinoChange = { textoDestino = it },
+            mostrarOrigen = mostrarOrigen,
+            onDestinoFocus = { mostrarOrigen = true }
         )
 
         AnimatedVisibility(
@@ -511,19 +532,7 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        FloatingActionButton(
-            onClick = {
-                if (locationGranted) {
-                    activateLocationComponent(mapView)
-                } else {
-                    permissionLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.ACCESS_FINE_LOCATION,
-                            Manifest.permission.ACCESS_COARSE_LOCATION
-                        )
-                    )
-                }
-            },
+        Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .navigationBarsPadding()
@@ -531,10 +540,43 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
                     end = 16.dp,
                     bottom = if (destinoSeleccionado != null) 200.dp else 16.dp
                 ),
-            containerColor = Color.White,
-            contentColor = Color(0xFF49B97E)
+            horizontalAlignment = Alignment.End
         ) {
-            Icon(Icons.Default.LocationOn, contentDescription = "Mi ubicación")
+            ExtendedFloatingActionButton(
+                onClick = { estiloSatelite = !estiloSatelite },
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.Layers,
+                        contentDescription = "Cambiar estilo del mapa"
+                    )
+                },
+                text = {
+                    Text(if (estiloSatelite) "Estándar" else "Satélite")
+                },
+                containerColor = if (estiloSatelite) Color(0xFF2F3B44) else Color.White,
+                contentColor = if (estiloSatelite) Color.White else Color(0xFF3D4A45)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            FloatingActionButton(
+                onClick = {
+                    if (locationGranted) {
+                        activateLocationComponent(mapView)
+                    } else {
+                        permissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    }
+                },
+                containerColor = Color.White,
+                contentColor = Color(0xFF49B97E)
+            ) {
+                Icon(Icons.Default.LocationOn, contentDescription = "La meva ubicació")
+            }
         }
     }
 }
