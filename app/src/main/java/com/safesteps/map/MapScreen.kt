@@ -1,13 +1,6 @@
-package com.safesteps
+package com.safesteps.map
 
 import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
-import android.graphics.Color as AndroidColor
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
-import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -41,7 +34,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Accessible
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Layers
@@ -86,193 +78,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.safesteps.domain.RoutePriority
 import kotlinx.coroutines.launch
 import org.maplibre.android.annotations.MarkerOptions
-import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.location.LocationComponentActivationOptions
-import org.maplibre.android.location.LocationComponentOptions
-import org.maplibre.android.location.modes.CameraMode
-import org.maplibre.android.location.modes.RenderMode
-import org.maplibre.android.maps.MapView
-import java.util.Locale
 import kotlin.math.max
-import kotlin.math.roundToInt
-
-private enum class RoutePriority {
-    SAFETY,
-    ACCESSIBILITY,
-    HEAT
-}
-
-private fun hasFineLocationPermission(context: Context): Boolean {
-    return ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-}
-
-private fun hasCoarseLocationPermission(context: Context): Boolean {
-    return ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-}
-
-private fun hasLocationPermission(context: Context): Boolean {
-    return hasFineLocationPermission(context) || hasCoarseLocationPermission(context)
-}
-
-@Composable
-private fun rememberMapViewWithLifecycle(): MapView {
-    val context = LocalContext.current
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val mapView = remember { MapView(context).apply { onCreate(Bundle()) } }
-
-    DisposableEffect(lifecycle, mapView) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
-                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
-                else -> Unit
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
-    }
-
-    return mapView
-}
-
-private fun activateLocationComponent(mapView: MapView) {
-    mapView.getMapAsync { map ->
-        val context = mapView.context
-        val fineGranted = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val coarseGranted = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (!fineGranted && !coarseGranted) {
-            return@getMapAsync
-        }
-
-        val style = map.style ?: return@getMapAsync
-        val locationComponent = map.locationComponent
-
-        if (!locationComponent.isLocationComponentActivated) {
-            val options = LocationComponentOptions.builder(context)
-                .foregroundTintColor(AndroidColor.parseColor("#1E88E5"))
-                .backgroundTintColor(AndroidColor.WHITE)
-                .bearingTintColor(AndroidColor.parseColor("#1E88E5"))
-                .accuracyColor(AndroidColor.parseColor("#5533B5E5"))
-                .pulseEnabled(true)
-                .pulseColor(AndroidColor.parseColor("#8833B5E5"))
-                .build()
-
-            val activationOptions = LocationComponentActivationOptions
-                .builder(context, style)
-                .useDefaultLocationEngine(false)
-                .locationComponentOptions(options)
-                .build()
-
-            locationComponent.activateLocationComponent(activationOptions)
-        }
-
-        try {
-            locationComponent.isLocationComponentEnabled = true
-            locationComponent.renderMode = RenderMode.COMPASS
-            locationComponent.cameraMode = CameraMode.TRACKING
-            locationComponent.zoomWhileTracking(15.0)
-        } catch (_: SecurityException) {
-        }
-    }
-}
-
-private fun pushLocationToMap(mapView: MapView, location: Location) {
-    mapView.getMapAsync { map ->
-        val locationComponent = map.locationComponent
-        if (locationComponent.isLocationComponentActivated) {
-            locationComponent.forceLocationUpdate(location)
-        }
-    }
-}
-
-private fun startAndroidLocationUpdates(
-    context: Context,
-    mapView: MapView,
-    onLocationUpdated: (Location) -> Unit
-): LocationListener? {
-    if (!hasLocationPermission(context)) return null
-
-    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    val listener = LocationListener { location ->
-        pushLocationToMap(mapView, location)
-        onLocationUpdated(location)
-    }
-
-    val fineGranted = hasFineLocationPermission(context)
-    val coarseGranted = hasCoarseLocationPermission(context)
-
-    val providers = buildList {
-        if (fineGranted) add(LocationManager.GPS_PROVIDER)
-        if (fineGranted || coarseGranted) add(LocationManager.NETWORK_PROVIDER)
-    }
-
-    for (provider in providers) {
-        try {
-            if (locationManager.isProviderEnabled(provider)) {
-                locationManager.requestLocationUpdates(provider, 1000L, 1f, listener)
-                locationManager.getLastKnownLocation(provider)?.let {
-                    pushLocationToMap(mapView, it)
-                    onLocationUpdated(it)
-                }
-            }
-        } catch (_: SecurityException) {
-        }
-    }
-
-    return listener
-}
-
-private fun stopAndroidLocationUpdates(context: Context, listener: LocationListener?) {
-    if (listener == null) return
-    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    locationManager.removeUpdates(listener)
-}
-
-private fun calculateDistanceAndDuration(
-    currentLocation: Location?,
-    destination: LatLng?
-): Pair<String, String> {
-    if (currentLocation == null || destination == null) return "-- km" to "-- min"
-
-    val destinationLocation = Location("destination").apply {
-        latitude = destination.latitude
-        longitude = destination.longitude
-    }
-
-    val meters = currentLocation.distanceTo(destinationLocation)
-    val km = meters / 1000.0
-    val minutes = max(1, (km * 12.0).roundToInt())
-
-    val distanceText = if (km < 1.0) {
-        "${meters.roundToInt()} m"
-    } else {
-        String.format(Locale.US, "%.1f km", km)
-    }
-
-    return distanceText to "$minutes min"
-}
+import com.safesteps.map.activateLocationComponent
+import com.safesteps.map.hasLocationPermission
+import com.safesteps.map.rememberMapViewWithLifecycle
+import com.safesteps.map.startAndroidLocationUpdates
+import com.safesteps.map.stopAndroidLocationUpdates
 
 @Composable
 private fun SearchBarItem(
@@ -703,24 +519,19 @@ private fun RoutePlannerSheet(
 }
 
 @Composable
-fun MapLibreScreen(modifier: Modifier = Modifier) {
+fun MapLibreScreen(
+    modifier: Modifier = Modifier,
+    viewModel: MapViewModel = viewModel()
+) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     val mapView = rememberMapViewWithLifecycle()
 
-    var destinoSeleccionado by remember { mutableStateOf<LatLng?>(null) }
-    var textoOrigen by remember { mutableStateOf("") }
-    var textoDestino by remember { mutableStateOf("") }
-    var mapaListo by remember { mutableStateOf(false) }
-    var locationGranted by remember { mutableStateOf(hasLocationPermission(context)) }
-    var estiloSatelite by remember { mutableStateOf(false) }
-    var mostrarOrigen by remember { mutableStateOf(false) }
-    var prioridadSeleccionada by remember { mutableStateOf(RoutePriority.SAFETY) }
-    var ultimaUbicacion by remember { mutableStateOf<Location?>(null) }
+    val uiState by viewModel.uiState.collectAsState()
+
     var sheetHeightPx by remember { mutableStateOf(0f) }
     var sheetOffsetPx by remember { mutableStateOf(0f) }
-
     val visibleSheetHeightPx = with(density) { 150.dp.toPx() }
     val collapsedSheetOffset = max(0f, sheetHeightPx - visibleSheetHeightPx)
 
@@ -729,45 +540,42 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
     ) { permissions ->
         val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
         val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        locationGranted = fine || coarse || hasLocationPermission(context)
+        val granted = fine || coarse || hasLocationPermission(context)
 
-        if (!locationGranted) {
-            Toast.makeText(
-                context,
-                "Permiso de ubicación necesario para navegación.",
-                Toast.LENGTH_SHORT
-            ).show()
+        viewModel.onLocationPermissionsResult(granted)
+
+        if (!granted) {
+            Toast.makeText(context, "Permiso de ubicación necesario para navegación.", Toast.LENGTH_SHORT).show()
         }
     }
 
     val sheetDragState = rememberDraggableState { delta ->
-        if (destinoSeleccionado != null) {
+        if (uiState.destinoSeleccionado != null) {
             sheetOffsetPx = (sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset)
         }
     }
 
     LaunchedEffect(Unit) {
-        if (!locationGranted) {
+        if (!hasLocationPermission(context)) {
             permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             )
+        } else {
+            viewModel.onLocationPermissionsResult(true)
         }
     }
 
-    LaunchedEffect(destinoSeleccionado) {
-        if (destinoSeleccionado != null) {
+    LaunchedEffect(uiState.destinoSeleccionado) {
+        if (uiState.destinoSeleccionado != null) {
             sheetOffsetPx = 0f
         }
     }
 
-    DisposableEffect(mapaListo, locationGranted) {
-        if (mapaListo && locationGranted) {
+    DisposableEffect(uiState.mapaListo, uiState.locationGranted) {
+        if (uiState.mapaListo && uiState.locationGranted) {
             activateLocationComponent(mapView)
-            val listener = startAndroidLocationUpdates(context, mapView) {
-                ultimaUbicacion = it
+            val listener = startAndroidLocationUpdates(context, mapView) { location ->
+                viewModel.updateLocation(location)
             }
             onDispose { stopAndroidLocationUpdates(context, listener) }
         } else {
@@ -775,36 +583,25 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    val (distanceText, durationText) = calculateDistanceAndDuration(
-        currentLocation = ultimaUbicacion,
-        destination = destinoSeleccionado
-    )
-
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
             factory = {
                 mapView.apply {
                     getMapAsync { map ->
                         map.setStyle("https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json") {
-                            mapaListo = true
+                            viewModel.onMapaListo()
+
                             map.uiSettings.isLogoEnabled = false
                             map.uiSettings.isAttributionEnabled = false
 
-                            if (locationGranted) {
+                            if (uiState.locationGranted) {
                                 activateLocationComponent(this@apply)
                             }
 
                             map.addOnMapClickListener { point ->
                                 map.clear()
                                 map.addMarker(MarkerOptions().position(point))
-                                destinoSeleccionado = point
-                                textoDestino = String.format(
-                                    Locale.US,
-                                    "%.4f, %.4f",
-                                    point.latitude,
-                                    point.longitude
-                                )
-                                mostrarOrigen = true
+                                viewModel.onMapClicked(point)
                                 true
                             }
                         }
@@ -815,21 +612,19 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
         )
 
         TopSearchPanel(
-            origen = textoOrigen,
-            onOrigenChange = { textoOrigen = it },
-            destino = textoDestino,
-            onDestinoChange = { textoDestino = it },
-            mostrarOrigen = mostrarOrigen,
-            onDestinoFocus = { mostrarOrigen = true }
+            origen = uiState.textoOrigen,
+            onOrigenChange = { viewModel.onOrigenChange(it) },
+            destino = uiState.textoDestino,
+            onDestinoChange = { viewModel.onDestinoChange(it) },
+            mostrarOrigen = uiState.mostrarOrigen,
+            onDestinoFocus = { /* Opcional: mostrar origen al hacer clic */ }
         )
 
         AnimatedVisibility(
-            visible = destinoSeleccionado != null,
+            visible = uiState.destinoSeleccionado != null,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 10.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 10.dp)
         ) {
             RoutePlannerSheet(
                 modifier = Modifier
@@ -844,87 +639,62 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
                         orientation = Orientation.Vertical,
                         state = sheetDragState,
                         onDragStopped = {
-                            val target = if (sheetOffsetPx > collapsedSheetOffset / 2f) {
-                                collapsedSheetOffset
-                            } else {
-                                0f
-                            }
-
+                            val target = if (sheetOffsetPx > collapsedSheetOffset / 2f) collapsedSheetOffset else 0f
                             coroutineScope.launch {
-                                animate(
-                                    initialValue = sheetOffsetPx,
-                                    targetValue = target
-                                ) { value, _ ->
+                                animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ ->
                                     sheetOffsetPx = value
                                 }
                             }
                         }
                     ),
-                selectedPriority = prioridadSeleccionada,
-                onPrioritySelected = { prioridadSeleccionada = it },
-                distanceText = distanceText,
-                durationText = durationText,
+                selectedPriority = uiState.prioridadSeleccionada,
+                onPrioritySelected = { viewModel.onPrioridadSeleccionada(it) },
+                distanceText = uiState.distanceText,
+                durationText = uiState.durationText,
                 onClose = {
-                    destinoSeleccionado = null
-                    textoDestino = ""
+                    viewModel.clearRuta()
                     sheetOffsetPx = 0f
                     mapView.getMapAsync { it.clear() }
                 },
                 onStartRoute = {
-                    val prioridad = when (prioridadSeleccionada) {
+                    val prioridad = when (uiState.prioridadSeleccionada) {
                         RoutePriority.SAFETY -> "Seguretat"
                         RoutePriority.ACCESSIBILITY -> "Confort i Accessibilitat"
                         RoutePriority.HEAT -> "Emergència Tèrmica"
+                        else -> "Seguretat"
                     }
-
-                    Toast.makeText(
-                        context,
-                        "Iniciando ruta: $prioridad",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(context, "Iniciando ruta: $prioridad", Toast.LENGTH_SHORT).show()
                 }
             )
         }
 
         AnimatedVisibility(
-            visible = destinoSeleccionado == null,
+            visible = uiState.destinoSeleccionado == null,
             enter = slideInVertically(initialOffsetY = { it / 2 }),
             exit = slideOutVertically(targetOffsetY = { it / 2 }),
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
             Column(
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(end = 16.dp, bottom = 16.dp),
+                modifier = Modifier.navigationBarsPadding().padding(end = 16.dp, bottom = 16.dp),
                 horizontalAlignment = Alignment.End
             ) {
                 ExtendedFloatingActionButton(
-                    onClick = { estiloSatelite = !estiloSatelite },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Layers,
-                            contentDescription = "Cambiar estilo del mapa"
-                        )
-                    },
-                    text = {
-                        Text(if (estiloSatelite) "Estándar" else "Satélite")
-                    },
-                    containerColor = if (estiloSatelite) Color(0xFF2F3B44) else Color.White,
-                    contentColor = if (estiloSatelite) Color.White else Color(0xFF3D4A45)
+                    onClick = { viewModel.toggleEstiloSatelite() },
+                    icon = { Icon(Icons.Default.Layers, contentDescription = null) },
+                    text = { Text(if (uiState.estiloSatelite) "Estándar" else "Satélite") },
+                    containerColor = if (uiState.estiloSatelite) Color(0xFF2F3B44) else Color.White,
+                    contentColor = if (uiState.estiloSatelite) Color.White else Color(0xFF3D4A45)
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 FloatingActionButton(
                     onClick = {
-                        if (locationGranted) {
+                        if (uiState.locationGranted) {
                             activateLocationComponent(mapView)
                         } else {
                             permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
+                                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
                             )
                         }
                     },
