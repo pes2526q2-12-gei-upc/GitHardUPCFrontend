@@ -736,7 +736,6 @@ fun MapLibreScreen(
                                 destiLong = destination.longitude,
                                 destiLat = destination.latitude
                             )
-                            Toast.makeText(context, "Calculant ruta...", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
