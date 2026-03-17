@@ -3,6 +3,10 @@ package com.safesteps.map
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Paint
+import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -20,7 +24,8 @@ import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapView
-import android.graphics.Color as AndroidColor
+import org.maplibre.android.annotations.Icon
+import org.maplibre.android.annotations.IconFactory
 
 fun hasFineLocationPermission(context: Context): Boolean {
     return ContextCompat.checkSelfPermission(
@@ -67,18 +72,10 @@ fun rememberMapViewWithLifecycle(): MapView {
 fun activateLocationComponent(mapView: MapView) {
     mapView.getMapAsync { map ->
         val context = mapView.context
-        val fineGranted = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val coarseGranted = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+        val fineGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-        if (!fineGranted && !coarseGranted) {
-            return@getMapAsync
-        }
+        if (!fineGranted && !coarseGranted) return@getMapAsync
 
         val style = map.style ?: return@getMapAsync
         val locationComponent = map.locationComponent
@@ -89,7 +86,7 @@ fun activateLocationComponent(mapView: MapView) {
                 .backgroundTintColor(AndroidColor.WHITE)
                 .bearingTintColor(AndroidColor.parseColor("#1E88E5"))
                 .accuracyColor(AndroidColor.parseColor("#5533B5E5"))
-                .pulseEnabled(true)
+                .pulseEnabled(false)
                 .pulseColor(AndroidColor.parseColor("#8833B5E5"))
                 .build()
 
@@ -104,9 +101,9 @@ fun activateLocationComponent(mapView: MapView) {
 
         try {
             locationComponent.isLocationComponentEnabled = true
-            locationComponent.renderMode = RenderMode.COMPASS
-            locationComponent.cameraMode = CameraMode.TRACKING
-            locationComponent.zoomWhileTracking(15.0)
+            locationComponent.renderMode = RenderMode.NORMAL
+            // LA CLAU ESTÀ AQUÍ: No forcem el tracking perquè no es baralli amb la nostra animació manual
+            locationComponent.cameraMode = CameraMode.NONE
         } catch (_: SecurityException) {
         }
     }
@@ -162,4 +159,22 @@ fun stopAndroidLocationUpdates(context: Context, listener: LocationListener?) {
     if (listener == null) return
     val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     locationManager.removeUpdates(listener)
+}
+
+fun crearIconaGrisa(context: android.content.Context): Icon {
+    // Creem un llenç buit de 40x40 píxels
+    val bitmap = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    // Configurem el pinzell de color gris
+    val paint = Paint().apply {
+        color = android.graphics.Color.DKGRAY
+        isAntiAlias = true
+    }
+
+    // Dibuixem una rodona al mig
+    canvas.drawCircle(20f, 20f, 20f, paint)
+
+    // Ho convertim a una icona compatible amb MapLibre
+    return IconFactory.getInstance(context).fromBitmap(bitmap)
 }

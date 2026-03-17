@@ -1,8 +1,15 @@
 package com.safesteps.map
 
 import android.location.Location
+import com.safesteps.data.Feature
 import com.safesteps.domain.RoutePriority
 import org.maplibre.android.geometry.LatLng
+
+enum class textField {
+    NONE,
+    ORIGIN,
+    DESTINY
+}
 
 data class MapUiState(
     val destinoSeleccionado: LatLng? = null,
@@ -15,5 +22,10 @@ data class MapUiState(
     val prioridadSeleccionada: RoutePriority = RoutePriority.SAFETY,
     val ultimaUbicacion: Location? = null,
     val distanceText: String = "-- km",
-    val durationText: String = "-- min"
+    val durationText: String = "-- min",
+    val adrecesSuggerides: List<Feature> = emptyList(),
+    val origenSeleccionado: LatLng? = null,
+    val isTyping: Boolean = false,
+    val firstLocationZoomDone: Boolean = false,
+    val campActiu: textField = textField.NONE
 )
