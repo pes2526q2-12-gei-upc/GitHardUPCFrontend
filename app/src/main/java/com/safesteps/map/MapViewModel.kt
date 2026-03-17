@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope // <-- IMPORT NUEVO AÑADIDO
 import com.safesteps.data.Feature
 import com.safesteps.data.PhotonApi
+import com.safesteps.data.obtenirCoordenadesRuta
 import com.safesteps.domain.RoutePriority
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -146,6 +147,25 @@ class MapViewModel : ViewModel() {
 
     fun marcarZoomInicialHecho() {
         _uiState.update { it.copy(firstLocationZoomDone = true) }
+    }
+
+    fun iniciarRuta(
+        origenLong: Double,
+        origenLat: Double,
+        destiLong: Double,
+        destiLat: Double
+    ) {
+        viewModelScope.launch {
+            try {
+                obtenirCoordenadesRuta(
+                    origenLong = origenLong,
+                    origenLat = origenLat,
+                    destiLong = destiLong,
+                    destiLat = destiLat
+                )
+            } catch (_: Exception) {
+            }
+        }
     }
 
 

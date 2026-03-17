@@ -716,7 +716,30 @@ fun MapLibreScreen(
                         uiState.origenSeleccionado?.let { ori -> map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context))) }
                     }
                 },
-                onStartRoute = { Toast.makeText(context, "Calculant ruta...", Toast.LENGTH_SHORT).show() }
+                onStartRoute = {
+                    val destination = uiState.destinoSeleccionado
+                    val selectedOrigin = uiState.origenSeleccionado
+                    val currentLocation = uiState.ultimaUbicacion
+
+                    if (destination == null) {
+                        Toast.makeText(context, "Selecciona un destí", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val origenLong = selectedOrigin?.longitude ?: currentLocation?.longitude
+                        val origenLat = selectedOrigin?.latitude ?: currentLocation?.latitude
+
+                        if (origenLong == null || origenLat == null) {
+                            Toast.makeText(context, "No s'ha pogut obtenir l'origen", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.iniciarRuta(
+                                origenLong = origenLong,
+                                origenLat = origenLat,
+                                destiLong = destination.longitude,
+                                destiLat = destination.latitude
+                            )
+                            Toast.makeText(context, "Calculant ruta...", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
             )
         }
 
