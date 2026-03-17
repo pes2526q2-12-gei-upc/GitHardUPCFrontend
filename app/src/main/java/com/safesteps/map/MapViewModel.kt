@@ -3,6 +3,7 @@ package com.safesteps.map
 import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope // <-- IMPORT NUEVO AÑADIDO
+import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
 import com.safesteps.data.PhotonApi
 import com.safesteps.data.obtenirCoordenadesRuta
@@ -149,7 +150,7 @@ class MapViewModel : ViewModel() {
         _uiState.update { it.copy(firstLocationZoomDone = true) }
     }
 
-    fun iniciarRuta(
+    fun calcularRuta(
         origenLong: Double,
         origenLat: Double,
         destiLong: Double,
@@ -157,17 +158,20 @@ class MapViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             try {
-                obtenirCoordenadesRuta(
+                val coordenadesRuta = obtenirCoordenadesRuta(
                     origenLong = origenLong,
                     origenLat = origenLat,
                     destiLong = destiLong,
                     destiLat = destiLat
                 )
+                dibujarRuta(coordenadesRuta)
             } catch (_: Exception) {
             }
         }
     }
 
+    private fun dibujarRuta(coordenades: List<Coordenada>) {
+    }
 
     private fun recalcularRuta(currentLocation: Location?, destination: LatLng?) {
         if (currentLocation == null || destination == null) {

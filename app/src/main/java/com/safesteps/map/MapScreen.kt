@@ -730,7 +730,7 @@ fun MapLibreScreen(
                         if (origenLong == null || origenLat == null) {
                             Toast.makeText(context, "No s'ha pogut obtenir l'origen", Toast.LENGTH_SHORT).show()
                         } else {
-                            viewModel.iniciarRuta(
+                            viewModel.calcularRuta(
                                 origenLong = origenLong,
                                 origenLat = origenLat,
                                 destiLong = destination.longitude,
