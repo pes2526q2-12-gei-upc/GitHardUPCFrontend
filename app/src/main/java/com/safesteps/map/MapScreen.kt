@@ -1,21 +1,13 @@
-package com.safesteps
+package com.safesteps.map
 
 import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Paint
-import android.graphics.Canvas
-import android.graphics.Color as AndroidColor
-import android.location.Location
 import android.location.LocationListener
-import android.location.LocationManager
-import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -70,6 +62,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,213 +82,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.safesteps.data.Feature
+import com.safesteps.domain.RoutePriority
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.annotations.MarkerOptions
-import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.location.LocationComponentActivationOptions
-import org.maplibre.android.location.LocationComponentOptions
-import org.maplibre.android.location.modes.CameraMode
-import org.maplibre.android.location.modes.RenderMode
-import org.maplibre.android.maps.MapView
-import java.util.Locale
-import kotlin.math.max
-import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
-import org.maplibre.android.annotations.Icon
-import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.camera.CameraUpdateFactory
-
-private enum class RoutePriority {
-    SAFETY,
-    ACCESSIBILITY,
-    HEAT
-}
-
-private enum class textField {
-    NONE,
-    ORIGIN,
-    DESTINY
-}
-
-fun crearIconaGrisa(context: android.content.Context): Icon {
-    // Creem un llenç buit de 40x40 píxels
-    val bitmap = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-
-    // Configurem el pinzell de color gris
-    val paint = Paint().apply {
-        color = android.graphics.Color.DKGRAY
-        isAntiAlias = true
-    }
-
-    // Dibuixem una rodona al mig
-    canvas.drawCircle(20f, 20f, 20f, paint)
-
-    // Ho convertim a una icona compatible amb MapLibre
-    return IconFactory.getInstance(context).fromBitmap(bitmap)
-}
-
-private fun hasFineLocationPermission(context: Context): Boolean {
-    return ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-}
-
-private fun hasCoarseLocationPermission(context: Context): Boolean {
-    return ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.ACCESS_COARSE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
-}
-
-private fun hasLocationPermission(context: Context): Boolean {
-    return hasFineLocationPermission(context) || hasCoarseLocationPermission(context)
-}
-
-@Composable
-private fun rememberMapViewWithLifecycle(): MapView {
-    val context = LocalContext.current
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val mapView = remember { MapView(context).apply { onCreate(Bundle()) } }
-
-    DisposableEffect(lifecycle, mapView) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
-                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
-                else -> Unit
-            }
-        }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer) }
-    }
-
-    return mapView
-}
-
-private fun activateLocationComponent(mapView: MapView) {
-    mapView.getMapAsync { map ->
-        val context = mapView.context
-        val fineGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarseGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-        if (!fineGranted && !coarseGranted) return@getMapAsync
-
-        val style = map.style ?: return@getMapAsync
-        val locationComponent = map.locationComponent
-
-        if (!locationComponent.isLocationComponentActivated) {
-            val options = LocationComponentOptions.builder(context)
-                .foregroundTintColor(AndroidColor.parseColor("#1E88E5"))
-                .backgroundTintColor(AndroidColor.WHITE)
-                .bearingTintColor(AndroidColor.parseColor("#1E88E5"))
-                .accuracyColor(AndroidColor.parseColor("#5533B5E5"))
-                .pulseEnabled(false)
-                .pulseColor(AndroidColor.parseColor("#8833B5E5"))
-                .build()
-
-            val activationOptions = LocationComponentActivationOptions
-                .builder(context, style)
-                .useDefaultLocationEngine(false)
-                .locationComponentOptions(options)
-                .build()
-
-            locationComponent.activateLocationComponent(activationOptions)
-        }
-
-        try {
-            locationComponent.isLocationComponentEnabled = true
-            locationComponent.renderMode = RenderMode.NORMAL
-            // LA CLAU ESTÀ AQUÍ: No forcem el tracking perquè no es baralli amb la nostra animació manual
-            locationComponent.cameraMode = CameraMode.NONE
-        } catch (_: SecurityException) {
-        }
-    }
-}
-
-private fun pushLocationToMap(mapView: MapView, location: Location) {
-    mapView.getMapAsync { map ->
-        val locationComponent = map.locationComponent
-        if (locationComponent.isLocationComponentActivated) {
-            locationComponent.forceLocationUpdate(location)
-        }
-    }
-}
-
-private fun startAndroidLocationUpdates(
-    context: Context,
-    mapView: MapView,
-    onLocationUpdated: (Location) -> Unit
-): LocationListener? {
-    if (!hasLocationPermission(context)) return null
-
-    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    val listener = LocationListener { location ->
-        pushLocationToMap(mapView, location)
-        onLocationUpdated(location)
-    }
-
-    val fineGranted = hasFineLocationPermission(context)
-    val coarseGranted = hasCoarseLocationPermission(context)
-
-    val providers = buildList {
-        if (fineGranted) add(LocationManager.GPS_PROVIDER)
-        if (fineGranted || coarseGranted) add(LocationManager.NETWORK_PROVIDER)
-    }
-
-    for (provider in providers) {
-        try {
-            if (locationManager.isProviderEnabled(provider)) {
-                locationManager.requestLocationUpdates(provider, 1000L, 1f, listener)
-                locationManager.getLastKnownLocation(provider)?.let {
-                    pushLocationToMap(mapView, it)
-                    onLocationUpdated(it)
-                }
-            }
-        } catch (_: SecurityException) {
-        }
-    }
-
-    return listener
-}
-
-private fun stopAndroidLocationUpdates(context: Context, listener: LocationListener?) {
-    if (listener == null) return
-    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    locationManager.removeUpdates(listener)
-}
-
-private fun calculateDistanceAndDuration(
-    currentLocation: Location?,
-    destination: LatLng?
-): Pair<String, String> {
-    if (currentLocation == null || destination == null) return "-- km" to "-- min"
-
-    val destinationLocation = Location("destination").apply {
-        latitude = destination.latitude
-        longitude = destination.longitude
-    }
-
-    val meters = currentLocation.distanceTo(destinationLocation)
-    val km = meters / 1000.0
-    val minutes = max(1, (km * 12.0).roundToInt())
-
-    val distanceText = if (km < 1.0) {
-        "${meters.roundToInt()} m"
-    } else {
-        String.format(Locale.US, "%.1f km", km)
-    }
-
-    return distanceText to "$minutes min"
-}
+import org.maplibre.android.geometry.LatLng
+import kotlin.math.max
 
 @Composable
 private fun SearchBarItem(
@@ -369,7 +164,6 @@ private fun SearchBarItem(
     }
 }
 
-
 @Composable
 private fun DropdownSuggeriments(
     adrecesSuggerides: List<Feature>,
@@ -442,7 +236,6 @@ private fun TopSearchPanel(
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            // Capçalera Menu i Perfil
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
                     Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Menu, null, tint = Color(0xFF66716C), modifier = Modifier.size(18.dp)) }
@@ -457,7 +250,6 @@ private fun TopSearchPanel(
             }
             Spacer(modifier = Modifier.height(14.dp))
 
-            // ZONA ORIGEN
             AnimatedVisibility(visible = mostrarOrigen) {
                 Column {
                     val esUbicacioActual = origen.isBlank() && campActiu != textField.ORIGIN
@@ -479,7 +271,6 @@ private fun TopSearchPanel(
                         onFocus = onOrigenFocus
                     )
 
-                    // Llista desplegable de l'Origen (Només surt si estem tocant l'origen)
                     if (campActiu == textField.ORIGIN) {
                         DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
                     }
@@ -487,7 +278,6 @@ private fun TopSearchPanel(
                 }
             }
 
-            // ZONA DESTÍ
             SearchBarItem(
                 value = destino,
                 onValueChange = onDestinoChange,
@@ -497,7 +287,6 @@ private fun TopSearchPanel(
                 onFocus = onDestinoFocus
             )
 
-            // Llista desplegable del Destí (Només surt si estem tocant el destí)
             if (campActiu == textField.DESTINY) {
                 DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
             }
@@ -750,114 +539,255 @@ private fun RoutePlannerSheet(
     }
 }
 
-suspend fun getTextoDestino(point: LatLng): String {
-    return try {
-        val resposta = PhotonApi.service.reverseGeocode(
-            lat = point.latitude,
-            lon = point.longitude
-        )
-        val adreca = resposta.features.firstOrNull()?.properties?.getAddress()
+@Composable
+private fun RouteActiveBottomBar(
+    durationText: String,
+    distanceText: String,
+    etaText: String,
+    onClose: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 14.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = Color(0xFFF2F4F3)
+            ) {
+                IconButton(onClick = onClose, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cerrar",
+                        tint = Color(0xFF3D4A45)
+                    )
+                }
+            }
 
-        // Si no troba adreca o ens retorna variables rares de sistema, posem un text genèric net
-        if (adreca.isNullOrBlank() || adreca.contains("LatLng") || adreca.contains("Location")) {
-            "${point.longitude}, ${point.latitude}"
-        } else {
-            adreca
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = durationText,
+                        color = Color(0xFF202124),
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = distanceText,
+                            color = Color(0xFF5F6368),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "•",
+                            color = Color(0xFF5F6368),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = etaText,
+                            color = Color(0xFF5F6368),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.size(44.dp))
         }
-    } catch (e: Exception) {
-        "Ubicació seleccionada al mapa"
     }
 }
 
 @Composable
-fun MapLibreScreen(modifier: Modifier = Modifier) {
+fun MapLibreScreen(
+    modifier: Modifier = Modifier,
+    viewModel: MapViewModel = viewModel()
+) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     val mapView = rememberMapViewWithLifecycle()
+    val uiState by viewModel.uiState.collectAsState()
 
-    var destinoSeleccionado by remember { mutableStateOf<LatLng?>(null) }
-    var textoOrigen by remember { mutableStateOf("") }
-    var textoDestino by remember { mutableStateOf("") }
-    var mapaListo by remember { mutableStateOf(false) }
-    var locationGranted by remember { mutableStateOf(hasLocationPermission(context)) }
-    var estiloSatelite by remember { mutableStateOf(false) }
-    var mostrarOrigen by remember { mutableStateOf(false) }
-    var prioridadSeleccionada by remember { mutableStateOf(RoutePriority.SAFETY) }
-    var ultimaUbicacion by remember { mutableStateOf<Location?>(null) }
     var sheetHeightPx by remember { mutableStateOf(0f) }
     var sheetOffsetPx by remember { mutableStateOf(0f) }
-    var adrecesSuggerides by remember { mutableStateOf<List<Feature>>(emptyList()) }
-    var campActiu by remember { mutableStateOf(textField.NONE) }
-    var origenSeleccionado by remember { mutableStateOf<LatLng?>(null) }
-    var isTyping by remember { mutableStateOf(false) }
-    var firstLocationZoomDone by remember { mutableStateOf(false) }
+    val visibleSheetHeightPx = with(density) { 150.dp.toPx() }
+    val collapsedSheetOffset = max(0f, sheetHeightPx - visibleSheetHeightPx)
 
-    // 1. Cercador automàtic
-    LaunchedEffect(textoOrigen, textoDestino, campActiu, isTyping) {
-        val textCerca = if (campActiu == textField.ORIGIN) textoOrigen else textoDestino
-        if (isTyping && campActiu != textField.NONE && textCerca.length >= 3) {
-            delay(300)
-            try {
-                val resposta = PhotonApi.service.findAddress(query = textCerca)
-                adrecesSuggerides = resposta.features.distinctBy { it.properties.getAddress() }
-            } catch (e: Exception) {
-                adrecesSuggerides = emptyList()
+    val dynamicBottomPadding by animateDpAsState(
+        targetValue = when {
+            uiState.modoRuta -> 110.dp
+            uiState.destinoSeleccionado != null -> {
+                val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
+                val currentVisibleHeightDp = with(density) { currentVisibleHeightPx.toDp() }
+                currentVisibleHeightDp + 16.dp
             }
-        } else {
-            adrecesSuggerides = emptyList()
+            else -> 16.dp
+        },
+        label = "buttonPadding"
+    )
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        val granted = fine || coarse || hasLocationPermission(context)
+        viewModel.onLocationPermissionsResult(granted)
+        if (!granted) Toast.makeText(context, "Permís d'ubicació necessari.", Toast.LENGTH_SHORT).show()
+    }
+
+    val sheetDragState = rememberDraggableState { delta ->
+        if (uiState.destinoSeleccionado != null && !uiState.modoRuta) {
+            sheetOffsetPx = (sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset)
         }
     }
 
-    LaunchedEffect(estiloSatelite) {
+    val resetToMainMenu = {
+        viewModel.clearRuta()
+        sheetOffsetPx = 0f
         mapView.getMapAsync { map ->
-            val styleUrl = if (estiloSatelite) "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" else "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+            map.clear()
+            uiState.origenSeleccionado?.let { ori ->
+                map.addMarker(
+                    MarkerOptions()
+                        .position(ori)
+                        .title("Origen")
+                        .icon(crearIconaGrisa(context))
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val yaTengoPermiso = hasLocationPermission(context)
+        viewModel.onLocationPermissionsResult(yaTengoPermiso)
+
+        if (!yaTengoPermiso) {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    LaunchedEffect(uiState.locationGranted, uiState.mapaListo) {
+        if (uiState.locationGranted && uiState.mapaListo) {
+            activateLocationComponent(mapView)
+        }
+    }
+
+    LaunchedEffect(uiState.estiloSatelite, uiState.modoRuta, uiState.rutaCoordenades) {
+        mapView.getMapAsync { map ->
+            val styleUrl =
+                if (uiState.estiloSatelite) {
+                    "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+                } else {
+                    "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                }
 
             map.setStyle(styleUrl) {
-                mapaListo = true
-                if (locationGranted) {
+                viewModel.onMapaListo()
+
+                if (uiState.locationGranted) {
                     activateLocationComponent(mapView)
                 }
-                // Si canviem d'estil, ens assegurem de tornar a pintar els marcadors que hi havia
-                map.clear()
-                origenSeleccionado?.let { ori -> map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context))) }
-                destinoSeleccionado?.let { dest -> map.addMarker(MarkerOptions().position(dest).title("Destí")) }
+
+                if (uiState.modoRuta && uiState.rutaCoordenades.isNotEmpty()) {
+                    drawRoute(mapView, uiState.rutaCoordenades)
+                } else {
+                    map.clear()
+                    uiState.origenSeleccionado?.let { ori ->
+                        map.addMarker(
+                            MarkerOptions()
+                                .position(ori)
+                                .title("Origen")
+                                .icon(crearIconaGrisa(context))
+                        )
+                    }
+                    uiState.destinoSeleccionado?.let { dest ->
+                        map.addMarker(
+                            MarkerOptions()
+                                .position(dest)
+                                .title("Destí")
+                        )
+                    }
+                }
             }
         }
     }
 
-    // 2. PINTOR DE XINXETES (Actua ràpidament cada cop que toques el mapa)
-    LaunchedEffect(origenSeleccionado, destinoSeleccionado) {
+    LaunchedEffect(
+        uiState.origenSeleccionado,
+        uiState.destinoSeleccionado,
+        uiState.modoRuta
+    ) {
+        if (uiState.modoRuta) return@LaunchedEffect
+
         mapView.getMapAsync { map ->
-            // Només pintem si el fons del mapa ja està completament carregat
             if (map.style?.isFullyLoaded == true) {
                 map.clear()
-                origenSeleccionado?.let { ori -> map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context))) }
-                destinoSeleccionado?.let { dest -> map.addMarker(MarkerOptions().position(dest).title("Destí")) }
+                uiState.origenSeleccionado?.let { ori ->
+                    map.addMarker(
+                        MarkerOptions()
+                            .position(ori)
+                            .title("Origen")
+                            .icon(crearIconaGrisa(context))
+                    )
+                }
+                uiState.destinoSeleccionado?.let { dest ->
+                    map.addMarker(
+                        MarkerOptions()
+                            .position(dest)
+                            .title("Destí")
+                    )
+                }
             }
         }
     }
 
-    // 3. Escoltar GPS sempre de fons (Independent del mapa)
-    DisposableEffect(locationGranted) {
+    LaunchedEffect(uiState.rutaCoordenades, uiState.modoRuta, uiState.mapaListo) {
+        if (uiState.modoRuta && uiState.mapaListo && uiState.rutaCoordenades.isNotEmpty()) {
+            drawRoute(mapView, uiState.rutaCoordenades)
+        }
+    }
+
+    DisposableEffect(uiState.locationGranted) {
         var listener: LocationListener? = null
-        if (locationGranted) {
+        if (uiState.locationGranted) {
             listener = startAndroidLocationUpdates(context, mapView) { loc ->
-                ultimaUbicacion = loc
+                viewModel.updateLocation(loc)
             }
         }
         onDispose { stopAndroidLocationUpdates(context, listener) }
     }
 
-    // 4. Zoom inicial de benvinguda (S'espera a tenir ubicació i mapa)
-    LaunchedEffect(ultimaUbicacion, mapaListo) {
-        if (ultimaUbicacion != null && mapaListo && !firstLocationZoomDone) {
-            firstLocationZoomDone = true
-            delay(500) // <-- LA CLAU: Donem mig segon perquè el mapa tingui mida a la pantalla
+    LaunchedEffect(uiState.ultimaUbicacion, uiState.mapaListo) {
+        if (uiState.ultimaUbicacion != null && uiState.mapaListo && !uiState.firstLocationZoomDone) {
+            viewModel.marcarZoomInicialHecho()
+            delay(500)
             mapView.getMapAsync { map ->
                 map.animateCamera(
                     CameraUpdateFactory.newLatLngZoom(
-                        LatLng(ultimaUbicacion!!.latitude, ultimaUbicacion!!.longitude),
+                        LatLng(uiState.ultimaUbicacion!!.latitude, uiState.ultimaUbicacion!!.longitude),
                         15.0
                     ),
                     1500
@@ -865,33 +795,6 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
             }
         }
     }
-
-    val visibleSheetHeightPx = with(density) { 150.dp.toPx() }
-    val collapsedSheetOffset = max(0f, sheetHeightPx - visibleSheetHeightPx)
-
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        locationGranted = fine || coarse || hasLocationPermission(context)
-        if (!locationGranted) Toast.makeText(context, "Permís d'ubicació necessari.", Toast.LENGTH_SHORT).show()
-    }
-
-    val sheetDragState = rememberDraggableState { delta ->
-        if (destinoSeleccionado != null) {
-            sheetOffsetPx = (sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset)
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        if (!locationGranted) permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-    }
-
-    LaunchedEffect(destinoSeleccionado) {
-        if (destinoSeleccionado != null) sheetOffsetPx = 0f
-    }
-
-    val origenPerCàlcul = origenSeleccionado?.let { Location("manual").apply { latitude = it.latitude; longitude = it.longitude } } ?: ultimaUbicacion
-    val (distanceText, durationText) = calculateDistanceAndDuration(currentLocation = origenPerCàlcul, destination = destinoSeleccionado)
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
@@ -901,31 +804,14 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
                         map.uiSettings.isLogoEnabled = false
                         map.uiSettings.isAttributionEnabled = false
 
-                        // Aquest detector de clics ara és independent i no fallarà mai
                         map.addOnMapClickListener { point ->
-                            destinoSeleccionado = point
-                            mostrarOrigen = true
-                            campActiu = textField.NONE
-                            isTyping = false
-
-                            // Animem la càmera
-                            map.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 15.0), 1000)
-
-                            // Actualitzem el text amb seguretat
-                            textoDestino = "Buscant adreça..."
-                            coroutineScope.launch {
-                                try {
-                                    val adrecaResultat = getTextoDestino(point)
-                                    textoDestino = if (adrecaResultat.contains("LatLng") || adrecaResultat.contains("Location")) {
-                                        "Ubicació seleccionada al mapa"
-                                    } else {
-                                        adrecaResultat
-                                    }
-                                } catch (e: Exception) {
-                                    textoDestino = "Ubicació seleccionada al mapa"
-                                }
+                            if (uiState.modoRuta) {
+                                true
+                            } else {
+                                viewModel.onMapClicked(point)
+                                map.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 15.0), 1000)
+                                true
                             }
-                            true
                         }
                     }
                 }
@@ -933,37 +819,37 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxSize()
         )
 
-        TopSearchPanel(
-            origen = textoOrigen, onOrigenChange = { textoOrigen = it; campActiu = textField.ORIGIN; isTyping = true },
-            destino = textoDestino, onDestinoChange = { textoDestino = it; campActiu = textField.DESTINY; isTyping = true },
-            mostrarOrigen = mostrarOrigen,
-            onOrigenFocus = { campActiu = textField.ORIGIN; isTyping = false },
-            onDestinoFocus = { mostrarOrigen = true; campActiu = textField.DESTINY; isTyping = false },
-            adrecesSuggerides = adrecesSuggerides,
-            onAdrecaSeleccionada = { feature ->
-                isTyping = false
-                val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
-                val textAdreca = feature.properties.getAddress()
-
-                if (campActiu == textField.ORIGIN) {
-                    textoOrigen = textAdreca
-                    origenSeleccionado = puntSeleccionat
-                } else {
-                    textoDestino = textAdreca
-                    destinoSeleccionado = puntSeleccionat
-                }
-
-                mapView.getMapAsync { map -> map.animateCamera(CameraUpdateFactory.newLatLngZoom(puntSeleccionat, 15.0), 1500) }
-                campActiu = textField.NONE
-                adrecesSuggerides = emptyList()
-            },
-            campActiu = campActiu
-        )
+        AnimatedVisibility(visible = !uiState.modoRuta) {
+            TopSearchPanel(
+                origen = uiState.textoOrigen,
+                onOrigenChange = { viewModel.onTextoBuscadorModificado(it, textField.ORIGIN) },
+                destino = uiState.textoDestino,
+                onDestinoChange = { viewModel.onTextoBuscadorModificado(it, textField.DESTINY) },
+                mostrarOrigen = uiState.mostrarOrigen,
+                onOrigenFocus = { viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN) },
+                onDestinoFocus = { viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY) },
+                adrecesSuggerides = uiState.adrecesSuggerides,
+                onAdrecaSeleccionada = { feature ->
+                    viewModel.onAdrecaSeleccionada(feature)
+                    val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
+                    mapView.getMapAsync { map ->
+                        map.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(puntSeleccionat, 15.0),
+                            1500
+                        )
+                    }
+                },
+                campActiu = uiState.campActiu
+            )
+        }
 
         AnimatedVisibility(
-            visible = destinoSeleccionado != null,
-            enter = slideInVertically(initialOffsetY = { it }), exit = slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 10.dp)
+            visible = uiState.destinoSeleccionado != null && !uiState.modoRuta,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 10.dp)
         ) {
             RoutePlannerSheet(
                 modifier = Modifier
@@ -973,67 +859,110 @@ fun MapLibreScreen(modifier: Modifier = Modifier) {
                         if (sheetOffsetPx > collapsedSheetOffset) sheetOffsetPx = collapsedSheetOffset
                     }
                     .draggable(
-                        orientation = Orientation.Vertical, state = sheetDragState,
+                        orientation = Orientation.Vertical,
+                        state = sheetDragState,
                         onDragStopped = {
                             val target = if (sheetOffsetPx > collapsedSheetOffset / 2f) collapsedSheetOffset else 0f
-                            coroutineScope.launch { animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ -> sheetOffsetPx = value } }
+                            coroutineScope.launch {
+                                animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ ->
+                                    sheetOffsetPx = value
+                                }
+                            }
                         }
                     ),
-                selectedPriority = prioridadSeleccionada,
-                onPrioritySelected = { prioridadSeleccionada = it },
-                distanceText = distanceText, durationText = durationText,
-                onClose = {
-                    destinoSeleccionado = null
-                    textoDestino = ""
-                    sheetOffsetPx = 0f
-                    mapView.getMapAsync { map ->
-                        map.clear()
-                        origenSeleccionado?.let { ori -> map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context))) }
+                selectedPriority = uiState.prioridadSeleccionada,
+                onPrioritySelected = { viewModel.onPrioridadSeleccionada(it) },
+                distanceText = uiState.distanceText,
+                durationText = uiState.durationText,
+                onClose = resetToMainMenu,
+                onStartRoute = {
+                    val destination = uiState.destinoSeleccionado
+                    val selectedOrigin = uiState.origenSeleccionado
+                    val currentLocation = uiState.ultimaUbicacion
+
+                    if (destination == null) {
+                        Toast.makeText(context, "Selecciona un destí", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val origenLong = selectedOrigin?.longitude ?: currentLocation?.longitude
+                        val origenLat = selectedOrigin?.latitude ?: currentLocation?.latitude
+
+                        if (origenLong == null || origenLat == null) {
+                            Toast.makeText(context, "No s'ha pogut obtenir l'origen", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.calcularRuta(
+                                origenLong = origenLong,
+                                origenLat = origenLat,
+                                destiLong = destination.longitude,
+                                destiLat = destination.latitude
+                            )
+                        }
                     }
-                },
-                onStartRoute = { Toast.makeText(context, "Calculant ruta...", Toast.LENGTH_SHORT).show() }
+                }
             )
         }
 
         AnimatedVisibility(
-            visible = destinoSeleccionado == null,
-            enter = slideInVertically(initialOffsetY = { it / 2 }), exit = slideOutVertically(targetOffsetY = { it / 2 }),
+            visible = uiState.modoRuta,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            RouteActiveBottomBar(
+                durationText = uiState.durationText,
+                distanceText = uiState.distanceText,
+                etaText = uiState.etaText,
+                onClose = resetToMainMenu
+            )
+        }
+
+        AnimatedVisibility(
+            visible = true,
+            enter = slideInVertically(initialOffsetY = { it / 2 }),
+            exit = slideOutVertically(targetOffsetY = { it / 2 }),
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
             Column(
-                modifier = Modifier.navigationBarsPadding().padding(end = 16.dp, bottom = 16.dp),
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(end = 16.dp, bottom = dynamicBottomPadding),
                 horizontalAlignment = Alignment.End
             ) {
                 ExtendedFloatingActionButton(
-                    onClick = { estiloSatelite = !estiloSatelite },
+                    onClick = { viewModel.toggleEstiloSatelite() },
                     icon = { Icon(Icons.Default.Layers, contentDescription = "Canviar estil") },
-                    text = { Text(if (estiloSatelite) "Estàndard" else "Satèl·lit") },
-                    containerColor = if (estiloSatelite) Color(0xFF2F3B44) else Color.White,
-                    contentColor = if (estiloSatelite) Color.White else Color(0xFF3D4A45)
+                    text = { Text(if (uiState.estiloSatelite) "Estàndard" else "Satèl·lit") },
+                    containerColor = if (uiState.estiloSatelite) Color(0xFF2F3B44) else Color.White,
+                    contentColor = if (uiState.estiloSatelite) Color.White else Color(0xFF3D4A45)
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 FloatingActionButton(
                     onClick = {
-                        if (locationGranted) {
-                            origenSeleccionado = null
-                            textoOrigen = ""
-                            campActiu = textField.NONE
-                            isTyping = false
-
+                        if (uiState.locationGranted) {
+                            viewModel.limpiarOrigen()
                             activateLocationComponent(mapView)
 
-                            if (ultimaUbicacion != null) {
+                            if (uiState.ultimaUbicacion != null) {
                                 mapView.getMapAsync { map ->
-                                    map.animateCamera(CameraUpdateFactory.newLatLngZoom(
-                                        LatLng(ultimaUbicacion!!.latitude, ultimaUbicacion!!.longitude), 15.0), 1000)
+                                    map.animateCamera(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(uiState.ultimaUbicacion!!.latitude, uiState.ultimaUbicacion!!.longitude),
+                                            15.0
+                                        ),
+                                        1000
+                                    )
                                 }
                             } else {
                                 Toast.makeText(context, "Buscant senyal GPS...", Toast.LENGTH_SHORT).show()
                             }
                         } else {
-                            permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
                         }
                     },
                     containerColor = Color.White,
