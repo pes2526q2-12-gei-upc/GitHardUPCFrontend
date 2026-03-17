@@ -64,8 +64,7 @@ class MapViewModel : ViewModel() {
                 campActiu = campo,
                 isTyping = true,
                 textoOrigen = if (campo == textField.ORIGIN) texto else it.textoOrigen,
-                textoDestino = if (campo == textField.DESTINY) texto else it.textoDestino,
-                mostrarOrigen = if (campo == textField.DESTINY) true else it.mostrarOrigen
+                textoDestino = if (campo == textField.DESTINY) texto else it.textoDestino
             )
         }
 
