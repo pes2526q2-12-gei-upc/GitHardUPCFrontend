@@ -164,13 +164,10 @@ class MapViewModel : ViewModel() {
                     destiLong = destiLong,
                     destiLat = destiLat
                 )
-                dibujarRuta(coordenadesRuta)
+                drawRoute(coordenadesRuta)
             } catch (_: Exception) {
             }
         }
-    }
-
-    private fun dibujarRuta(coordenades: List<Coordenada>) {
     }
 
     private fun recalcularRuta(currentLocation: Location?, destination: LatLng?) {
