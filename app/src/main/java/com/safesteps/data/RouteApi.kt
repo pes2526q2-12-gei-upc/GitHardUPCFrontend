@@ -1,5 +1,6 @@
 package com.safesteps.data
 
+import android.util.Log
 import java.io.IOException
 import retrofit2.Response
 import retrofit2.Retrofit
@@ -44,7 +45,8 @@ suspend fun obtenirCoordenadesRuta(
     origenLong: Double,
     origenLat: Double,
     destiLong: Double,
-    destiLat: Double
+    destiLat: Double,
+    nRoutes: Int
 ): List<Coordenada> {
     val response = RouteCoordinatesBackend.service.calcularRuta(
         RouteRequestWithNRoutes(
@@ -56,13 +58,17 @@ suspend fun obtenirCoordenadesRuta(
                 lat = destiLat,
                 lon = destiLong
             ),
-            nRoutes = 1
+            nRoutes = nRoutes
         )
     )
 
     if (!response.isSuccessful) {
         throw IOException("Error calculant la ruta: ${response.code()} ${response.message()}")
     }
+
+    Log.d("ROUTE_API", "Envaint petición al servidor")
+    Log.d("ROUTE_API", "origin=($origenLat, $origenLong), destination=($destiLat, $destiLong)")
+    Log.d("ROUTE_API", "Resposta HTTP: code=${response.code()} success=${response.isSuccessful}")
 
     return emptyList()
 }

@@ -162,7 +162,8 @@ class MapViewModel : ViewModel() {
                     origenLong = origenLong,
                     origenLat = origenLat,
                     destiLong = destiLong,
-                    destiLat = destiLat
+                    destiLat = destiLat,
+                    nRoutes = 1
                 )
                 drawRoute(coordenadesRuta)
             } catch (_: Exception) {
