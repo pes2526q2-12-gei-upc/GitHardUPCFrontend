@@ -1,10 +1,9 @@
 package com.safesteps.map
 
-import android.util.Log
 import android.location.Location
+import android.util.Log
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope // <-- IMPORT NUEVO AÑADIDO
-import com.safesteps.data.Coordenada
+import androidx.lifecycle.viewModelScope
 import com.safesteps.data.Feature
 import com.safesteps.data.PhotonApi
 import com.safesteps.data.obtenirCoordenadesRuta
@@ -13,7 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch // <-- IMPORT NUEVO AÑADIDO
+import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
 import java.util.Locale
 import kotlin.math.max
@@ -50,7 +49,13 @@ class MapViewModel : ViewModel() {
                 destinoSeleccionado = null,
                 textoDestino = "",
                 distanceText = "-- km",
-                durationText = "-- min"
+                durationText = "-- min",
+                rutaCoordenades = emptyList(),
+                modoRuta = false,
+                adrecesSuggerides = emptyList(),
+                campActiu = textField.NONE,
+                isTyping = false,
+                mostrarOrigen = false
             )
         }
     }
@@ -60,7 +65,6 @@ class MapViewModel : ViewModel() {
         recalcularRuta(location, _uiState.value.destinoSeleccionado)
     }
 
-    // 1. Cuando el usuario escribe en el buscador
     fun onTextoBuscadorModificado(texto: String, campo: textField) {
         _uiState.update {
             it.copy(
@@ -72,16 +76,15 @@ class MapViewModel : ViewModel() {
             )
         }
 
-        // Si ha escrito 3 o más letras, buscamos en PhotonApi
         if (texto.length >= 3) {
             viewModelScope.launch {
-                kotlinx.coroutines.delay(300) // Esperamos 300ms por si sigue tecleando
+                kotlinx.coroutines.delay(300)
                 try {
                     val respuesta = PhotonApi.service.findAddress(query = texto)
                     _uiState.update { state ->
                         state.copy(adrecesSuggerides = respuesta.features.distinctBy { it.properties.getAddress() })
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     _uiState.update { it.copy(adrecesSuggerides = emptyList()) }
                 }
             }
@@ -90,8 +93,9 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    // 2. Cuando el usuario hace clic en una dirección de la lista de sugerencias
     fun onAdrecaSeleccionada(feature: Feature) {
+        if (_uiState.value.modoRuta) return
+
         val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
         val textAdreca = feature.properties.getAddress()
 
@@ -116,7 +120,6 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    // 3. Cuando el usuario le da al botón de centrar en su ubicación
     fun limpiarOrigen() {
         _uiState.update {
             it.copy(
@@ -127,9 +130,10 @@ class MapViewModel : ViewModel() {
             )
         }
     }
-    // --- LA FUNCIÓN ARREGLADA ---
+
     fun onMapClicked(point: LatLng) {
-        // 1. Ponemos el marcador, texto provisional y calculamos ruta
+        if (_uiState.value.modoRuta) return
+
         _uiState.update {
             it.copy(
                 destinoSeleccionado = point,
@@ -139,10 +143,8 @@ class MapViewModel : ViewModel() {
         }
         recalcularRuta(_uiState.value.ultimaUbicacion, point)
 
-        // 2. Lanzamos la búsqueda en internet en segundo plano
         viewModelScope.launch {
             val direccionReal = getTextoDestino(point)
-            // 3. Cuando internet responde, actualizamos la bandeja
             _uiState.update { it.copy(textoDestino = direccionReal) }
         }
     }
@@ -170,8 +172,16 @@ class MapViewModel : ViewModel() {
                 Log.d("time", "time = ${infoRuta.second.first}")
                 Log.d("distance", "distancia = ${infoRuta.second.second}")
 
-                drawRoute(infoRuta.first)
-
+                _uiState.update {
+                    it.copy(
+                        rutaCoordenades = infoRuta.first,
+                        modoRuta = infoRuta.first.isNotEmpty(),
+                        adrecesSuggerides = emptyList(),
+                        campActiu = textField.NONE,
+                        isTyping = false,
+                        mostrarOrigen = false
+                    )
+                }
             } catch (_: Exception) {
             }
         }
@@ -205,8 +215,6 @@ class MapViewModel : ViewModel() {
         _uiState.update { it.copy(mapaListo = true) }
     }
 
-    // --- FUNCIONES MANTENIDAS (Tal y como las tenías) ---
-
     fun calculateDistanceAndDuration(
         currentLocation: Location?,
         destination: LatLng?
@@ -239,13 +247,12 @@ class MapViewModel : ViewModel() {
             )
             val adreca = resposta.features.firstOrNull()?.properties?.getAddress()
 
-            // Si no troba adreca o ens retorna variables rares de sistema, posem un text genèric net
             if (adreca.isNullOrBlank() || adreca.contains("LatLng") || adreca.contains("Location")) {
                 "${point.longitude}, ${point.latitude}"
             } else {
                 adreca
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "Ubicació seleccionada al mapa"
         }
     }

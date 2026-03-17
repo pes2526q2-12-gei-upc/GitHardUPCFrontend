@@ -1,6 +1,7 @@
 package com.safesteps.map
 
 import android.location.Location
+import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
 import com.safesteps.domain.RoutePriority
 import org.maplibre.android.geometry.LatLng
@@ -27,5 +28,7 @@ data class MapUiState(
     val origenSeleccionado: LatLng? = null,
     val isTyping: Boolean = false,
     val firstLocationZoomDone: Boolean = false,
-    val campActiu: textField = textField.NONE
+    val campActiu: textField = textField.NONE,
+    val rutaCoordenades: List<Coordenada> = emptyList(),
+    val modoRuta: Boolean = false
 )

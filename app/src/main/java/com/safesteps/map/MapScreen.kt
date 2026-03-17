@@ -1,7 +1,6 @@
 package com.safesteps.map
 
 import android.Manifest
-import android.location.Location
 import android.location.LocationListener
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -84,14 +83,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.safesteps.data.Feature
-import com.safesteps.data.PhotonApi
 import com.safesteps.domain.RoutePriority
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.annotations.MarkerOptions
+import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import kotlin.math.max
-import kotlinx.coroutines.delay
-import org.maplibre.android.camera.CameraUpdateFactory
 
 @Composable
 private fun SearchBarItem(
@@ -237,7 +235,6 @@ private fun TopSearchPanel(
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            // Capçalera Menu i Perfil
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
                     Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Menu, null, tint = Color(0xFF66716C), modifier = Modifier.size(18.dp)) }
@@ -252,7 +249,6 @@ private fun TopSearchPanel(
             }
             Spacer(modifier = Modifier.height(14.dp))
 
-            // ZONA ORIGEN
             AnimatedVisibility(visible = mostrarOrigen) {
                 Column {
                     val esUbicacioActual = origen.isBlank() && campActiu != textField.ORIGIN
@@ -274,7 +270,6 @@ private fun TopSearchPanel(
                         onFocus = onOrigenFocus
                     )
 
-                    // Llista desplegable de l'Origen (Només surt si estem tocant l'origen)
                     if (campActiu == textField.ORIGIN) {
                         DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
                     }
@@ -282,7 +277,6 @@ private fun TopSearchPanel(
                 }
             }
 
-            // ZONA DESTÍ
             SearchBarItem(
                 value = destino,
                 onValueChange = onDestinoChange,
@@ -292,14 +286,12 @@ private fun TopSearchPanel(
                 onFocus = onDestinoFocus
             )
 
-            // Llista desplegable del Destí (Només surt si estem tocant el destí)
             if (campActiu == textField.DESTINY) {
                 DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
             }
         }
     }
 }
-
 
 @Composable
 private fun RoutePriorityOption(
@@ -549,14 +541,12 @@ private fun RoutePlannerSheet(
 @Composable
 fun MapLibreScreen(
     modifier: Modifier = Modifier,
-    viewModel: MapViewModel = viewModel() // <-- ¡Inyectamos el cerebro!
+    viewModel: MapViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     val mapView = rememberMapViewWithLifecycle()
-
-    // 1. MIRAMOS LA BANDEJA
     val uiState by viewModel.uiState.collectAsState()
 
     var sheetHeightPx by remember { mutableStateOf(0f) }
@@ -573,14 +563,14 @@ fun MapLibreScreen(
     }
 
     val sheetDragState = rememberDraggableState { delta ->
-        if (uiState.destinoSeleccionado != null) {
+        if (uiState.destinoSeleccionado != null && !uiState.modoRuta) {
             sheetOffsetPx = (sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset)
         }
     }
 
     LaunchedEffect(Unit) {
         val yaTengoPermiso = hasLocationPermission(context)
-        viewModel.onLocationPermissionsResult(yaTengoPermiso) // <-- ¡Le chivamos al cerebro la verdad!
+        viewModel.onLocationPermissionsResult(yaTengoPermiso)
 
         if (!yaTengoPermiso) {
             permissionLauncher.launch(
@@ -598,28 +588,78 @@ fun MapLibreScreen(
         }
     }
 
-    LaunchedEffect(uiState.estiloSatelite) {
+    LaunchedEffect(uiState.estiloSatelite, uiState.modoRuta, uiState.rutaCoordenades) {
         mapView.getMapAsync { map ->
-            val styleUrl = if (uiState.estiloSatelite) "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json" else "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+            val styleUrl =
+                if (uiState.estiloSatelite) {
+                    "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+                } else {
+                    "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+                }
+
             map.setStyle(styleUrl) {
                 viewModel.onMapaListo()
+
                 if (uiState.locationGranted) {
                     activateLocationComponent(mapView)
                 }
-                map.clear()
-                uiState.origenSeleccionado?.let { ori -> map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context))) }
-                uiState.destinoSeleccionado?.let { dest -> map.addMarker(MarkerOptions().position(dest).title("Destí")) }
+
+                if (uiState.modoRuta && uiState.rutaCoordenades.isNotEmpty()) {
+                    drawRoute(mapView, uiState.rutaCoordenades)
+                } else {
+                    map.clear()
+                    uiState.origenSeleccionado?.let { ori ->
+                        map.addMarker(
+                            MarkerOptions()
+                                .position(ori)
+                                .title("Origen")
+                                .icon(crearIconaGrisa(context))
+                        )
+                    }
+                    uiState.destinoSeleccionado?.let { dest ->
+                        map.addMarker(
+                            MarkerOptions()
+                                .position(dest)
+                                .title("Destí")
+                        )
+                    }
+                }
             }
         }
     }
 
-    LaunchedEffect(uiState.origenSeleccionado, uiState.destinoSeleccionado) {
+    LaunchedEffect(
+        uiState.origenSeleccionado,
+        uiState.destinoSeleccionado,
+        uiState.modoRuta
+    ) {
+        if (uiState.modoRuta) return@LaunchedEffect
+
         mapView.getMapAsync { map ->
             if (map.style?.isFullyLoaded == true) {
                 map.clear()
-                uiState.origenSeleccionado?.let { ori -> map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context))) }
-                uiState.destinoSeleccionado?.let { dest -> map.addMarker(MarkerOptions().position(dest).title("Destí")) }
+                uiState.origenSeleccionado?.let { ori ->
+                    map.addMarker(
+                        MarkerOptions()
+                            .position(ori)
+                            .title("Origen")
+                            .icon(crearIconaGrisa(context))
+                    )
+                }
+                uiState.destinoSeleccionado?.let { dest ->
+                    map.addMarker(
+                        MarkerOptions()
+                            .position(dest)
+                            .title("Destí")
+                    )
+                }
             }
+        }
+    }
+
+    LaunchedEffect(uiState.rutaCoordenades, uiState.modoRuta, uiState.mapaListo) {
+        if (uiState.modoRuta && uiState.mapaListo && uiState.rutaCoordenades.isNotEmpty()) {
+            drawRoute(mapView, uiState.rutaCoordenades)
         }
     }
 
@@ -658,9 +698,13 @@ fun MapLibreScreen(
                         map.uiSettings.isAttributionEnabled = false
 
                         map.addOnMapClickListener { point ->
-                            viewModel.onMapClicked(point)
-                            map.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 15.0), 1000)
-                            true
+                            if (uiState.modoRuta) {
+                                true
+                            } else {
+                                viewModel.onMapClicked(point)
+                                map.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 15.0), 1000)
+                                true
+                            }
                         }
                     }
                 }
@@ -668,27 +712,37 @@ fun MapLibreScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        TopSearchPanel(
-            origen = uiState.textoOrigen,
-            onOrigenChange = { viewModel.onTextoBuscadorModificado(it, textField.ORIGIN) },
-            destino = uiState.textoDestino,
-            onDestinoChange = { viewModel.onTextoBuscadorModificado(it, textField.DESTINY) },
-            mostrarOrigen = uiState.mostrarOrigen,
-            onOrigenFocus = { viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN) },
-            onDestinoFocus = { viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY) },
-            adrecesSuggerides = uiState.adrecesSuggerides,
-            onAdrecaSeleccionada = { feature ->
-                viewModel.onAdrecaSeleccionada(feature)
-                val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
-                mapView.getMapAsync { map -> map.animateCamera(CameraUpdateFactory.newLatLngZoom(puntSeleccionat, 15.0), 1500) }
-            },
-            campActiu = uiState.campActiu
-        )
+        AnimatedVisibility(visible = !uiState.modoRuta) {
+            TopSearchPanel(
+                origen = uiState.textoOrigen,
+                onOrigenChange = { viewModel.onTextoBuscadorModificado(it, textField.ORIGIN) },
+                destino = uiState.textoDestino,
+                onDestinoChange = { viewModel.onTextoBuscadorModificado(it, textField.DESTINY) },
+                mostrarOrigen = uiState.mostrarOrigen,
+                onOrigenFocus = { viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN) },
+                onDestinoFocus = { viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY) },
+                adrecesSuggerides = uiState.adrecesSuggerides,
+                onAdrecaSeleccionada = { feature ->
+                    viewModel.onAdrecaSeleccionada(feature)
+                    val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
+                    mapView.getMapAsync { map ->
+                        map.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(puntSeleccionat, 15.0),
+                            1500
+                        )
+                    }
+                },
+                campActiu = uiState.campActiu
+            )
+        }
 
         AnimatedVisibility(
-            visible = uiState.destinoSeleccionado != null,
-            enter = slideInVertically(initialOffsetY = { it }), exit = slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 10.dp)
+            visible = uiState.destinoSeleccionado != null && !uiState.modoRuta,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 10.dp)
         ) {
             RoutePlannerSheet(
                 modifier = Modifier
@@ -698,10 +752,15 @@ fun MapLibreScreen(
                         if (sheetOffsetPx > collapsedSheetOffset) sheetOffsetPx = collapsedSheetOffset
                     }
                     .draggable(
-                        orientation = Orientation.Vertical, state = sheetDragState,
+                        orientation = Orientation.Vertical,
+                        state = sheetDragState,
                         onDragStopped = {
                             val target = if (sheetOffsetPx > collapsedSheetOffset / 2f) collapsedSheetOffset else 0f
-                            coroutineScope.launch { animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ -> sheetOffsetPx = value } }
+                            coroutineScope.launch {
+                                animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ ->
+                                    sheetOffsetPx = value
+                                }
+                            }
                         }
                     ),
                 selectedPriority = uiState.prioridadSeleccionada,
@@ -713,7 +772,14 @@ fun MapLibreScreen(
                     sheetOffsetPx = 0f
                     mapView.getMapAsync { map ->
                         map.clear()
-                        uiState.origenSeleccionado?.let { ori -> map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context))) }
+                        uiState.origenSeleccionado?.let { ori ->
+                            map.addMarker(
+                                MarkerOptions()
+                                    .position(ori)
+                                    .title("Origen")
+                                    .icon(crearIconaGrisa(context))
+                            )
+                        }
                     }
                 },
                 onStartRoute = {
@@ -743,12 +809,15 @@ fun MapLibreScreen(
         }
 
         AnimatedVisibility(
-            visible = uiState.destinoSeleccionado == null,
-            enter = slideInVertically(initialOffsetY = { it / 2 }), exit = slideOutVertically(targetOffsetY = { it / 2 }),
+            visible = uiState.destinoSeleccionado == null && !uiState.modoRuta,
+            enter = slideInVertically(initialOffsetY = { it / 2 }),
+            exit = slideOutVertically(targetOffsetY = { it / 2 }),
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
             Column(
-                modifier = Modifier.navigationBarsPadding().padding(end = 16.dp, bottom = 16.dp),
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .padding(end = 16.dp, bottom = 16.dp),
                 horizontalAlignment = Alignment.End
             ) {
                 ExtendedFloatingActionButton(
@@ -769,14 +838,24 @@ fun MapLibreScreen(
 
                             if (uiState.ultimaUbicacion != null) {
                                 mapView.getMapAsync { map ->
-                                    map.animateCamera(CameraUpdateFactory.newLatLngZoom(
-                                        LatLng(uiState.ultimaUbicacion!!.latitude, uiState.ultimaUbicacion!!.longitude), 15.0), 1000)
+                                    map.animateCamera(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(uiState.ultimaUbicacion!!.latitude, uiState.ultimaUbicacion!!.longitude),
+                                            15.0
+                                        ),
+                                        1000
+                                    )
                                 }
                             } else {
                                 Toast.makeText(context, "Buscant senyal GPS...", Toast.LENGTH_SHORT).show()
                             }
                         } else {
-                            permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                            permissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
                         }
                     },
                     containerColor = Color.White,
