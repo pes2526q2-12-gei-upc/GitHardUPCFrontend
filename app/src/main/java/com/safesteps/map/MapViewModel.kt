@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
+import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -50,6 +52,7 @@ class MapViewModel : ViewModel() {
                 textoDestino = "",
                 distanceText = "-- km",
                 durationText = "-- min",
+                etaText = "--:--",
                 rutaCoordenades = emptyList(),
                 modoRuta = false,
                 adrecesSuggerides = emptyList(),
@@ -62,7 +65,9 @@ class MapViewModel : ViewModel() {
 
     fun updateLocation(location: Location) {
         _uiState.update { it.copy(ultimaUbicacion = location) }
-        recalcularRuta(location, _uiState.value.destinoSeleccionado)
+        if (!_uiState.value.modoRuta) {
+            recalcularRuta(location, _uiState.value.destinoSeleccionado)
+        }
     }
 
     fun onTextoBuscadorModificado(texto: String, campo: textField) {
@@ -172,10 +177,19 @@ class MapViewModel : ViewModel() {
                 Log.d("time", "time = ${infoRuta.second.first}")
                 Log.d("distance", "distancia = ${infoRuta.second.second}")
 
+                val routeDurationMinutes = when {
+                    infoRuta.second.first > 0 -> infoRuta.second.first
+                    infoRuta.second.second > 0.0 -> estimateMinutesFromDistanceMeters(infoRuta.second.second)
+                    else -> 0
+                }
+
                 _uiState.update {
                     it.copy(
                         rutaCoordenades = infoRuta.first,
                         modoRuta = infoRuta.first.isNotEmpty(),
+                        distanceText = if (infoRuta.second.second > 0.0) formatDistance(infoRuta.second.second) else it.distanceText,
+                        durationText = if (routeDurationMinutes > 0) formatDuration(routeDurationMinutes) else it.durationText,
+                        etaText = if (routeDurationMinutes > 0) formatEta(routeDurationMinutes) else it.etaText,
                         adrecesSuggerides = emptyList(),
                         campActiu = textField.NONE,
                         isTyping = false,
@@ -189,7 +203,7 @@ class MapViewModel : ViewModel() {
 
     private fun recalcularRuta(currentLocation: Location?, destination: LatLng?) {
         if (currentLocation == null || destination == null) {
-            _uiState.update { it.copy(distanceText = "-- km", durationText = "-- min") }
+            _uiState.update { it.copy(distanceText = "-- km", durationText = "-- min", etaText = "--:--") }
             return
         }
 
@@ -198,17 +212,16 @@ class MapViewModel : ViewModel() {
             longitude = destination.longitude
         }
 
-        val meters = currentLocation.distanceTo(destinationLocation)
-        val km = meters / 1000.0
-        val minutes = max(1, (km * 12.0).roundToInt())
+        val meters = currentLocation.distanceTo(destinationLocation).toDouble()
+        val minutes = estimateMinutesFromDistanceMeters(meters)
 
-        val distanceText = if (km < 1.0) {
-            "${meters.roundToInt()} m"
-        } else {
-            String.format(Locale.US, "%.1f km", km)
+        _uiState.update {
+            it.copy(
+                distanceText = formatDistance(meters),
+                durationText = formatDuration(minutes),
+                etaText = formatEta(minutes)
+            )
         }
-
-        _uiState.update { it.copy(distanceText = distanceText, durationText = "$minutes min") }
     }
 
     fun onMapaListo() {
@@ -226,17 +239,10 @@ class MapViewModel : ViewModel() {
             longitude = destination.longitude
         }
 
-        val meters = currentLocation.distanceTo(destinationLocation)
-        val km = meters / 1000.0
-        val minutes = max(1, (km * 12.0).roundToInt())
+        val meters = currentLocation.distanceTo(destinationLocation).toDouble()
+        val minutes = estimateMinutesFromDistanceMeters(meters)
 
-        val distanceText = if (km < 1.0) {
-            "${meters.roundToInt()} m"
-        } else {
-            String.format(Locale.US, "%.1f km", km)
-        }
-
-        return distanceText to "$minutes min"
+        return formatDistance(meters) to formatDuration(minutes)
     }
 
     private suspend fun getTextoDestino(point: LatLng): String {
@@ -255,5 +261,30 @@ class MapViewModel : ViewModel() {
         } catch (_: Exception) {
             "Ubicació seleccionada al mapa"
         }
+    }
+
+    private fun formatDistance(distanceMeters: Double): String {
+        return if (distanceMeters < 1000.0) {
+            "${distanceMeters.roundToInt()} m"
+        } else {
+            String.format(Locale.US, "%.1f km", distanceMeters / 1000.0)
+        }
+    }
+
+    private fun formatDuration(durationMinutes: Int): String {
+        return if (durationMinutes > 0) "$durationMinutes min" else "-- min"
+    }
+
+    private fun formatEta(durationMinutes: Int): String {
+        if (durationMinutes <= 0) return "--:--"
+        val calendar = Calendar.getInstance().apply {
+            add(Calendar.MINUTE, durationMinutes)
+        }
+        return SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
+    }
+
+    private fun estimateMinutesFromDistanceMeters(distanceMeters: Double): Int {
+        val km = distanceMeters / 1000.0
+        return max(1, (km * 12.0).roundToInt())
     }
 }

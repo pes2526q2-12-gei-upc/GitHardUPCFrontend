@@ -24,6 +24,7 @@ data class MapUiState(
     val ultimaUbicacion: Location? = null,
     val distanceText: String = "-- km",
     val durationText: String = "-- min",
+    val etaText: String = "--:--",
     val adrecesSuggerides: List<Feature> = emptyList(),
     val origenSeleccionado: LatLng? = null,
     val isTyping: Boolean = false,

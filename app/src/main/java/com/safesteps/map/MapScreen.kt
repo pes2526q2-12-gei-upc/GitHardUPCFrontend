@@ -539,6 +539,83 @@ private fun RoutePlannerSheet(
 }
 
 @Composable
+private fun RouteActiveBottomBar(
+    durationText: String,
+    distanceText: String,
+    etaText: String,
+    onClose: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 14.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = Color(0xFFF2F4F3)
+            ) {
+                IconButton(onClick = onClose, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Cerrar",
+                        tint = Color(0xFF3D4A45)
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = durationText,
+                        color = Color(0xFF202124),
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = distanceText,
+                            color = Color(0xFF5F6368),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "•",
+                            color = Color(0xFF5F6368),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = etaText,
+                            color = Color(0xFF5F6368),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.size(44.dp))
+        }
+    }
+}
+
+@Composable
 fun MapLibreScreen(
     modifier: Modifier = Modifier,
     viewModel: MapViewModel = viewModel()
@@ -565,6 +642,22 @@ fun MapLibreScreen(
     val sheetDragState = rememberDraggableState { delta ->
         if (uiState.destinoSeleccionado != null && !uiState.modoRuta) {
             sheetOffsetPx = (sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset)
+        }
+    }
+
+    val resetToMainMenu = {
+        viewModel.clearRuta()
+        sheetOffsetPx = 0f
+        mapView.getMapAsync { map ->
+            map.clear()
+            uiState.origenSeleccionado?.let { ori ->
+                map.addMarker(
+                    MarkerOptions()
+                        .position(ori)
+                        .title("Origen")
+                        .icon(crearIconaGrisa(context))
+                )
+            }
         }
     }
 
@@ -767,21 +860,7 @@ fun MapLibreScreen(
                 onPrioritySelected = { viewModel.onPrioridadSeleccionada(it) },
                 distanceText = uiState.distanceText,
                 durationText = uiState.durationText,
-                onClose = {
-                    viewModel.clearRuta()
-                    sheetOffsetPx = 0f
-                    mapView.getMapAsync { map ->
-                        map.clear()
-                        uiState.origenSeleccionado?.let { ori ->
-                            map.addMarker(
-                                MarkerOptions()
-                                    .position(ori)
-                                    .title("Origen")
-                                    .icon(crearIconaGrisa(context))
-                            )
-                        }
-                    }
-                },
+                onClose = resetToMainMenu,
                 onStartRoute = {
                     val destination = uiState.destinoSeleccionado
                     val selectedOrigin = uiState.origenSeleccionado
@@ -805,6 +884,20 @@ fun MapLibreScreen(
                         }
                     }
                 }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = uiState.modoRuta,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it }),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            RouteActiveBottomBar(
+                durationText = uiState.durationText,
+                distanceText = uiState.distanceText,
+                etaText = uiState.etaText,
+                onClose = resetToMainMenu
             )
         }
 
