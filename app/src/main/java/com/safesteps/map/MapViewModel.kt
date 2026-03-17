@@ -65,9 +65,6 @@ class MapViewModel : ViewModel() {
 
     fun updateLocation(location: Location) {
         _uiState.update { it.copy(ultimaUbicacion = location) }
-        if (!_uiState.value.modoRuta) {
-            recalcularRuta(location, _uiState.value.destinoSeleccionado)
-        }
     }
 
     fun onTextoBuscadorModificado(texto: String, campo: textField) {
@@ -143,10 +140,12 @@ class MapViewModel : ViewModel() {
             it.copy(
                 destinoSeleccionado = point,
                 textoDestino = "Buscant adreça...",
-                mostrarOrigen = true
+                mostrarOrigen = true,
+                distanceText = "-- km",
+                durationText = "-- min",
+                etaText = "--:--"
             )
         }
-        recalcularRuta(_uiState.value.ultimaUbicacion, point)
 
         viewModelScope.launch {
             val direccionReal = getTextoDestino(point)
@@ -201,49 +200,10 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    private fun recalcularRuta(currentLocation: Location?, destination: LatLng?) {
-        if (currentLocation == null || destination == null) {
-            _uiState.update { it.copy(distanceText = "-- km", durationText = "-- min", etaText = "--:--") }
-            return
-        }
-
-        val destinationLocation = Location("destination").apply {
-            latitude = destination.latitude
-            longitude = destination.longitude
-        }
-
-        val meters = currentLocation.distanceTo(destinationLocation).toDouble()
-        val minutes = estimateMinutesFromDistanceMeters(meters)
-
-        _uiState.update {
-            it.copy(
-                distanceText = formatDistance(meters),
-                durationText = formatDuration(minutes),
-                etaText = formatEta(minutes)
-            )
-        }
-    }
-
     fun onMapaListo() {
         _uiState.update { it.copy(mapaListo = true) }
     }
 
-    fun calculateDistanceAndDuration(
-        currentLocation: Location?,
-        destination: LatLng?
-    ): Pair<String, String> {
-        if (currentLocation == null || destination == null) return "-- km" to "-- min"
-
-        val destinationLocation = Location("destination").apply {
-            latitude = destination.latitude
-            longitude = destination.longitude
-        }
-
-        val meters = currentLocation.distanceTo(destinationLocation).toDouble()
-        val minutes = estimateMinutesFromDistanceMeters(meters)
-
-        return formatDistance(meters) to formatDuration(minutes)
-    }
 
     private suspend fun getTextoDestino(point: LatLng): String {
         return try {

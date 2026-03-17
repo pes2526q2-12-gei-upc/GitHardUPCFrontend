@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -631,6 +632,19 @@ fun MapLibreScreen(
     val visibleSheetHeightPx = with(density) { 150.dp.toPx() }
     val collapsedSheetOffset = max(0f, sheetHeightPx - visibleSheetHeightPx)
 
+    val dynamicBottomPadding by animateDpAsState(
+        targetValue = when {
+            uiState.modoRuta -> 110.dp
+            uiState.destinoSeleccionado != null -> {
+                val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
+                val currentVisibleHeightDp = with(density) { currentVisibleHeightPx.toDp() }
+                currentVisibleHeightDp + 16.dp
+            }
+            else -> 16.dp
+        },
+        label = "buttonPadding"
+    )
+
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
         val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
@@ -902,7 +916,7 @@ fun MapLibreScreen(
         }
 
         AnimatedVisibility(
-            visible = uiState.destinoSeleccionado == null && !uiState.modoRuta,
+            visible = true,
             enter = slideInVertically(initialOffsetY = { it / 2 }),
             exit = slideOutVertically(targetOffsetY = { it / 2 }),
             modifier = Modifier.align(Alignment.BottomEnd)
@@ -910,7 +924,7 @@ fun MapLibreScreen(
             Column(
                 modifier = Modifier
                     .navigationBarsPadding()
-                    .padding(end = 16.dp, bottom = 16.dp),
+                    .padding(end = 16.dp, bottom = dynamicBottomPadding),
                 horizontalAlignment = Alignment.End
             ) {
                 ExtendedFloatingActionButton(
