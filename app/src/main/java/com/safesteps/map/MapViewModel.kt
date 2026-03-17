@@ -1,5 +1,6 @@
 package com.safesteps.map
 
+import android.util.Log
 import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope // <-- IMPORT NUEVO AÑADIDO
@@ -158,14 +159,19 @@ class MapViewModel : ViewModel() {
     ) {
         viewModelScope.launch {
             try {
-                val coordenadesRuta = obtenirCoordenadesRuta(
+                val infoRuta = obtenirCoordenadesRuta(
                     origenLong = origenLong,
                     origenLat = origenLat,
                     destiLong = destiLong,
                     destiLat = destiLat,
                     nRoutes = 1
                 )
-                drawRoute(coordenadesRuta)
+                Log.d("ROUTE_VM", " = ${infoRuta.first}")
+                Log.d("time", "time = ${infoRuta.second.first}")
+                Log.d("distance", "distancia = ${infoRuta.second.second}")
+
+                drawRoute(infoRuta.first)
+
             } catch (_: Exception) {
             }
         }
