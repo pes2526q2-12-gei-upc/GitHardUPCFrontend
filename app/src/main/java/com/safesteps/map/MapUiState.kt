@@ -31,5 +31,6 @@ data class MapUiState(
     val firstLocationZoomDone: Boolean = false,
     val campActiu: textField = textField.NONE,
     val rutaCoordenades: List<Coordenada> = emptyList(),
-    val modoRuta: Boolean = false
+    val modoRuta: Boolean = false,
+    val calculantRuta: Boolean = false
 )
