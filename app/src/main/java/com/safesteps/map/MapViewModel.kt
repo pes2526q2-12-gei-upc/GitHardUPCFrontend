@@ -63,6 +63,17 @@ class MapViewModel : ViewModel() {
         }
     }
 
+    fun cancelarRutaVisual() {
+        _uiState.update { it.copy(
+            rutaCoordenades = emptyList(),
+            modoRuta = false,
+            distanceText = "-- km",
+            durationText = "-- min",
+            etaText = "--:--",
+            calculantRuta = false
+        ) }
+    }
+
     fun updateLocation(location: Location) {
         _uiState.update { it.copy(ultimaUbicacion = location) }
     }
@@ -123,15 +134,20 @@ class MapViewModel : ViewModel() {
     }
 
     fun limpiarOrigen() {
-        _uiState.update {
-            it.copy(
-                origenSeleccionado = null,
-                textoOrigen = "",
-                campActiu = textField.NONE,
-                isTyping = false
-            )
-        }
+        _uiState.update { it.copy(
+            origenSeleccionado = null,
+            textoOrigen = ""
+        ) }
     }
+
+    fun limpiarDestino() {
+        _uiState.update { it.copy(
+            destinoSeleccionado = null,
+            textoDestino = ""
+        ) }
+    }
+
+
 
     fun onMapClicked(point: LatLng) {
         if (_uiState.value.modoRuta) return
@@ -164,6 +180,7 @@ class MapViewModel : ViewModel() {
         destiLat: Double
     ) {
         viewModelScope.launch {
+            _uiState.update { it.copy(calculantRuta = true) }
             try {
                 val infoRuta = obtenirCoordenadesRuta(
                     origenLong = origenLong,
@@ -185,19 +202,24 @@ class MapViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         rutaCoordenades = infoRuta.first,
-                        modoRuta = infoRuta.first.isNotEmpty(),
                         distanceText = if (infoRuta.second.second > 0.0) formatDistance(infoRuta.second.second) else it.distanceText,
                         durationText = if (routeDurationMinutes > 0) formatDuration(routeDurationMinutes) else it.durationText,
                         etaText = if (routeDurationMinutes > 0) formatEta(routeDurationMinutes) else it.etaText,
                         adrecesSuggerides = emptyList(),
                         campActiu = textField.NONE,
                         isTyping = false,
-                        mostrarOrigen = false
                     )
                 }
             } catch (_: Exception) {
+                Log.e("ROUTE_VM", "Error calculant la ruta")
+            } finally {
+                _uiState.update { it.copy(calculantRuta = false) }
             }
         }
+    }
+
+    fun iniciarNavegacio() {
+        _uiState.update { it.copy(modoRuta = true) }
     }
 
     fun onMapaListo() {

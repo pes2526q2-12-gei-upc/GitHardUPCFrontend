@@ -162,19 +162,15 @@ fun stopAndroidLocationUpdates(context: Context, listener: LocationListener?) {
 }
 
 fun crearIconaGrisa(context: android.content.Context): Icon {
-    // Creem un llenç buit de 40x40 píxels
     val bitmap = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    // Configurem el pinzell de color gris
     val paint = Paint().apply {
-        color = android.graphics.Color.DKGRAY
+        color = android.graphics.Color.parseColor("#9EAEB5")
         isAntiAlias = true
     }
 
-    // Dibuixem una rodona al mig
     canvas.drawCircle(20f, 20f, 20f, paint)
 
-    // Ho convertim a una icona compatible amb MapLibre
     return IconFactory.getInstance(context).fromBitmap(bitmap)
 }

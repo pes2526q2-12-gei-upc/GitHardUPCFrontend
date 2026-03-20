@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Accessible
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Layers
@@ -91,6 +92,15 @@ import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import kotlin.math.max
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.safesteps.R
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.graphicsLayer
 
 @Composable
 private fun SearchBarItem(
@@ -103,6 +113,7 @@ private fun SearchBarItem(
     textColor: Color = Color(0xFF3D4A45),
     placeholderColor: Color = Color(0xFF9AA7A0),
     onFocus: (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null
 ) {
     Box(
@@ -154,6 +165,11 @@ private fun SearchBarItem(
                             }
                         }
                 )
+            }
+
+            if (trailingIcon != null) {
+                Spacer(modifier = Modifier.width(4.dp))
+                trailingIcon()
             }
 
             if (trailingContent != null) {
@@ -268,6 +284,13 @@ private fun TopSearchPanel(
                                 modifier = Modifier.size(18.dp)
                             )
                         },
+                        trailingIcon = {
+                            if (origen.isNotEmpty()) {
+                                IconButton(onClick = { onOrigenChange("") }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Esborrar origen", tint = Color.Gray)
+                                }
+                            }
+                        },
                         onFocus = onOrigenFocus
                     )
 
@@ -284,6 +307,13 @@ private fun TopSearchPanel(
                 placeholder = "Destí",
                 borderColor = Color(0xFFF2D8D4),
                 leadingIcon = { Icon(Icons.Default.LocationOn, null, tint = Color(0xFFFF8A80), modifier = Modifier.size(18.dp)) },
+                trailingIcon = {
+                    if (destino.isNotEmpty()) {
+                        IconButton(onClick = { onDestinoChange("") }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Esborrar destí", tint = Color.Gray)
+                        }
+                    }
+                },
                 onFocus = onDestinoFocus
             )
 
@@ -291,6 +321,45 @@ private fun TopSearchPanel(
                 DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
             }
         }
+    }
+}
+
+@Composable
+private fun RoutePriorityCompactOption(
+    title: String,
+    selected: Boolean,
+    icon: ImageVector,
+    activeColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bgColor = if (selected) activeColor.copy(alpha = 0.15f) else Color.Transparent
+    val contentColor = if (selected) activeColor else Color(0xFF77837D)
+    val borderColor = if (selected) activeColor else Color(0xFFE7ECE8)
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(bgColor)
+            .border(width = if (selected) 2.dp else 1.dp, color = borderColor, shape = RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.size(28.dp)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = title,
+            color = contentColor,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelMedium,
+            maxLines = 1
+        )
     }
 }
 
@@ -442,39 +511,37 @@ private fun RoutePlannerSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            RoutePriorityOption(
-                title = "Seguretat",
-                subtitle = "Zones il·luminades i concorregudes",
-                selected = selectedPriority == RoutePriority.SAFETY,
-                icon = Icons.Default.Security,
-                iconBackground = Color(0xFF1F4A85),
-                iconTint = Color.White,
-                onClick = { onPrioritySelected(RoutePriority.SAFETY) }
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                RoutePriorityCompactOption(
+                    title = "Seguretat",
+                    selected = selectedPriority == RoutePriority.SAFETY,
+                    icon = Icons.Default.Security,
+                    activeColor = Color(0xFF1F4A85),
+                    onClick = { onPrioritySelected(RoutePriority.SAFETY) },
+                    modifier = Modifier.weight(1f)
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
+                RoutePriorityCompactOption(
+                    title = "Confort",
+                    selected = selectedPriority == RoutePriority.ACCESSIBILITY,
+                    icon = Icons.Default.Accessible,
+                    activeColor = Color(0xFF7FD7AA),
+                    onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
+                    modifier = Modifier.weight(1f)
+                )
 
-            RoutePriorityOption(
-                title = "Confort i Accessibilitat",
-                subtitle = "Sense barreres i tranquil",
-                selected = selectedPriority == RoutePriority.ACCESSIBILITY,
-                icon = Icons.Default.Accessible,
-                iconBackground = Color(0xFF7FD7AA),
-                iconTint = Color.White,
-                onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            RoutePriorityOption(
-                title = "Emergència Tèrmica",
-                subtitle = "Ombra i refugis climàtics",
-                selected = selectedPriority == RoutePriority.HEAT,
-                icon = Icons.Default.WbSunny,
-                iconBackground = Color(0xFFFF7B42),
-                iconTint = Color.White,
-                onClick = { onPrioritySelected(RoutePriority.HEAT) }
-            )
+                RoutePriorityCompactOption(
+                    title = "Clima",
+                    selected = selectedPriority == RoutePriority.HEAT,
+                    icon = Icons.Default.WbSunny,
+                    activeColor = Color(0xFFFF7B42),
+                    onClick = { onPrioritySelected(RoutePriority.HEAT) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -661,15 +728,17 @@ fun MapLibreScreen(
 
     val resetToMainMenu = {
         viewModel.clearRuta()
+        viewModel.limpiarOrigen()
         sheetOffsetPx = 0f
         mapView.getMapAsync { map ->
             map.clear()
-            uiState.origenSeleccionado?.let { ori ->
-                map.addMarker(
-                    MarkerOptions()
-                        .position(ori)
-                        .title("Origen")
-                        .icon(crearIconaGrisa(context))
+            uiState.ultimaUbicacion?.let { loc ->
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        LatLng(loc.latitude, loc.longitude),
+                        15.0
+                    ),
+                    1000
                 )
             }
         }
@@ -711,8 +780,15 @@ fun MapLibreScreen(
                     activateLocationComponent(mapView)
                 }
 
-                if (uiState.modoRuta && uiState.rutaCoordenades.isNotEmpty()) {
-                    drawRoute(mapView, uiState.rutaCoordenades)
+                if (uiState.rutaCoordenades.isNotEmpty()) {
+                    val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
+                    drawRoute(
+                        mapView = mapView,
+                        coordenades = uiState.rutaCoordenades,
+                        origen = origenPoint,
+                        desti = uiState.destinoSeleccionado,
+                        context = context
+                    )
                 } else {
                     map.clear()
                     uiState.origenSeleccionado?.let { ori ->
@@ -735,12 +811,28 @@ fun MapLibreScreen(
         }
     }
 
+    LaunchedEffect(uiState.destinoSeleccionado, uiState.origenSeleccionado) {
+        val destination = uiState.destinoSeleccionado
+        if (destination != null) {
+            val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
+
+            if (origenPoint != null) {
+                viewModel.calcularRuta(
+                    origenLong = origenPoint.longitude,
+                    origenLat = origenPoint.latitude,
+                    destiLong = destination.longitude,
+                    destiLat = destination.latitude
+                )
+            }
+        }
+    }
+
     LaunchedEffect(
         uiState.origenSeleccionado,
         uiState.destinoSeleccionado,
         uiState.modoRuta
     ) {
-        if (uiState.modoRuta) return@LaunchedEffect
+        if (uiState.modoRuta || uiState.rutaCoordenades.isNotEmpty()) return@LaunchedEffect
 
         mapView.getMapAsync { map ->
             if (map.style?.isFullyLoaded == true) {
@@ -764,9 +856,32 @@ fun MapLibreScreen(
         }
     }
 
-    LaunchedEffect(uiState.rutaCoordenades, uiState.modoRuta, uiState.mapaListo) {
-        if (uiState.modoRuta && uiState.mapaListo && uiState.rutaCoordenades.isNotEmpty()) {
-            drawRoute(mapView, uiState.rutaCoordenades)
+    LaunchedEffect(uiState.destinoSeleccionado) {
+        val destination = uiState.destinoSeleccionado
+        if (destination != null) {
+            val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
+
+            if (origenPoint != null) {
+                viewModel.calcularRuta(
+                    origenLong = origenPoint.longitude,
+                    origenLat = origenPoint.latitude,
+                    destiLong = destination.longitude,
+                    destiLat = destination.latitude
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.rutaCoordenades, uiState.mapaListo) {
+        if (uiState.mapaListo && uiState.rutaCoordenades.isNotEmpty()) {
+            val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
+            drawRoute(
+                mapView = mapView,
+                coordenades = uiState.rutaCoordenades,
+                origen = origenPoint,
+                desti = uiState.destinoSeleccionado,
+                context = context
+            )
         }
     }
 
@@ -822,21 +937,36 @@ fun MapLibreScreen(
         AnimatedVisibility(visible = !uiState.modoRuta) {
             TopSearchPanel(
                 origen = uiState.textoOrigen,
-                onOrigenChange = { viewModel.onTextoBuscadorModificado(it, textField.ORIGIN) },
+                onOrigenChange = { text ->
+                    viewModel.onTextoBuscadorModificado(text, textField.ORIGIN)
+                    if (text.isEmpty()) {
+                        viewModel.limpiarOrigen()
+                        viewModel.cancelarRutaVisual()
+                    }
+                },
                 destino = uiState.textoDestino,
-                onDestinoChange = { viewModel.onTextoBuscadorModificado(it, textField.DESTINY) },
+                onDestinoChange = { text ->
+                    viewModel.onTextoBuscadorModificado(text, textField.DESTINY)
+                    if (text.isEmpty()) {
+                        viewModel.limpiarDestino()
+                        viewModel.cancelarRutaVisual()
+                    }
+                },
                 mostrarOrigen = uiState.mostrarOrigen,
                 onOrigenFocus = { viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN) },
                 onDestinoFocus = { viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY) },
                 adrecesSuggerides = uiState.adrecesSuggerides,
                 onAdrecaSeleccionada = { feature ->
+                    val estavemBuscantOrigen = uiState.campActiu == textField.ORIGIN
                     viewModel.onAdrecaSeleccionada(feature)
-                    val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
-                    mapView.getMapAsync { map ->
-                        map.animateCamera(
-                            CameraUpdateFactory.newLatLngZoom(puntSeleccionat, 15.0),
-                            1500
-                        )
+                    if (estavemBuscantOrigen) {
+                        val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
+                        mapView.getMapAsync { map ->
+                            map.animateCamera(
+                                CameraUpdateFactory.newLatLngZoom(puntSeleccionat, 15.0),
+                                1500
+                            )
+                        }
                     }
                 },
                 campActiu = uiState.campActiu
@@ -871,11 +1001,35 @@ fun MapLibreScreen(
                         }
                     ),
                 selectedPriority = uiState.prioridadSeleccionada,
-                onPrioritySelected = { viewModel.onPrioridadSeleccionada(it) },
+                onPrioritySelected = { priority ->
+                    viewModel.onPrioridadSeleccionada(priority)
+                    val destination = uiState.destinoSeleccionado
+                    val selectedOrigin = uiState.origenSeleccionado
+                    val currentLocation = uiState.ultimaUbicacion
+
+                    if (destination != null) {
+                        val origenLong = selectedOrigin?.longitude ?: currentLocation?.longitude
+                        val origenLat = selectedOrigin?.latitude ?: currentLocation?.latitude
+
+                        if (origenLong != null && origenLat != null) {
+                            viewModel.calcularRuta(
+                                origenLong = origenLong,
+                                origenLat = origenLat,
+                                destiLong = destination.longitude,
+                                destiLat = destination.latitude
+                            )
+                        } else {
+                            Toast.makeText(context, "Esperant ubicació GPS...", Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                    }
+                },
                 distanceText = uiState.distanceText,
                 durationText = uiState.durationText,
                 onClose = resetToMainMenu,
                 onStartRoute = {
+                    viewModel.iniciarNavegacio()
+                    /*
                     val destination = uiState.destinoSeleccionado
                     val selectedOrigin = uiState.origenSeleccionado
                     val currentLocation = uiState.ultimaUbicacion
@@ -897,6 +1051,7 @@ fun MapLibreScreen(
                             )
                         }
                     }
+                    */
                 }
             )
         }
@@ -969,6 +1124,43 @@ fun MapLibreScreen(
                     contentColor = Color(0xFF49B97E)
                 ) {
                     Icon(Icons.Default.MyLocation, contentDescription = "La meva ubicació")
+                }
+            }
+        }
+        if (uiState.calculantRuta) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White.copy(alpha = 0.85f))
+                    .clickable(enabled = false, onClick = {}),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.traveler))
+                    val progress by animateLottieCompositionAsState(
+                        composition = composition,
+                        iterations = LottieConstants.IterateForever
+                    )
+
+                    LottieAnimation(
+                        composition = composition,
+                        progress = { progress },
+                        modifier = Modifier
+                            .size(200.dp)
+                            .graphicsLayer {
+                                colorFilter = ColorFilter.colorMatrix(
+                                    ColorMatrix().apply { setToSaturation(0f) }
+                                )
+                            }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Calculant la millor ruta...",
+                        color = Color.DarkGray,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         }
