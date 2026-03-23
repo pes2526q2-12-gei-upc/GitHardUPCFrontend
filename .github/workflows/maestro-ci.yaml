@@ -40,5 +40,5 @@ jobs:
             adb install app/build/outputs/apk/debug/app-debug.apk
             
             echo "Executant tests UI..."
-            # Utilitzem la ruta absoluta de l'executable per evitar problemes de PATH
+            chmod +x $HOME/.maestro/bin/maestro # Donem permisos d'execució
             $HOME/.maestro/bin/maestro test .maestro/
