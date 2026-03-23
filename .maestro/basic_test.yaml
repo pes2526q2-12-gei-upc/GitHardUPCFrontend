@@ -1,0 +1,4 @@
+appId: com.safesteps
+---
+- launchApp
+- assertVisible: ".*" # Aquesta expressió regular simplement comprova que l'app s'ha obert i hi ha text o elements a la pantalla
