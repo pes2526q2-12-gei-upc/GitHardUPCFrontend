@@ -30,30 +30,44 @@ fun drawRoute(
 
         map.clear()
 
-        val punts = coordenades.map { LatLng(it.lat, it.lon) }
+        val puntsRuta = coordenades.map { LatLng(it.lat, it.lon) }.toMutableList()
+
+        origen?.let {
+            if (puntsRuta.isNotEmpty() && (it.latitude != puntsRuta.first().latitude || it.longitude != puntsRuta.first().longitude)) {
+                puntsRuta.add(0, it)
+            }
+        }
+        desti?.let {
+            if (puntsRuta.isNotEmpty() && (it.latitude != puntsRuta.last().latitude || it.longitude != puntsRuta.last().longitude)) {
+                puntsRuta.add(it)
+            }
+        }
 
         map.addPolyline(
             PolylineOptions()
-                .addAll(punts)
+                .addAll(puntsRuta)
                 .color(Color.parseColor("#1E88E5"))
                 .width(6f)
         )
+
         origen?.let {
             map.addMarker(MarkerOptions()
                 .position(it)
                 .title("Origen")
                 .icon(crearIconaGrisa(context)))
         }
-        desti?.let { map.addMarker(MarkerOptions().position(it).title("Destí")) }
 
-        if (punts.size > 1) {
+        desti?.let {
+            map.addMarker(MarkerOptions()
+                .position(it)
+                .title("Destí"))
+        }
+
+        if (puntsRuta.size > 1) {
             val boundsBuilder = LatLngBounds.Builder()
-            punts.forEach { boundsBuilder.include(it) }
-            origen?.let { boundsBuilder.include(it) }
-            desti?.let { boundsBuilder.include(it) }
+            puntsRuta.forEach { boundsBuilder.include(it) }
 
             val bounds = boundsBuilder.build()
-
             map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 350), 1000)
         }
     }
