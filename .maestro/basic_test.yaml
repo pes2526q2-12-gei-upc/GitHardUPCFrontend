@@ -1,0 +1,4 @@
+appId: com.teu.projecte.rutes # Recorda canviar-ho pel teu application ID real
+---
+- launchApp
+- assertVisible: ".*" # Aquesta expressió regular simplement comprova que l'app s'ha obert i hi ha text o elements a la pantalla
