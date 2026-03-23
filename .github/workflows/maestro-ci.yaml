@@ -35,10 +35,10 @@ jobs:
           script: |
             echo "Instal·lant Maestro..."
             curl -Ls "https://get.maestro.mobile.dev" | bash
-            export PATH="$PATH":"$HOME/.maestro/bin"
             
             echo "Instal·lant l'APK a l'emulador..."
             adb install app/build/outputs/apk/debug/app-debug.apk
             
             echo "Executant tests UI..."
-            maestro test .maestro/
+            # Utilitzem la ruta absoluta de l'executable per evitar problemes de PATH
+            $HOME/.maestro/bin/maestro test .maestro/
