@@ -179,6 +179,14 @@ class MapViewModel : ViewModel() {
         destiLong: Double,
         destiLat: Double
     ) {
+        val prioridad = _uiState.value.prioridadSeleccionada
+
+        val seguretatWeight = if (prioridad == RoutePriority.SAFETY) 1f else 0f
+        val eMecaniquesWeight = if (prioridad == RoutePriority.ACCESSIBILITY) 1f else 0f
+        val bancsWeight = if (prioridad == RoutePriority.ACCESSIBILITY) 1f else 0f
+        val ombraWeight = if (prioridad == RoutePriority.HEAT) 1f else 0f
+        val fontsAiguaWeight = if (prioridad == RoutePriority.HEAT) 1f else 0f
+
         viewModelScope.launch {
             _uiState.update { it.copy(calculantRuta = true) }
             try {
@@ -187,7 +195,12 @@ class MapViewModel : ViewModel() {
                     origenLat = origenLat,
                     destiLong = destiLong,
                     destiLat = destiLat,
-                    nRoutes = 1
+                    nRoutes = 1,
+                    seguretat = seguretatWeight,
+                    fontsAigua = fontsAiguaWeight,
+                    ombra = ombraWeight,
+                    eMecaniques = eMecaniquesWeight,
+                    bancs = bancsWeight
                 )
                 Log.d("ROUTE_VM", " = ${infoRuta.first}")
                 Log.d("time", "time = ${infoRuta.second.first}")

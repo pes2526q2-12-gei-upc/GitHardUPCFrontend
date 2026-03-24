@@ -14,10 +14,19 @@ private data class RoutePointRequest(
     val lon: Double
 )
 
+private data class RouteFilterRequest(
+    val seguretat: Float,
+    val fontsAigua: Float,
+    val ombra: Float,
+    val escalesMecaniques: Float,
+    val bancs: Float
+)
+
 private data class RouteRequestWithNRoutes(
     val origin: RoutePointRequest,
     val destination: RoutePointRequest,
-    val nRoutes: Int = 1
+    val nRoutes: Int = 1,
+    val filtre: RouteFilterRequest
 )
 
 private interface RouteCoordinatesApi {
@@ -47,7 +56,13 @@ suspend fun obtenirCoordenadesRuta(
     origenLat: Double,
     destiLong: Double,
     destiLat: Double,
-    nRoutes: Int = 1
+    nRoutes: Int = 1,
+    seguretat: Float,
+    fontsAigua: Float,
+    ombra: Float,
+    eMecaniques: Float,
+    bancs: Float
+
 ): Pair<List<Coordenada>, Pair<Int, Double>> {
     Log.d("ROUTE_API", "Enviando petición al servidor")
     Log.d("ROUTE_API", "origin=($origenLat, $origenLong), destination=($destiLat, $destiLong), nRoutes=$nRoutes")
@@ -62,7 +77,15 @@ suspend fun obtenirCoordenadesRuta(
                 lat = destiLat,
                 lon = destiLong
             ),
-            nRoutes = nRoutes
+            nRoutes = nRoutes,
+
+            filtre = RouteFilterRequest(
+                seguretat = seguretat,
+                fontsAigua = fontsAigua,
+                ombra = ombra,
+                escalesMecaniques = eMecaniques,
+                bancs = bancs
+            )
         )
     )
 
