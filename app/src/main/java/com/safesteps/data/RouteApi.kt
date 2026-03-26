@@ -48,79 +48,72 @@ suspend fun obtenirCoordenadesRuta(
     destiLong: Double,
     destiLat: Double,
     nRoutes: Int = 1
-): Pair<List<Coordenada>, Pair<Int, Double>> {
-    Log.d("ROUTE_API", "Enviando petición al servidor")
-    Log.d("ROUTE_API", "origin=($origenLat, $origenLong), destination=($destiLat, $destiLong), nRoutes=$nRoutes")
+): Triple<List<Coordenada>, Pair<Int, Double>, List<PuntInteres>> {
+
+    Log.d("ROUTE_API", "Enviando petición: origin=($origenLat, $origenLong), destination=($destiLat, $destiLong)")
 
     val response = RouteCoordinatesBackend.service.calcularRuta(
         RouteRequestWithNRoutes(
-            origin = RoutePointRequest(
-                lat = origenLat,
-                lon = origenLong
-            ),
-            destination = RoutePointRequest(
-                lat = destiLat,
-                lon = destiLong
-            ),
+            origin = RoutePointRequest(lat = origenLat, lon = origenLong),
+            destination = RoutePointRequest(lat = destiLat, lon = destiLong),
             nRoutes = nRoutes
         )
     )
 
-    Log.d("ROUTE_API", "Respuesta HTTP: code=${response.code()} success=${response.isSuccessful}")
-
     if (!response.isSuccessful) {
-        throw IOException("Error calculant la ruta: ${response.code()} ${response.message()}")
+        throw IOException("Error: ${response.code()}")
     }
 
-    val body = response.body() ?: throw IOException("La resposta del servidor és buida")
-    val resultatNormalitzat = normalizarResposta(body)
+    val body = response.body() ?: throw IOException("Resposta buida")
 
-    return resultatNormalitzat
+    return normalizarResposta(body)
 }
 
 fun normalizarResposta(
     response: JsonObject
-): Pair<List<Coordenada>, Pair<Int, Double>> {
+): Triple<List<Coordenada>, Pair<Int, Double>, List<PuntInteres>> {
+
     val routes = response.getAsJsonArray("routes")
-        ?: throw IOException("La resposta no conté el camp routes")
+        ?: throw IOException("No hi ha routes")
 
     if (routes.size() == 0) {
-        return emptyList<Coordenada>() to (0 to 0.0)
+        return Triple(emptyList(), 0 to 0.0, emptyList())
     }
 
     val primeraRuta = routes[0].asJsonObject
 
     val coordinatesJson = primeraRuta.getAsJsonArray("coordinates")
-        ?: throw IOException("La ruta no conté el camp coordinates")
+        ?: throw IOException("No hi ha coordinates")
 
     val coordenades = coordinatesJson.map { pointElement ->
         val point = pointElement.asJsonArray
-        if (point.size() < 2) {
-            throw IOException("Una coordenada de la resposta no té el format correcte")
-        }
-
-        val lon = point[0].asDouble
-        val lat = point[1].asDouble
-
-        Coordenada(
-            lat,
-            lon
-        )
+        Coordenada(lat = point[1].asDouble, lon = point[0].asDouble)
     }
 
-    val temps = when {
-        primeraRuta.has("estimatedTimeMinutes") && !primeraRuta.get("estimatedTimeMinutes").isJsonNull -> {
-            primeraRuta.get("estimatedTimeMinutes").asString.toDoubleOrNull()?.toInt() ?: 0
+    val temps = if (primeraRuta.has("estimatedTimeMinutes") && !primeraRuta.get("estimatedTimeMinutes").isJsonNull) {
+        primeraRuta.get("estimatedTimeMinutes").asDouble.toInt()
+    } else 0
+
+    val distancia = if (primeraRuta.has("distanceMeters") && !primeraRuta.get("distanceMeters").isJsonNull) {
+        primeraRuta.get("distanceMeters").asDouble
+    } else 0.0
+
+    val puntsInteresList = mutableListOf<PuntInteres>()
+    if (primeraRuta.has("pois") && !primeraRuta.get("pois").isJsonNull) {
+        val poisJson = primeraRuta.getAsJsonArray("pois")
+        poisJson.forEach { element ->
+            val obj = element.asJsonObject
+            puntsInteresList.add(
+                PuntInteres(
+                    id = java.util.UUID.randomUUID().toString(), // Generamos ID único
+                    tipus = obj.get("type").asString,
+                    latitud = obj.get("lat").asDouble,
+                    longitud = obj.get("lon").asDouble,
+                    nom = if (obj.has("name") && !obj.get("name").isJsonNull) obj.get("name").asString else null
+                )
+            )
         }
-        else -> 0
     }
 
-    val distancia = when {
-        primeraRuta.has("distanceMeters") && !primeraRuta.get("distanceMeters").isJsonNull -> {
-            primeraRuta.get("distanceMeters").asString.toDoubleOrNull() ?: 0.0
-        }
-        else -> 0.0
-    }
-
-    return coordenades to (temps to distancia)
+    return Triple(coordenades, temps to distancia, puntsInteresList)
 }

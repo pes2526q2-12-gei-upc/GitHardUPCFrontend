@@ -3,6 +3,7 @@ package com.safesteps.map
 import android.location.Location
 import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
+import com.safesteps.data.PuntInteres
 import com.safesteps.domain.RoutePriority
 import org.maplibre.android.geometry.LatLng
 
@@ -32,5 +33,8 @@ data class MapUiState(
     val campActiu: textField = textField.NONE,
     val rutaCoordenades: List<Coordenada> = emptyList(),
     val modoRuta: Boolean = false,
-    val calculantRuta: Boolean = false
+    val calculantRuta: Boolean = false,
+    val puntsInteres: List<PuntInteres> = emptyList(),
+    val mostrarPuntsInteres: Boolean = true,
+    val puntInteresSeleccionat: PuntInteres? = null
 )

@@ -446,6 +446,7 @@ private fun RoutePlannerSheet(
     onPrioritySelected: (RoutePriority) -> Unit,
     distanceText: String,
     durationText: String,
+    puntsInteres: List<com.safesteps.data.PuntInteres>,
     onClose: () -> Unit,
     onStartRoute: () -> Unit
 ) {
@@ -544,6 +545,25 @@ private fun RoutePlannerSheet(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (puntsInteres.isNotEmpty()) {
+                val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
+                val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
+                val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    if (fonts > 0) Text("💧 $fonts Fonts", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                    if (bancs > 0) Text("🪑 $bancs Bancs", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                    if (comisaries > 0) Text("👮 $comisaries Comisaries", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -764,53 +784,6 @@ fun MapLibreScreen(
         }
     }
 
-    LaunchedEffect(uiState.estiloSatelite, uiState.modoRuta, uiState.rutaCoordenades) {
-        mapView.getMapAsync { map ->
-            val styleUrl =
-                if (uiState.estiloSatelite) {
-                    "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-                } else {
-                    "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
-                }
-
-            map.setStyle(styleUrl) {
-                viewModel.onMapaListo()
-
-                if (uiState.locationGranted) {
-                    activateLocationComponent(mapView)
-                }
-
-                if (uiState.rutaCoordenades.isNotEmpty()) {
-                    val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
-                    drawRoute(
-                        mapView = mapView,
-                        coordenades = uiState.rutaCoordenades,
-                        origen = origenPoint,
-                        desti = uiState.destinoSeleccionado,
-                        context = context
-                    )
-                } else {
-                    map.clear()
-                    uiState.origenSeleccionado?.let { ori ->
-                        map.addMarker(
-                            MarkerOptions()
-                                .position(ori)
-                                .title("Origen")
-                                .icon(crearIconaGrisa(context))
-                        )
-                    }
-                    uiState.destinoSeleccionado?.let { dest ->
-                        map.addMarker(
-                            MarkerOptions()
-                                .position(dest)
-                                .title("Destí")
-                        )
-                    }
-                }
-            }
-        }
-    }
-
     LaunchedEffect(uiState.destinoSeleccionado, uiState.origenSeleccionado) {
         val destination = uiState.destinoSeleccionado
         if (destination != null) {
@@ -856,6 +829,64 @@ fun MapLibreScreen(
         }
     }
 
+    // UNIFICADO: Este bloque gestiona TODO el dibujo en el mapa sin conflictos
+    LaunchedEffect(
+        uiState.estiloSatelite,
+        uiState.modoRuta,
+        uiState.rutaCoordenades,
+        uiState.mostrarPuntsInteres,
+        uiState.puntsInteres,
+        uiState.origenSeleccionado,
+        uiState.destinoSeleccionado
+    ) {
+        mapView.getMapAsync { map ->
+            val styleUrl = if (uiState.estiloSatelite) {
+                "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+            } else {
+                "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+            }
+
+            // 1. Cargamos el estilo (Esto limpia el mapa automáticamente)
+            map.setStyle(styleUrl) {
+                viewModel.onMapaListo()
+                if (uiState.locationGranted) activateLocationComponent(mapView)
+
+                // 2. ¿Hay una ruta que dibujar?
+                if (uiState.rutaCoordenades.isNotEmpty()) {
+                    val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
+
+                    drawRoute(
+                        mapView = mapView,
+                        coordenades = uiState.rutaCoordenades,
+                        origen = origenPoint,
+                        desti = uiState.destinoSeleccionado,
+                        context = context
+                    )
+
+                    // 3. ¿Hay que mostrar los puntos extra (fuentes, bancos...)?
+                    if (uiState.mostrarPuntsInteres) {
+                        uiState.puntsInteres.forEach { punt ->
+                            val titulo = punt.nom ?: punt.tipus.lowercase().replaceFirstChar { it.uppercase() }
+                            map.addMarker(
+                                MarkerOptions()
+                                    .position(LatLng(punt.latitud, punt.longitud))
+                                    .title(titulo)
+                                    .snippet("Toca per veure detalls")
+                            )
+                        }
+                    }
+                } else {
+                    // 4. Si NO hay ruta, solo dibujamos los pines de Origen y Destino si existen
+                    uiState.origenSeleccionado?.let { ori ->
+                        map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context)))
+                    }
+                    uiState.destinoSeleccionado?.let { dest ->
+                        map.addMarker(MarkerOptions().position(dest).title("Destí"))
+                    }
+                }
+            }
+        }
+    }
     LaunchedEffect(uiState.destinoSeleccionado) {
         val destination = uiState.destinoSeleccionado
         if (destination != null) {
@@ -869,19 +900,6 @@ fun MapLibreScreen(
                     destiLat = destination.latitude
                 )
             }
-        }
-    }
-
-    LaunchedEffect(uiState.rutaCoordenades, uiState.mapaListo) {
-        if (uiState.mapaListo && uiState.rutaCoordenades.isNotEmpty()) {
-            val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
-            drawRoute(
-                mapView = mapView,
-                coordenades = uiState.rutaCoordenades,
-                origen = origenPoint,
-                desti = uiState.destinoSeleccionado,
-                context = context
-            )
         }
     }
 
@@ -918,6 +936,15 @@ fun MapLibreScreen(
                     getMapAsync { map ->
                         map.uiSettings.isLogoEnabled = false
                         map.uiSettings.isAttributionEnabled = false
+
+                        map.setOnMarkerClickListener { marker ->
+                            val puntPulsat = uiState.puntsInteres.find {
+                                it.latitud == marker.position.latitude && it.longitud == marker.position.longitude
+                            }
+                            viewModel.onPuntInteresSeleccionat(puntPulsat)
+
+                            false
+                        }
 
                         map.addOnMapClickListener { point ->
                             if (uiState.modoRuta) {
@@ -1027,6 +1054,7 @@ fun MapLibreScreen(
                 distanceText = uiState.distanceText,
                 durationText = uiState.durationText,
                 onClose = resetToMainMenu,
+                puntsInteres = uiState.puntsInteres,
                 onStartRoute = {
                     viewModel.iniciarNavegacio()
                     /*
@@ -1082,6 +1110,17 @@ fun MapLibreScreen(
                     .padding(end = 16.dp, bottom = dynamicBottomPadding),
                 horizontalAlignment = Alignment.End
             ) {
+                AnimatedVisibility(visible = uiState.puntsInteres.isNotEmpty() && !uiState.modoRuta) {
+                    ExtendedFloatingActionButton(
+                        onClick = { viewModel.togglePuntsInteres() },
+                        icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                        text = { Text(if (uiState.mostrarPuntsInteres) "Ocultar Info Extra" else "Mostrar Info Extra") },
+                        containerColor = Color.White,
+                        contentColor = Color(0xFFC86A37),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                }
+
                 ExtendedFloatingActionButton(
                     onClick = { viewModel.toggleEstiloSatelite() },
                     icon = { Icon(Icons.Default.Layers, contentDescription = "Canviar estil") },

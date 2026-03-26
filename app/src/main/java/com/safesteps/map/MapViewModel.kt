@@ -58,7 +58,9 @@ class MapViewModel : ViewModel() {
                 adrecesSuggerides = emptyList(),
                 campActiu = textField.NONE,
                 isTyping = false,
-                mostrarOrigen = false
+                mostrarOrigen = false,
+                puntsInteres = emptyList(),
+                puntInteresSeleccionat = null
             )
         }
     }
@@ -70,7 +72,9 @@ class MapViewModel : ViewModel() {
             distanceText = "-- km",
             durationText = "-- min",
             etaText = "--:--",
-            calculantRuta = false
+            calculantRuta = false,
+            puntsInteres = emptyList(),
+            puntInteresSeleccionat = null
         ) }
     }
 
@@ -189,29 +193,37 @@ class MapViewModel : ViewModel() {
                     destiLat = destiLat,
                     nRoutes = 1
                 )
-                Log.d("ROUTE_VM", " = ${infoRuta.first}")
-                Log.d("time", "time = ${infoRuta.second.first}")
-                Log.d("distance", "distancia = ${infoRuta.second.second}")
+
+                val coordenadas = infoRuta.first
+                val tiempoDistancia = infoRuta.second
+                val puntosInteres = infoRuta.third
+
+                Log.d("ROUTE_VM", "Coordenadas = ${coordenadas.size}")
+                Log.d("time", "time = ${tiempoDistancia.first}")
+                Log.d("distance", "distancia = ${tiempoDistancia.second}")
+                Log.d("POIS", "Puntos encontrados = ${puntosInteres.size}")
 
                 val routeDurationMinutes = when {
-                    infoRuta.second.first > 0 -> infoRuta.second.first
-                    infoRuta.second.second > 0.0 -> estimateMinutesFromDistanceMeters(infoRuta.second.second)
+                    tiempoDistancia.first > 0 -> tiempoDistancia.first
+                    tiempoDistancia.second > 0.0 -> estimateMinutesFromDistanceMeters(tiempoDistancia.second)
                     else -> 0
                 }
 
                 _uiState.update {
                     it.copy(
-                        rutaCoordenades = infoRuta.first,
-                        distanceText = if (infoRuta.second.second > 0.0) formatDistance(infoRuta.second.second) else it.distanceText,
+                        rutaCoordenades = coordenadas,
+                        distanceText = if (tiempoDistancia.second > 0.0) formatDistance(tiempoDistancia.second) else it.distanceText,
                         durationText = if (routeDurationMinutes > 0) formatDuration(routeDurationMinutes) else it.durationText,
                         etaText = if (routeDurationMinutes > 0) formatEta(routeDurationMinutes) else it.etaText,
                         adrecesSuggerides = emptyList(),
                         campActiu = textField.NONE,
                         isTyping = false,
+
+                        puntsInteres = puntosInteres
                     )
                 }
-            } catch (_: Exception) {
-                Log.e("ROUTE_VM", "Error calculant la ruta")
+            } catch (e: Exception) {
+                Log.e("ROUTE_VM", "Error calculant la ruta: ${e.message}")
             } finally {
                 _uiState.update { it.copy(calculantRuta = false) }
             }
@@ -226,7 +238,13 @@ class MapViewModel : ViewModel() {
         _uiState.update { it.copy(mapaListo = true) }
     }
 
+    fun togglePuntsInteres() {
+        _uiState.update { it.copy(mostrarPuntsInteres = !it.mostrarPuntsInteres) }
+    }
 
+    fun onPuntInteresSeleccionat(punt: com.safesteps.data.PuntInteres?) {
+        _uiState.update { it.copy(puntInteresSeleccionat = punt) }
+    }
     private suspend fun getTextoDestino(point: LatLng): String {
         return try {
             val resposta = PhotonApi.service.reverseGeocode(
