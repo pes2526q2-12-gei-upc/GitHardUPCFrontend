@@ -17,7 +17,16 @@ private data class RoutePointRequest(
 private data class RouteRequestWithNRoutes(
     val origin: RoutePointRequest,
     val destination: RoutePointRequest,
-    val nRoutes: Int = 1
+    val nRoutes: Int = 1,
+    val filtre: RouteFilterRequest
+)
+
+private data class RouteFilterRequest(
+    val seguretat: Float,
+    val fontsAigua: Float,
+    val ombra: Float,
+    val escalesMecaniques: Float,
+    val bancs: Float
 )
 
 private interface RouteCoordinatesApi {
@@ -47,26 +56,51 @@ suspend fun obtenirCoordenadesRuta(
     origenLat: Double,
     destiLong: Double,
     destiLat: Double,
-    nRoutes: Int = 1
-): Triple<List<Coordenada>, Pair<Int, Double>, List<PuntInteres>> {
+    nRoutes: Int = 1,
+    seguretat: Float,
+    fontsAigua: Float,
+    ombra: Float,
+    eMecaniques: Float,
+    bancs: Float
+): Triple<List<Coordenada>, Pair<Int, Double>, List<PuntInteres>> { // ⬅️ Aquí usamos el Triple para los POIs
 
-    Log.d("ROUTE_API", "Enviando petición: origin=($origenLat, $origenLong), destination=($destiLat, $destiLong)")
+    Log.d("ROUTE_API", "Enviando petición al servidor")
+    Log.d("ROUTE_API", "origin=($origenLat, $origenLong), destination=($destiLat, $destiLong), nRoutes=$nRoutes")
 
     val response = RouteCoordinatesBackend.service.calcularRuta(
         RouteRequestWithNRoutes(
-            origin = RoutePointRequest(lat = origenLat, lon = origenLong),
-            destination = RoutePointRequest(lat = destiLat, lon = destiLong),
-            nRoutes = nRoutes
+            origin = RoutePointRequest(
+                lat = origenLat,
+                lon = origenLong
+            ),
+            destination = RoutePointRequest(
+                lat = destiLat,
+                lon = destiLong
+            ),
+            nRoutes = nRoutes,
+
+            filtre = RouteFilterRequest(
+                seguretat = seguretat,
+                fontsAigua = fontsAigua,
+                ombra = ombra,
+                escalesMecaniques = eMecaniques,
+                bancs = bancs
+            )
         )
     )
 
+    Log.d("ROUTE_API", "Respuesta HTTP: code=${response.code()} success=${response.isSuccessful}")
+
     if (!response.isSuccessful) {
-        throw IOException("Error: ${response.code()}")
+        throw IOException("Error calculant la ruta: ${response.code()} ${response.message()}")
     }
 
-    val body = response.body() ?: throw IOException("Resposta buida")
+    val body = response.body() ?: throw IOException("La resposta del servidor és buida")
 
-    return normalizarResposta(body)
+    // normalizarResposta debe estar configurada en tu nueva versión para devolver el Triple
+    val resultatNormalitzat = normalizarResposta(body)
+
+    return resultatNormalitzat
 }
 
 fun normalizarResposta(

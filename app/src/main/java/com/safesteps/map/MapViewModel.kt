@@ -183,15 +183,29 @@ class MapViewModel : ViewModel() {
         destiLong: Double,
         destiLat: Double
     ) {
+        val prioridad = _uiState.value.prioridadSeleccionada
+        Log.d("PRUEBA_RUTA", "Llamando a calcularRuta. Prioridad actual: $prioridad")
+        val seguretatWeight = if (prioridad == RoutePriority.SAFETY) 1f else 0f
+        val eMecaniquesWeight = if (prioridad == RoutePriority.ACCESSIBILITY) 1f else 0f
+        val bancsWeight = if (prioridad == RoutePriority.ACCESSIBILITY) 1f else 0f
+        val ombraWeight = if (prioridad == RoutePriority.HEAT) 1f else 0f
+        val fontsAiguaWeight = if (prioridad == RoutePriority.HEAT) 1f else 0f
+
         viewModelScope.launch {
             _uiState.update { it.copy(calculantRuta = true) }
             try {
+                // 2. PASAMOS LOS PESOS A LA FUNCIÓN DE LA API
                 val infoRuta = obtenirCoordenadesRuta(
                     origenLong = origenLong,
                     origenLat = origenLat,
                     destiLong = destiLong,
                     destiLat = destiLat,
-                    nRoutes = 1
+                    nRoutes = 1,
+                    seguretat = seguretatWeight,
+                    fontsAigua = fontsAiguaWeight,
+                    ombra = ombraWeight,
+                    eMecaniques = eMecaniquesWeight,
+                    bancs = bancsWeight
                 )
 
                 val coordenadas = infoRuta.first
@@ -218,8 +232,7 @@ class MapViewModel : ViewModel() {
                         adrecesSuggerides = emptyList(),
                         campActiu = textField.NONE,
                         isTyping = false,
-
-                        puntsInteres = puntosInteres
+                        puntsInteres = puntosInteres // Guardamos los POIs en el estado
                     )
                 }
             } catch (e: Exception) {
