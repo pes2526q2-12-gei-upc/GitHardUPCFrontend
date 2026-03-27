@@ -229,6 +229,84 @@ private fun DropdownSuggeriments(
     }
 }
 
+
+@Composable
+private fun TopPanelHeader() {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Menu, null, tint = Color(0xFF66716C), modifier = Modifier.size(18.dp))
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
+            Text("SafeSteps", color = Color(0xFF33413B), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+        }
+        Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun OriginSearchSection(
+    origen: String,
+    onOrigenChange: (String) -> Unit,
+    onOrigenFocus: () -> Unit,
+    campActiu: textField, // Mantenemos tu tipo exacto
+    adrecesSuggerides: List<Feature>,
+    onAdrecaSeleccionada: (Feature) -> Unit
+) {
+    val esUbicacioActual = origen.isBlank() && campActiu != textField.ORIGIN
+
+    // 1. Separamos las decisiones de estilo
+    val actualBorderColor = if (esUbicacioActual) Color(0xFFBBDEFB) else Color(0xFFDDEEE5)
+    val actualTextColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF3D4A45)
+    val actualPlaceholderColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF9AA7A0)
+
+    val actualIconVector = if (esUbicacioActual) Icons.Default.MyLocation else Icons.Default.RadioButtonUnchecked
+    val actualIconTint = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF74D3A2)
+
+    Column {
+        SearchBarItem(
+            value = origen,
+            onValueChange = onOrigenChange,
+            placeholder = "La meva ubicació",
+            borderColor = actualBorderColor,
+            textColor = actualTextColor,
+            placeholderColor = actualPlaceholderColor,
+            leadingIcon = {
+                Icon(
+                    imageVector = actualIconVector,
+                    contentDescription = null,
+                    tint = actualIconTint,
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            trailingIcon = {
+                // 2. Delegamos la lógica del botón a una función separada
+                BotonBorrarOrigen(origen, onOrigenChange)
+            },
+            onFocus = onOrigenFocus
+        )
+
+        if (campActiu == textField.ORIGIN) {
+            DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
+        }
+    }
+}
+
+@Composable
+private fun BotonBorrarOrigen(origen: String, onOrigenChange: (String) -> Unit) {
+    if (origen.isNotEmpty()) {
+        IconButton(onClick = { onOrigenChange("") }) {
+            Icon(Icons.Default.Clear, null, tint = Color.Gray)
+        }
+    }
+}
+
 @Composable
 private fun TopSearchPanel(
     origen: String,
@@ -252,53 +330,16 @@ private fun TopSearchPanel(
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Menu, null, tint = Color(0xFF66716C), modifier = Modifier.size(18.dp)) }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
-                    Text("SafeSteps", color = Color(0xFF33413B), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-                }
-                Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(20.dp)) }
-                }
-            }
+            TopPanelHeader()
+
             Spacer(modifier = Modifier.height(14.dp))
 
             AnimatedVisibility(visible = mostrarOrigen) {
-                Column {
-                    val esUbicacioActual = origen.isBlank() && campActiu != textField.ORIGIN
-                    SearchBarItem(
-                        value = origen,
-                        onValueChange = onOrigenChange,
-                        placeholder = "La meva ubicació",
-                        borderColor = if (esUbicacioActual) Color(0xFFBBDEFB) else Color(0xFFDDEEE5),
-                        textColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF3D4A45),
-                        placeholderColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF9AA7A0),
-                        leadingIcon = {
-                            Icon(
-                                if (esUbicacioActual) Icons.Default.MyLocation else Icons.Default.RadioButtonUnchecked,
-                                null,
-                                tint = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF74D3A2),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        trailingIcon = {
-                            if (origen.isNotEmpty()) {
-                                IconButton(onClick = { onOrigenChange("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Esborrar origen", tint = Color.Gray)
-                                }
-                            }
-                        },
-                        onFocus = onOrigenFocus
-                    )
-
-                    if (campActiu == textField.ORIGIN) {
-                        DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
+                OriginSearchSection(
+                    origen, onOrigenChange, onOrigenFocus,
+                    campActiu, adrecesSuggerides, onAdrecaSeleccionada
+                )
+                Spacer(modifier = Modifier.height(10.dp))
             }
 
             SearchBarItem(
@@ -310,7 +351,7 @@ private fun TopSearchPanel(
                 trailingIcon = {
                     if (destino.isNotEmpty()) {
                         IconButton(onClick = { onDestinoChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Esborrar destí", tint = Color.Gray)
+                            Icon(Icons.Default.Clear, null, tint = Color.Gray)
                         }
                     }
                 },
