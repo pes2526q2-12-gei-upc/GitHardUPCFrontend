@@ -1,21 +1,15 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-COMMIT_MSG_FILE=$1
-COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+# Expresión regular para validar: [TG-ID] tipo: mensaje
+# Tipos permitidos según nuestra metodología: feat, fix, docs, style, refactor, test, chore [cite: 625]
+commit_regex="^\[TG-[0-9]+\] (feat|fix|docs|style|refactor|test|chore): .+"
 
-# Regex: Empieza por feat:, fix:, o docs:, seguido de un espacio, [TG-Números], espacio, y el texto.
-REGEX="^(feat|fix|docs):\s\[TG-[0-9]+\]\s.+"
+error_msg="Aborting commit. Tu mensaje no cumple el estándar: [TG-ID] tipo: descripción"
 
-if [[ ! $COMMIT_MSG =~ $REGEX ]]; then
-  echo "=================================================================="
-  echo "❌ ERROR: El mensaje del commit no cumple con la nomenclatura."
-  echo "La metodología exige la siguiente sintaxis estricta:"
-  echo "  <tipo>: [TG-<ID>] <mensaje explicativo>"
-  echo ""
-  echo "Tipos permitidos: feat, fix, docs"
-  echo "Ejemplo válido: feat: [TG-45] missatge_explicatiu"
-  echo "=================================================================="
-  exit 1
+if ! grep -qE "$commit_regex" "$1"; then
+    echo "❌ Error: $error_msg"
+    echo "Ejemplo válido: [TG-45] feat: implementar cálculo de ruta segura" [cite: 624]
+    exit 1
 fi
 
 exit 0

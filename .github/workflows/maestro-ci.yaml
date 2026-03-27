@@ -1,0 +1,44 @@
+name: Tests UI Frontend (Maestro)
+
+on:
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  maestro-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descarregar codi
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Donar permisos a Gradle
+        run: chmod +x ./gradlew
+
+      - name: Compilar APK de l'App
+        run: ./gradlew assembleDebug
+
+      - name: Executar Emulador i Tests Maestro
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          profile: Nexus 6
+          script: |
+            echo "Instal·lant Maestro..."
+            curl -Ls "https://get.maestro.mobile.dev" | bash
+            
+            echo "Instal·lant l'APK a l'emulador..."
+            adb install app/build/outputs/apk/debug/app-debug.apk
+            
+            echo "Executant tests UI..."
+            chmod +x $HOME/.maestro/bin/maestro # Donem permisos d'execució
+            $HOME/.maestro/bin/maestro test .maestro/
