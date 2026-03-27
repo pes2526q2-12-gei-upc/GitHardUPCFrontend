@@ -906,15 +906,20 @@ fun MapLibreScreen(
 
                     // 3. ¿Hay que mostrar los puntos extra (fuentes, bancos...)?
                     if (uiState.mostrarPuntsInteres) {
-                        uiState.puntsInteres.forEach { punt ->
-                            val titulo = punt.nom ?: punt.tipus.lowercase().replaceFirstChar { it.uppercase() }
-                            map.addMarker(
-                                MarkerOptions()
-                                    .position(LatLng(punt.latitud, punt.longitud))
-                                    .title(titulo)
-                                    .snippet("Toca per veure detalls")
-                            )
-                        }
+                        uiState.puntsInteres
+                            .filter { punt ->
+                                val tipus = punt.tipus.trim().uppercase()
+                                tipus == "FONT" || tipus == "COMISSARIA"
+                            }
+                            .forEach { punt ->
+                                val titulo = punt.nom ?: punt.tipus.lowercase().replaceFirstChar { it.uppercase() }
+                                map.addMarker(
+                                    MarkerOptions()
+                                        .position(LatLng(punt.latitud, punt.longitud))
+                                        .title(titulo)
+                                        .icon(crearIconaPoi(context, punt.tipus))
+                                )
+                            }
                     }
                 } else {
                     // 4. Si NO hay ruta, solo dibujamos los pines de Origen y Destino si existen
