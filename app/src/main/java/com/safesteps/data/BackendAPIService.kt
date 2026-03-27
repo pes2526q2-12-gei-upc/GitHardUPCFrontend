@@ -5,6 +5,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
+
 data class RouteRequest(
     val originLat: Double,
     val originLong: Double,
@@ -13,9 +14,15 @@ data class RouteRequest(
 )
 
 data class RutaResponse(
+    val routes: List<RouteData>
+)
+
+data class RouteData(
     val distànciaKm: Double,
     val tempsMinuts: Int,
-    val coordenades: List<Coordenada>
+    val coordenades: List<Coordenada>,
+
+    val puntsInteres: List<PuntInteres> = emptyList()
 )
 
 data class Coordenada(
@@ -23,12 +30,19 @@ data class Coordenada(
     val lon: Double
 )
 
+data class PuntInteres(
+    val id: String,
+    val tipus: String,
+    val latitud: Double,
+    val longitud: Double,
+    val nom: String? = null
+)
+
 interface ElMeuBackendApi {
-    // Ara és un POST i li passem l'objecte JSON al Body
     @POST("api/v1/calculate-route")
     suspend fun calcularRuta(
         @Body request: RouteRequest
-    ): Response<RutaResponse> // RutaResponse és el JSON que et retornarà
+    ): Response<RutaResponse>
 }
 
 object backendAPI {
@@ -44,5 +58,4 @@ object backendAPI {
     val service: ElMeuBackendApi by lazy {
         retrofit.create(ElMeuBackendApi::class.java)
     }
-
 }

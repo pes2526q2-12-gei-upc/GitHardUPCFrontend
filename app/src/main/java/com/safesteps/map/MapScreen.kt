@@ -229,6 +229,84 @@ private fun DropdownSuggeriments(
     }
 }
 
+
+@Composable
+private fun TopPanelHeader() {
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Menu, null, tint = Color(0xFF66716C), modifier = Modifier.size(18.dp))
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
+            Text("SafeSteps", color = Color(0xFF33413B), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+        }
+        Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun OriginSearchSection(
+    origen: String,
+    onOrigenChange: (String) -> Unit,
+    onOrigenFocus: () -> Unit,
+    campActiu: textField, // Mantenemos tu tipo exacto
+    adrecesSuggerides: List<Feature>,
+    onAdrecaSeleccionada: (Feature) -> Unit
+) {
+    val esUbicacioActual = origen.isBlank() && campActiu != textField.ORIGIN
+
+    // 1. Separamos las decisiones de estilo
+    val actualBorderColor = if (esUbicacioActual) Color(0xFFBBDEFB) else Color(0xFFDDEEE5)
+    val actualTextColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF3D4A45)
+    val actualPlaceholderColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF9AA7A0)
+
+    val actualIconVector = if (esUbicacioActual) Icons.Default.MyLocation else Icons.Default.RadioButtonUnchecked
+    val actualIconTint = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF74D3A2)
+
+    Column {
+        SearchBarItem(
+            value = origen,
+            onValueChange = onOrigenChange,
+            placeholder = "La meva ubicació",
+            borderColor = actualBorderColor,
+            textColor = actualTextColor,
+            placeholderColor = actualPlaceholderColor,
+            leadingIcon = {
+                Icon(
+                    imageVector = actualIconVector,
+                    contentDescription = null,
+                    tint = actualIconTint,
+                    modifier = Modifier.size(18.dp)
+                )
+            },
+            trailingIcon = {
+                // 2. Delegamos la lógica del botón a una función separada
+                BotonBorrarOrigen(origen, onOrigenChange)
+            },
+            onFocus = onOrigenFocus
+        )
+
+        if (campActiu == textField.ORIGIN) {
+            DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
+        }
+    }
+}
+
+@Composable
+private fun BotonBorrarOrigen(origen: String, onOrigenChange: (String) -> Unit) {
+    if (origen.isNotEmpty()) {
+        IconButton(onClick = { onOrigenChange("") }) {
+            Icon(Icons.Default.Clear, null, tint = Color.Gray)
+        }
+    }
+}
+
 @Composable
 private fun TopSearchPanel(
     origen: String,
@@ -252,53 +330,16 @@ private fun TopSearchPanel(
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Menu, null, tint = Color(0xFF66716C), modifier = Modifier.size(18.dp)) }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
-                    Text("SafeSteps", color = Color(0xFF33413B), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-                }
-                Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(20.dp)) }
-                }
-            }
+            TopPanelHeader()
+
             Spacer(modifier = Modifier.height(14.dp))
 
             AnimatedVisibility(visible = mostrarOrigen) {
-                Column {
-                    val esUbicacioActual = origen.isBlank() && campActiu != textField.ORIGIN
-                    SearchBarItem(
-                        value = origen,
-                        onValueChange = onOrigenChange,
-                        placeholder = "La meva ubicació",
-                        borderColor = if (esUbicacioActual) Color(0xFFBBDEFB) else Color(0xFFDDEEE5),
-                        textColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF3D4A45),
-                        placeholderColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF9AA7A0),
-                        leadingIcon = {
-                            Icon(
-                                if (esUbicacioActual) Icons.Default.MyLocation else Icons.Default.RadioButtonUnchecked,
-                                null,
-                                tint = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF74D3A2),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        },
-                        trailingIcon = {
-                            if (origen.isNotEmpty()) {
-                                IconButton(onClick = { onOrigenChange("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Esborrar origen", tint = Color.Gray)
-                                }
-                            }
-                        },
-                        onFocus = onOrigenFocus
-                    )
-
-                    if (campActiu == textField.ORIGIN) {
-                        DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
+                OriginSearchSection(
+                    origen, onOrigenChange, onOrigenFocus,
+                    campActiu, adrecesSuggerides, onAdrecaSeleccionada
+                )
+                Spacer(modifier = Modifier.height(10.dp))
             }
 
             SearchBarItem(
@@ -310,7 +351,7 @@ private fun TopSearchPanel(
                 trailingIcon = {
                     if (destino.isNotEmpty()) {
                         IconButton(onClick = { onDestinoChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Esborrar destí", tint = Color.Gray)
+                            Icon(Icons.Default.Clear, null, tint = Color.Gray)
                         }
                     }
                 },
@@ -446,6 +487,7 @@ private fun RoutePlannerSheet(
     onPrioritySelected: (RoutePriority) -> Unit,
     distanceText: String,
     durationText: String,
+    puntsInteres: List<com.safesteps.data.PuntInteres>,
     onClose: () -> Unit,
     onStartRoute: () -> Unit
 ) {
@@ -544,6 +586,25 @@ private fun RoutePlannerSheet(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (puntsInteres.isNotEmpty()) {
+                val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
+                val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
+                val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    if (fonts > 0) Text("💧 $fonts Fonts", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                    if (bancs > 0) Text("🪑 $bancs Bancs", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                    if (comisaries > 0) Text("👮 $comisaries Comisaries", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -764,53 +825,6 @@ fun MapLibreScreen(
         }
     }
 
-    LaunchedEffect(uiState.estiloSatelite, uiState.modoRuta, uiState.rutaCoordenades) {
-        mapView.getMapAsync { map ->
-            val styleUrl =
-                if (uiState.estiloSatelite) {
-                    "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-                } else {
-                    "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
-                }
-
-            map.setStyle(styleUrl) {
-                viewModel.onMapaListo()
-
-                if (uiState.locationGranted) {
-                    activateLocationComponent(mapView)
-                }
-
-                if (uiState.rutaCoordenades.isNotEmpty()) {
-                    val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
-                    drawRoute(
-                        mapView = mapView,
-                        coordenades = uiState.rutaCoordenades,
-                        origen = origenPoint,
-                        desti = uiState.destinoSeleccionado,
-                        context = context
-                    )
-                } else {
-                    map.clear()
-                    uiState.origenSeleccionado?.let { ori ->
-                        map.addMarker(
-                            MarkerOptions()
-                                .position(ori)
-                                .title("Origen")
-                                .icon(crearIconaGrisa(context))
-                        )
-                    }
-                    uiState.destinoSeleccionado?.let { dest ->
-                        map.addMarker(
-                            MarkerOptions()
-                                .position(dest)
-                                .title("Destí")
-                        )
-                    }
-                }
-            }
-        }
-    }
-
     LaunchedEffect(uiState.destinoSeleccionado, uiState.origenSeleccionado) {
         val destination = uiState.destinoSeleccionado
         if (destination != null) {
@@ -856,6 +870,69 @@ fun MapLibreScreen(
         }
     }
 
+    // UNIFICADO: Este bloque gestiona TODO el dibujo en el mapa sin conflictos
+    LaunchedEffect(
+        uiState.estiloSatelite,
+        uiState.modoRuta,
+        uiState.rutaCoordenades,
+        uiState.mostrarPuntsInteres,
+        uiState.puntsInteres,
+        uiState.origenSeleccionado,
+        uiState.destinoSeleccionado
+    ) {
+        mapView.getMapAsync { map ->
+            val styleUrl = if (uiState.estiloSatelite) {
+                "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+            } else {
+                "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+            }
+
+            // 1. Cargamos el estilo (Esto limpia el mapa automáticamente)
+            map.setStyle(styleUrl) {
+                viewModel.onMapaListo()
+                if (uiState.locationGranted) activateLocationComponent(mapView)
+
+                // 2. ¿Hay una ruta que dibujar?
+                if (uiState.rutaCoordenades.isNotEmpty()) {
+                    val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
+
+                    drawRoute(
+                        mapView = mapView,
+                        coordenades = uiState.rutaCoordenades,
+                        origen = origenPoint,
+                        desti = uiState.destinoSeleccionado,
+                        context = context
+                    )
+
+                    // 3. ¿Hay que mostrar los puntos extra (fuentes, bancos...)?
+                    if (uiState.mostrarPuntsInteres) {
+                        uiState.puntsInteres
+                            .filter { punt ->
+                                val tipus = punt.tipus.trim().uppercase()
+                                tipus == "FONT" || tipus == "COMISSARIA"
+                            }
+                            .forEach { punt ->
+                                val titulo = punt.nom ?: punt.tipus.lowercase().replaceFirstChar { it.uppercase() }
+                                map.addMarker(
+                                    MarkerOptions()
+                                        .position(LatLng(punt.latitud, punt.longitud))
+                                        .title(titulo)
+                                        .icon(crearIconaPoi(context, punt.tipus))
+                                )
+                            }
+                    }
+                } else {
+                    // 4. Si NO hay ruta, solo dibujamos los pines de Origen y Destino si existen
+                    uiState.origenSeleccionado?.let { ori ->
+                        map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context)))
+                    }
+                    uiState.destinoSeleccionado?.let { dest ->
+                        map.addMarker(MarkerOptions().position(dest).title("Destí"))
+                    }
+                }
+            }
+        }
+    }
     LaunchedEffect(uiState.destinoSeleccionado) {
         val destination = uiState.destinoSeleccionado
         if (destination != null) {
@@ -869,19 +946,6 @@ fun MapLibreScreen(
                     destiLat = destination.latitude
                 )
             }
-        }
-    }
-
-    LaunchedEffect(uiState.rutaCoordenades, uiState.mapaListo) {
-        if (uiState.mapaListo && uiState.rutaCoordenades.isNotEmpty()) {
-            val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
-            drawRoute(
-                mapView = mapView,
-                coordenades = uiState.rutaCoordenades,
-                origen = origenPoint,
-                desti = uiState.destinoSeleccionado,
-                context = context
-            )
         }
     }
 
@@ -918,6 +982,15 @@ fun MapLibreScreen(
                     getMapAsync { map ->
                         map.uiSettings.isLogoEnabled = false
                         map.uiSettings.isAttributionEnabled = false
+
+                        map.setOnMarkerClickListener { marker ->
+                            val puntPulsat = uiState.puntsInteres.find {
+                                it.latitud == marker.position.latitude && it.longitud == marker.position.longitude
+                            }
+                            viewModel.onPuntInteresSeleccionat(puntPulsat)
+
+                            false
+                        }
 
                         map.addOnMapClickListener { point ->
                             if (uiState.modoRuta) {
@@ -1027,6 +1100,7 @@ fun MapLibreScreen(
                 distanceText = uiState.distanceText,
                 durationText = uiState.durationText,
                 onClose = resetToMainMenu,
+                puntsInteres = uiState.puntsInteres,
                 onStartRoute = {
                     viewModel.iniciarNavegacio()
                     /*
@@ -1082,6 +1156,17 @@ fun MapLibreScreen(
                     .padding(end = 16.dp, bottom = dynamicBottomPadding),
                 horizontalAlignment = Alignment.End
             ) {
+                AnimatedVisibility(visible = uiState.puntsInteres.isNotEmpty() && !uiState.modoRuta) {
+                    ExtendedFloatingActionButton(
+                        onClick = { viewModel.togglePuntsInteres() },
+                        icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+                        text = { Text(if (uiState.mostrarPuntsInteres) "Ocultar Info Extra" else "Mostrar Info Extra") },
+                        containerColor = Color.White,
+                        contentColor = Color(0xFFC86A37),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                }
+
                 ExtendedFloatingActionButton(
                     onClick = { viewModel.toggleEstiloSatelite() },
                     icon = { Icon(Icons.Default.Layers, contentDescription = "Canviar estil") },
