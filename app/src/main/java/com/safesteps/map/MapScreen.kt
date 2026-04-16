@@ -2,6 +2,7 @@ package com.safesteps.map
 
 import android.Manifest
 import android.location.LocationListener
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -10,6 +11,7 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +49,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -56,10 +59,12 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -75,15 +80,33 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.safesteps.R
 import com.safesteps.data.Feature
 import com.safesteps.domain.RoutePriority
 import kotlinx.coroutines.delay
@@ -92,15 +115,6 @@ import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import kotlin.math.max
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
-import com.safesteps.R
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.graphicsLayer
 
 @Composable
 private fun SearchBarItem(
@@ -231,7 +245,10 @@ private fun DropdownSuggeriments(
 
 
 @Composable
-private fun TopPanelHeader() {
+private fun TopPanelHeader(
+    currentUser: UserInfo?,
+    onLoginClick: () -> Unit
+) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
             Box(contentAlignment = Alignment.Center) {
@@ -242,9 +259,30 @@ private fun TopPanelHeader() {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
             Text("SafeSteps", color = Color(0xFF33413B), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
         }
-        Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(20.dp))
+
+        if (currentUser != null) {
+            Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (currentUser.photoUrl != null) {
+                        AsyncImage(
+                            model = currentUser.photoUrl,
+                            contentDescription = "Foto de perfil",
+                            modifier = Modifier.fillMaxSize().clip(CircleShape)
+                        )
+                    } else {
+                        Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+        } else {
+            Button(
+                onClick = onLoginClick,
+                modifier = Modifier.height(36.dp),
+                shape = RoundedCornerShape(18.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6DD29A))
+            ) {
+                Text("Log-in", color = Color.White, style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -255,13 +293,12 @@ private fun OriginSearchSection(
     origen: String,
     onOrigenChange: (String) -> Unit,
     onOrigenFocus: () -> Unit,
-    campActiu: textField, // Mantenemos tu tipo exacto
+    campActiu: textField,
     adrecesSuggerides: List<Feature>,
     onAdrecaSeleccionada: (Feature) -> Unit
 ) {
     val esUbicacioActual = origen.isBlank() && campActiu != textField.ORIGIN
 
-    // 1. Separamos las decisiones de estilo
     val actualBorderColor = if (esUbicacioActual) Color(0xFFBBDEFB) else Color(0xFFDDEEE5)
     val actualTextColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF3D4A45)
     val actualPlaceholderColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF9AA7A0)
@@ -286,7 +323,6 @@ private fun OriginSearchSection(
                 )
             },
             trailingIcon = {
-                // 2. Delegamos la lógica del botón a una función separada
                 BotonBorrarOrigen(origen, onOrigenChange)
             },
             onFocus = onOrigenFocus
@@ -318,7 +354,9 @@ private fun TopSearchPanel(
     onDestinoFocus: () -> Unit,
     adrecesSuggerides: List<Feature>,
     onAdrecaSeleccionada: (Feature) -> Unit,
-    campActiu: textField
+    campActiu: textField,
+    currentUser: UserInfo?,
+    onLoginClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -330,7 +368,7 @@ private fun TopSearchPanel(
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            TopPanelHeader()
+            TopPanelHeader(currentUser = currentUser, onLoginClick = onLoginClick)
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -744,6 +782,20 @@ private fun RouteActiveBottomBar(
     }
 }
 
+private fun GoogleSignInAccount.toUserInfo(): UserInfo {
+    val resolvedEmail = email.orEmpty()
+    val resolvedUsername = displayName?.takeIf { it.isNotBlank() }
+        ?: resolvedEmail.substringBefore("@").takeIf { it.isNotBlank() }
+        ?: resolvedEmail
+
+    return UserInfo(
+        username = resolvedUsername,
+        email = resolvedEmail,
+        photoUrl = photoUrl?.toString(),
+        idToken = idToken
+    )
+}
+
 @Composable
 fun MapLibreScreen(
     modifier: Modifier = Modifier,
@@ -772,6 +824,29 @@ fun MapLibreScreen(
         },
         label = "buttonPadding"
     )
+
+    val gso = remember {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestProfile()
+            .requestIdToken(context.getString(R.string.server_client_id))
+            .build()
+    }
+    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            if (account != null) {
+                viewModel.onUserLoggedIn(account.toUserInfo())
+            }
+        } catch (e: ApiException) {
+            Log.e("GOOGLE_AUTH", "Sign in failed: ${e.statusCode}")
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
@@ -817,6 +892,23 @@ fun MapLibreScreen(
                 )
             )
         }
+
+        viewModel.restoreLoggedUser(GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo())
+    }
+
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.restoreLoggedUser(GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo())
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     LaunchedEffect(uiState.locationGranted, uiState.mapaListo) {
@@ -842,36 +934,6 @@ fun MapLibreScreen(
     }
 
     LaunchedEffect(
-        uiState.origenSeleccionado,
-        uiState.destinoSeleccionado,
-        uiState.modoRuta
-    ) {
-        if (uiState.modoRuta || uiState.rutaCoordenades.isNotEmpty()) return@LaunchedEffect
-
-        mapView.getMapAsync { map ->
-            if (map.style?.isFullyLoaded == true) {
-                map.clear()
-                uiState.origenSeleccionado?.let { ori ->
-                    map.addMarker(
-                        MarkerOptions()
-                            .position(ori)
-                            .title("Origen")
-                            .icon(crearIconaGrisa(context))
-                    )
-                }
-                uiState.destinoSeleccionado?.let { dest ->
-                    map.addMarker(
-                        MarkerOptions()
-                            .position(dest)
-                            .title("Destí")
-                    )
-                }
-            }
-        }
-    }
-
-    // UNIFICADO: Este bloque gestiona TODO el dibujo en el mapa sin conflictos
-    LaunchedEffect(
         uiState.estiloSatelite,
         uiState.modoRuta,
         uiState.rutaCoordenades,
@@ -887,12 +949,10 @@ fun MapLibreScreen(
                 "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
             }
 
-            // 1. Cargamos el estilo (Esto limpia el mapa automáticamente)
             map.setStyle(styleUrl) {
                 viewModel.onMapaListo()
                 if (uiState.locationGranted) activateLocationComponent(mapView)
 
-                // 2. ¿Hay una ruta que dibujar?
                 if (uiState.rutaCoordenades.isNotEmpty()) {
                     val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
 
@@ -904,7 +964,6 @@ fun MapLibreScreen(
                         context = context
                     )
 
-                    // 3. ¿Hay que mostrar los puntos extra (fuentes, bancos...)?
                     if (uiState.mostrarPuntsInteres) {
                         uiState.puntsInteres
                             .filter { punt ->
@@ -922,7 +981,6 @@ fun MapLibreScreen(
                             }
                     }
                 } else {
-                    // 4. Si NO hay ruta, solo dibujamos los pines de Origen y Destino si existen
                     uiState.origenSeleccionado?.let { ori ->
                         map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context)))
                     }
@@ -930,21 +988,6 @@ fun MapLibreScreen(
                         map.addMarker(MarkerOptions().position(dest).title("Destí"))
                     }
                 }
-            }
-        }
-    }
-    LaunchedEffect(uiState.destinoSeleccionado) {
-        val destination = uiState.destinoSeleccionado
-        if (destination != null) {
-            val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
-
-            if (origenPoint != null) {
-                viewModel.calcularRuta(
-                    origenLong = origenPoint.longitude,
-                    origenLat = origenPoint.latitude,
-                    destiLong = destination.longitude,
-                    destiLat = destination.latitude
-                )
             }
         }
     }
@@ -1042,7 +1085,9 @@ fun MapLibreScreen(
                         }
                     }
                 },
-                campActiu = uiState.campActiu
+                campActiu = uiState.campActiu,
+                currentUser = uiState.currentUser,
+                onLoginClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
             )
         }
 
@@ -1075,7 +1120,7 @@ fun MapLibreScreen(
                     ),
                 selectedPriority = uiState.prioridadSeleccionada,
                 onPrioritySelected = { priority ->
-                    viewModel.onPrioridadSeleccionada(priority)
+                    viewModel.onPrioritySelected(priority)
                     val destination = uiState.destinoSeleccionado
                     val selectedOrigin = uiState.origenSeleccionado
                     val currentLocation = uiState.ultimaUbicacion
@@ -1103,29 +1148,6 @@ fun MapLibreScreen(
                 puntsInteres = uiState.puntsInteres,
                 onStartRoute = {
                     viewModel.iniciarNavegacio()
-                    /*
-                    val destination = uiState.destinoSeleccionado
-                    val selectedOrigin = uiState.origenSeleccionado
-                    val currentLocation = uiState.ultimaUbicacion
-
-                    if (destination == null) {
-                        Toast.makeText(context, "Selecciona un destí", Toast.LENGTH_SHORT).show()
-                    } else {
-                        val origenLong = selectedOrigin?.longitude ?: currentLocation?.longitude
-                        val origenLat = selectedOrigin?.latitude ?: currentLocation?.latitude
-
-                        if (origenLong == null || origenLat == null) {
-                            Toast.makeText(context, "No s'ha pogut obtenir l'origen", Toast.LENGTH_SHORT).show()
-                        } else {
-                            viewModel.calcularRuta(
-                                origenLong = origenLong,
-                                origenLat = origenLat,
-                                destiLong = destination.longitude,
-                                destiLat = destination.latitude
-                            )
-                        }
-                    }
-                    */
                 }
             )
         }

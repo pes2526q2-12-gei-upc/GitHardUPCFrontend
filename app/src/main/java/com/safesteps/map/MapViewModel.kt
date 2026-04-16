@@ -33,6 +33,10 @@ class MapViewModel : ViewModel() {
         _uiState.update { it.copy(textoDestino = texto) }
     }
 
+    fun onPrioritySelected(prioridad: RoutePriority) {
+        _uiState.update { it.copy(prioridadSeleccionada = prioridad) }
+    }
+
     fun onPrioridadSeleccionada(prioridad: RoutePriority) {
         _uiState.update { it.copy(prioridadSeleccionada = prioridad) }
     }
@@ -194,7 +198,6 @@ class MapViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(calculantRuta = true) }
             try {
-                // 2. PASAMOS LOS PESOS A LA FUNCIÓN DE LA API
                 val infoRuta = obtenirCoordenadesRuta(
                     origenLong = origenLong,
                     origenLat = origenLat,
@@ -232,7 +235,7 @@ class MapViewModel : ViewModel() {
                         adrecesSuggerides = emptyList(),
                         campActiu = textField.NONE,
                         isTyping = false,
-                        puntsInteres = puntosInteres // Guardamos los POIs en el estado
+                        puntsInteres = puntosInteres
                     )
                 }
             } catch (e: Exception) {
@@ -258,6 +261,27 @@ class MapViewModel : ViewModel() {
     fun onPuntInteresSeleccionat(punt: com.safesteps.data.PuntInteres?) {
         _uiState.update { it.copy(puntInteresSeleccionat = punt) }
     }
+
+    fun onLoginClick() {
+        _uiState.update { it.copy(showLoginDialog = true) }
+    }
+
+    fun onLoginDismiss() {
+        _uiState.update { it.copy(showLoginDialog = false) }
+    }
+
+    fun onUserLoggedIn(user: UserInfo) {
+        _uiState.update { it.copy(currentUser = user, showLoginDialog = false) }
+    }
+
+    fun restoreLoggedUser(user: UserInfo?) {
+        _uiState.update { it.copy(currentUser = user) }
+    }
+
+    fun onLogout() {
+        _uiState.update { it.copy(currentUser = null) }
+    }
+
     private suspend fun getTextoDestino(point: LatLng): String {
         return try {
             val resposta = PhotonApi.service.reverseGeocode(

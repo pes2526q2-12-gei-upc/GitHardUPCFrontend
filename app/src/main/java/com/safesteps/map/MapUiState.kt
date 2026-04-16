@@ -13,6 +13,13 @@ enum class textField {
     DESTINY
 }
 
+data class UserInfo(
+    val username: String,
+    val email: String,
+    val photoUrl: String? = null,
+    val idToken: String? = null
+)
+
 data class MapUiState(
     val destinoSeleccionado: LatLng? = null,
     val textoOrigen: String = "",
@@ -36,5 +43,7 @@ data class MapUiState(
     val calculantRuta: Boolean = false,
     val puntsInteres: List<PuntInteres> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
-    val puntInteresSeleccionat: PuntInteres? = null
+    val puntInteresSeleccionat: PuntInteres? = null,
+    val currentUser: UserInfo? = null,
+    val showLoginDialog: Boolean = false
 )
