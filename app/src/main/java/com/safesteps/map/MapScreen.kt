@@ -85,6 +85,7 @@ import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -261,15 +262,18 @@ private fun TopPanelHeader(
         }
 
         if (currentUser != null) {
-            Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
-                Box(contentAlignment = Alignment.Center) {
-                    if (currentUser.photoUrl != null) {
-                        AsyncImage(
-                            model = currentUser.photoUrl,
-                            contentDescription = "Foto de perfil",
-                            modifier = Modifier.fillMaxSize().clip(CircleShape)
-                        )
-                    } else {
+            if (!currentUser.photoUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = currentUser.photoUrl,
+                    contentDescription = "Foto de perfil",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                )
+            } else {
+                Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
+                    Box(contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
@@ -829,7 +833,6 @@ fun MapLibreScreen(
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .requestProfile()
-            .requestIdToken(context.getString(R.string.server_client_id))
             .build()
     }
     val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
@@ -842,9 +845,12 @@ fun MapLibreScreen(
             val account = task.getResult(ApiException::class.java)
             if (account != null) {
                 viewModel.onUserLoggedIn(account.toUserInfo())
+            } else {
+                Toast.makeText(context, "No s'ha pogut iniciar sessió, torna-ho a intentar", Toast.LENGTH_SHORT).show()
             }
         } catch (e: ApiException) {
             Log.e("GOOGLE_AUTH", "Sign in failed: ${e.statusCode}")
+            Toast.makeText(context, "No s'ha pogut iniciar sessió, torna-ho a intentar", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -893,7 +899,7 @@ fun MapLibreScreen(
             )
         }
 
-        viewModel.restoreLoggedUser(GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo())
+        GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo()?.let(viewModel::restoreLoggedUser)
     }
 
 
@@ -902,7 +908,7 @@ fun MapLibreScreen(
     DisposableEffect(lifecycleOwner, context) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.restoreLoggedUser(GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo())
+                GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo()?.let(viewModel::restoreLoggedUser)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
