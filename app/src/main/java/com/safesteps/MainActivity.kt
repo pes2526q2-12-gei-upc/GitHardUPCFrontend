@@ -7,7 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
-import com.safesteps.map.MapLibreScreen
 import com.safesteps.ui.theme.SafeStepsTheme
 import org.maplibre.android.MapLibre
 
@@ -20,8 +19,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SafeStepsTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MapLibreScreen(modifier = Modifier.fillMaxSize())
+                Scaffold(modifier = Modifier.fillMaxSize()) { _ ->
+                    SafeStepsApp(modifier = Modifier.fillMaxSize())
                 }
             }
         }

@@ -262,26 +262,6 @@ class MapViewModel : ViewModel() {
         _uiState.update { it.copy(puntInteresSeleccionat = punt) }
     }
 
-    fun onLoginClick() {
-        _uiState.update { it.copy(showLoginDialog = true) }
-    }
-
-    fun onLoginDismiss() {
-        _uiState.update { it.copy(showLoginDialog = false) }
-    }
-
-    fun onUserLoggedIn(user: UserInfo) {
-        _uiState.update { it.copy(currentUser = user, showLoginDialog = false) }
-    }
-
-    fun restoreLoggedUser(user: UserInfo?) {
-        _uiState.update { it.copy(currentUser = user) }
-    }
-
-    fun onLogout() {
-        _uiState.update { it.copy(currentUser = null) }
-    }
-
     private suspend fun getTextoDestino(point: LatLng): String {
         return try {
             val resposta = PhotonApi.service.reverseGeocode(

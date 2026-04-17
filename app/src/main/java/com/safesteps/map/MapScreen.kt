@@ -2,7 +2,6 @@ package com.safesteps.map
 
 import android.Manifest
 import android.location.LocationListener
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -88,14 +87,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.airbnb.lottie.compose.LottieAnimation
@@ -103,11 +99,8 @@ import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
 import com.safesteps.R
+import com.safesteps.auth.UserInfo
 import com.safesteps.data.Feature
 import com.safesteps.domain.RoutePriority
 import kotlinx.coroutines.delay
@@ -248,7 +241,8 @@ private fun DropdownSuggeriments(
 @Composable
 private fun TopPanelHeader(
     currentUser: UserInfo?,
-    onLoginClick: () -> Unit
+    onLoginClick: () -> Unit,
+    onProfileClick: () -> Unit
 ) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
@@ -270,9 +264,16 @@ private fun TopPanelHeader(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
+                        .clickable(onClick = onProfileClick)
                 )
             } else {
-                Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
+                Surface(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clickable(onClick = onProfileClick),
+                    shape = CircleShape,
+                    color = Color(0xFF6DD29A)
+                ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
@@ -314,7 +315,7 @@ private fun OriginSearchSection(
         SearchBarItem(
             value = origen,
             onValueChange = onOrigenChange,
-            placeholder = "La meva ubicació",
+            placeholder = "La meva ubicaci\u00F3",
             borderColor = actualBorderColor,
             textColor = actualTextColor,
             placeholderColor = actualPlaceholderColor,
@@ -360,7 +361,8 @@ private fun TopSearchPanel(
     onAdrecaSeleccionada: (Feature) -> Unit,
     campActiu: textField,
     currentUser: UserInfo?,
-    onLoginClick: () -> Unit
+    onLoginClick: () -> Unit,
+    onProfileClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -372,7 +374,11 @@ private fun TopSearchPanel(
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            TopPanelHeader(currentUser = currentUser, onLoginClick = onLoginClick)
+            TopPanelHeader(
+                currentUser = currentUser,
+                onLoginClick = onLoginClick,
+                onProfileClick = onProfileClick
+            )
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -387,7 +393,7 @@ private fun TopSearchPanel(
             SearchBarItem(
                 value = destino,
                 onValueChange = onDestinoChange,
-                placeholder = "Destí",
+                placeholder = "Dest\u00ED",
                 borderColor = Color(0xFFF2D8D4),
                 leadingIcon = { Icon(Icons.Default.LocationOn, null, tint = Color(0xFFFF8A80), modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
@@ -641,9 +647,9 @@ private fun RoutePlannerSheet(
                         .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    if (fonts > 0) Text("💧 $fonts Fonts", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
-                    if (bancs > 0) Text("🪑 $bancs Bancs", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
-                    if (comisaries > 0) Text("👮 $comisaries Comisaries", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                    if (fonts > 0) Text("\uD83D\uDCA7 $fonts Fonts", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                    if (bancs > 0) Text("\uD83E\uDE91 $bancs Bancs", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                    if (comisaries > 0) Text("\uD83D\uDC6E $comisaries Comisaries", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -667,7 +673,7 @@ private fun RoutePlannerSheet(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "•",
+                    text = "\u2022",
                     color = Color(0xFF88D1A6),
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -767,7 +773,7 @@ private fun RouteActiveBottomBar(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "•",
+                            text = "\u2022",
                             color = Color(0xFF5F6368),
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -786,23 +792,12 @@ private fun RouteActiveBottomBar(
     }
 }
 
-private fun GoogleSignInAccount.toUserInfo(): UserInfo {
-    val resolvedEmail = email.orEmpty()
-    val resolvedUsername = displayName?.takeIf { it.isNotBlank() }
-        ?: resolvedEmail.substringBefore("@").takeIf { it.isNotBlank() }
-        ?: resolvedEmail
-
-    return UserInfo(
-        username = resolvedUsername,
-        email = resolvedEmail,
-        photoUrl = photoUrl?.toString(),
-        idToken = idToken
-    )
-}
-
 @Composable
 fun MapLibreScreen(
     modifier: Modifier = Modifier,
+    currentUser: UserInfo? = null,
+    onLoginClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
     viewModel: MapViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -828,38 +823,12 @@ fun MapLibreScreen(
         },
         label = "buttonPadding"
     )
-
-    val gso = remember {
-        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestEmail()
-            .requestProfile()
-            .build()
-    }
-    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
-
-    val googleSignInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-        try {
-            val account = task.getResult(ApiException::class.java)
-            if (account != null) {
-                viewModel.onUserLoggedIn(account.toUserInfo())
-            } else {
-                Toast.makeText(context, "No s'ha pogut iniciar sessió, torna-ho a intentar", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: ApiException) {
-            Log.e("GOOGLE_AUTH", "Sign in failed: ${e.statusCode}")
-            Toast.makeText(context, "No s'ha pogut iniciar sessió, torna-ho a intentar", Toast.LENGTH_SHORT).show()
-        }
-    }
-
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
         val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
         val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         val granted = fine || coarse || hasLocationPermission(context)
         viewModel.onLocationPermissionsResult(granted)
-        if (!granted) Toast.makeText(context, "Permís d'ubicació necessari.", Toast.LENGTH_SHORT).show()
+        if (!granted) Toast.makeText(context, "Perm\u00EDs d'ubicaci\u00F3 necessari.", Toast.LENGTH_SHORT).show()
     }
 
     val sheetDragState = rememberDraggableState { delta ->
@@ -897,23 +866,6 @@ fun MapLibreScreen(
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
-        }
-
-        GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo()?.let(viewModel::restoreLoggedUser)
-    }
-
-
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    DisposableEffect(lifecycleOwner, context) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo()?.let(viewModel::restoreLoggedUser)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -991,7 +943,7 @@ fun MapLibreScreen(
                         map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context)))
                     }
                     uiState.destinoSeleccionado?.let { dest ->
-                        map.addMarker(MarkerOptions().position(dest).title("Destí"))
+                        map.addMarker(MarkerOptions().position(dest).title("Dest\u00ED"))
                     }
                 }
             }
@@ -1092,8 +1044,9 @@ fun MapLibreScreen(
                     }
                 },
                 campActiu = uiState.campActiu,
-                currentUser = uiState.currentUser,
-                onLoginClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
+                currentUser = currentUser,
+                onLoginClick = onLoginClick,
+                onProfileClick = onProfileClick
             )
         }
 
@@ -1143,7 +1096,7 @@ fun MapLibreScreen(
                                 destiLat = destination.latitude
                             )
                         } else {
-                            Toast.makeText(context, "Esperant ubicació GPS...", Toast.LENGTH_SHORT)
+                            Toast.makeText(context, "Esperant ubicaci\u00F3 GPS...", Toast.LENGTH_SHORT)
                                 .show()
                         }
                     }
@@ -1198,7 +1151,7 @@ fun MapLibreScreen(
                 ExtendedFloatingActionButton(
                     onClick = { viewModel.toggleEstiloSatelite() },
                     icon = { Icon(Icons.Default.Layers, contentDescription = "Canviar estil") },
-                    text = { Text(if (uiState.estiloSatelite) "Estàndard" else "Satèl·lit") },
+                    text = { Text(if (uiState.estiloSatelite) "Est\u00E0ndard" else "Sat\u00E8l\u00B7lit") },
                     containerColor = if (uiState.estiloSatelite) Color(0xFF2F3B44) else Color.White,
                     contentColor = if (uiState.estiloSatelite) Color.White else Color(0xFF3D4A45)
                 )
@@ -1236,7 +1189,7 @@ fun MapLibreScreen(
                     containerColor = Color.White,
                     contentColor = Color(0xFF49B97E)
                 ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "La meva ubicació")
+                    Icon(Icons.Default.MyLocation, contentDescription = "La meva ubicaci\u00F3")
                 }
             }
         }
