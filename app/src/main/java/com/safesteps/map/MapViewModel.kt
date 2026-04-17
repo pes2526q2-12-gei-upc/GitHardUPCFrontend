@@ -8,6 +8,7 @@ import com.safesteps.data.Feature
 import com.safesteps.data.PhotonApi
 import com.safesteps.data.obtenirCoordenadesRuta
 import com.safesteps.domain.RoutePriority
+import com.safesteps.i18n.AppLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +27,11 @@ class MapViewModel(
 
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
+    private var currentLanguage: AppLanguage = AppLanguage.default
+
+    fun onLanguageChanged(language: AppLanguage) {
+        currentLanguage = language
+    }
 
     fun onOrigenChange(texto: String) {
         _uiState.update { it.copy(textoOrigen = texto) }
@@ -105,7 +111,7 @@ class MapViewModel(
                 try {
                     val respuesta = PhotonApi.service.findAddress(
                         query = texto,
-                        lang = textProvider.photonLanguage()
+                        lang = textProvider.photonLanguage(currentLanguage)
                     )
                     _uiState.update { state ->
                         state.copy(adrecesSuggerides = respuesta.features.distinctBy { it.properties.getAddress() })
@@ -168,7 +174,7 @@ class MapViewModel(
         _uiState.update {
             it.copy(
                 destinoSeleccionado = point,
-                textoDestino = textProvider.searchingAddress(),
+                textoDestino = textProvider.searchingAddress(currentLanguage),
                 mostrarOrigen = true,
                 distanceText = "-- km",
                 durationText = "-- min",
@@ -272,7 +278,7 @@ class MapViewModel(
             val resposta = PhotonApi.service.reverseGeocode(
                 lat = point.latitude,
                 lon = point.longitude,
-                lang = textProvider.photonLanguage()
+                lang = textProvider.photonLanguage(currentLanguage)
             )
             val adreca = resposta.features.firstOrNull()?.properties?.getAddress()
 
@@ -282,7 +288,7 @@ class MapViewModel(
                 adreca
             }
         } catch (_: Exception) {
-            textProvider.selectedMapLocation()
+            textProvider.selectedMapLocation(currentLanguage)
         }
     }
 
@@ -290,7 +296,7 @@ class MapViewModel(
         return if (distanceMeters < 1000.0) {
             "${distanceMeters.roundToInt()} m"
         } else {
-            String.format(Locale.US, "%.1f km", distanceMeters / 1000.0)
+            String.format(localeForCurrentLanguage(), "%.1f km", distanceMeters / 1000.0)
         }
     }
 
@@ -303,11 +309,15 @@ class MapViewModel(
         val calendar = Calendar.getInstance().apply {
             add(Calendar.MINUTE, durationMinutes)
         }
-        return SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
+        return SimpleDateFormat("h:mm a", localeForCurrentLanguage()).format(calendar.time)
     }
 
     private fun estimateMinutesFromDistanceMeters(distanceMeters: Double): Int {
         val km = distanceMeters / 1000.0
         return max(1, (km * 12.0).roundToInt())
+    }
+
+    private fun localeForCurrentLanguage(): Locale {
+        return Locale.forLanguageTag(currentLanguage.languageTag)
     }
 }

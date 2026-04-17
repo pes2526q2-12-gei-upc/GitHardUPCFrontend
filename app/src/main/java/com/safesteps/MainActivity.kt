@@ -7,18 +7,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.safesteps.i18n.AppLocaleManager
-import com.safesteps.i18n.LanguagePreferencesRepository
 import com.safesteps.ui.theme.SafeStepsTheme
 import org.maplibre.android.MapLibre
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        val languageRepository = LanguagePreferencesRepository(applicationContext)
-        val restoredEmail = GoogleSignIn.getLastSignedInAccount(this)?.email
-        AppLocaleManager.applyLanguage(languageRepository.getLanguageForUser(restoredEmail))
-
         super.onCreate(savedInstanceState)
 
         MapLibre.getInstance(this)

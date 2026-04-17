@@ -45,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -53,6 +52,7 @@ import com.safesteps.R
 import com.safesteps.auth.UserInfo
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.LanguageSelector
+import com.safesteps.i18n.appString
 
 private val filterLevelResIds = listOf(
     R.string.filter_level_low,
@@ -104,7 +104,7 @@ fun ProfileScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
+                            contentDescription = appString(R.string.back),
                             tint = Color(0xFF33413B)
                         )
                     }
@@ -116,7 +116,7 @@ fun ProfileScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = stringResource(R.string.profile_title),
+                    text = appString(R.string.profile_title),
                     color = Color(0xFF23333A),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold
@@ -153,8 +153,8 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(28.dp))
 
                 FilterAccordion(
-                    title = stringResource(R.string.filter_safety),
-                    selectedLabel = stringResource(filterLevelResIds[seguridadValue]),
+                    title = appString(R.string.filter_safety),
+                    selectedLabel = appString(filterLevelResIds[seguridadValue]),
                     expanded = seguridadExpanded,
                     sliderValue = seguridadValue,
                     onExpandedChange = { seguridadExpanded = !seguridadExpanded },
@@ -164,8 +164,8 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 FilterAccordion(
-                    title = stringResource(R.string.filter_comfort),
-                    selectedLabel = stringResource(filterLevelResIds[confortValue]),
+                    title = appString(R.string.filter_comfort),
+                    selectedLabel = appString(filterLevelResIds[confortValue]),
                     expanded = confortExpanded,
                     sliderValue = confortValue,
                     onExpandedChange = { confortExpanded = !confortExpanded },
@@ -175,8 +175,8 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 FilterAccordion(
-                    title = stringResource(R.string.filter_climate),
-                    selectedLabel = stringResource(filterLevelResIds[climaValue]),
+                    title = appString(R.string.filter_climate),
+                    selectedLabel = appString(filterLevelResIds[climaValue]),
                     expanded = climaExpanded,
                     sliderValue = climaValue,
                     onExpandedChange = { climaExpanded = !climaExpanded },
@@ -197,7 +197,7 @@ fun ProfileScreen(
                     )
                 ) {
                     Text(
-                        text = stringResource(R.string.log_out),
+                        text = appString(R.string.log_out),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -212,7 +212,7 @@ private fun ProfileHeader(user: UserInfo) {
     if (!user.photoUrl.isNullOrBlank()) {
         AsyncImage(
             model = user.photoUrl,
-            contentDescription = stringResource(R.string.profile_photo),
+            contentDescription = appString(R.string.profile_photo),
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .size(96.dp)
@@ -318,10 +318,10 @@ private fun FilterSlider(
     value: Int,
     onValueChange: (Int) -> Unit
 ) {
-    val selectedLabel = stringResource(filterLevelResIds[value])
+    val selectedLabel = appString(filterLevelResIds[value])
 
     Text(
-        text = stringResource(R.string.preference_level),
+        text = appString(R.string.preference_level),
         color = Color(0xFF5C6A64),
         style = MaterialTheme.typography.labelLarge
     )

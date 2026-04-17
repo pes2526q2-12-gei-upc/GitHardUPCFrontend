@@ -18,6 +18,7 @@ import com.safesteps.auth.rememberGoogleSignInAction
 import com.safesteps.i18n.LanguagePreferencesRepository
 import com.safesteps.i18n.LanguageViewModel
 import com.safesteps.i18n.LanguageViewModelFactory
+import com.safesteps.i18n.ProvideLocalizedStrings
 import com.safesteps.map.MapLibreScreen
 import com.safesteps.profile.ProfileScreen
 
@@ -63,32 +64,35 @@ fun SafeStepsApp(
         currentDestination = SafeStepsDestination.MAP
     }
 
-    when {
-        currentDestination == SafeStepsDestination.PROFILE && authUiState.currentUser != null -> {
-            ProfileScreen(
-                modifier = modifier,
-                user = authUiState.currentUser!!,
-                currentLanguage = languageUiState.currentLanguage,
-                onLanguageSelected = languageViewModel::onLanguageSelected,
-                onBack = { currentDestination = SafeStepsDestination.MAP },
-                onLogout = {
-                    onLogoutClick()
-                    currentDestination = SafeStepsDestination.MAP
-                }
-            )
-        }
-
-        else -> {
-            MapLibreScreen(
-                modifier = modifier,
-                currentUser = authUiState.currentUser,
-                onLoginClick = onLoginClick,
-                onProfileClick = {
-                    if (authUiState.currentUser != null) {
-                        currentDestination = SafeStepsDestination.PROFILE
+    ProvideLocalizedStrings(languageUiState.currentLanguage) {
+        when {
+            currentDestination == SafeStepsDestination.PROFILE && authUiState.currentUser != null -> {
+                ProfileScreen(
+                    modifier = modifier,
+                    user = authUiState.currentUser!!,
+                    currentLanguage = languageUiState.currentLanguage,
+                    onLanguageSelected = languageViewModel::onLanguageSelected,
+                    onBack = { currentDestination = SafeStepsDestination.MAP },
+                    onLogout = {
+                        onLogoutClick()
+                        currentDestination = SafeStepsDestination.MAP
                     }
-                }
-            )
+                )
+            }
+
+            else -> {
+                MapLibreScreen(
+                    modifier = modifier,
+                    currentUser = authUiState.currentUser,
+                    currentLanguage = languageUiState.currentLanguage,
+                    onLoginClick = onLoginClick,
+                    onProfileClick = {
+                        if (authUiState.currentUser != null) {
+                            currentDestination = SafeStepsDestination.PROFILE
+                        }
+                    }
+                )
+            }
         }
     }
 }

@@ -28,7 +28,6 @@ class LanguageViewModel(
         currentUserEmail = email
         val resolvedLanguage = repository.getLanguageForUser(email)
 
-        AppLocaleManager.applyLanguage(resolvedLanguage)
         _uiState.update {
             it.copy(
                 currentLanguage = resolvedLanguage,
@@ -41,7 +40,6 @@ class LanguageViewModel(
         val email = currentUserEmail ?: return
 
         repository.saveLanguageForUser(email, language)
-        AppLocaleManager.applyLanguage(language)
         _uiState.update { it.copy(currentLanguage = language) }
     }
 }

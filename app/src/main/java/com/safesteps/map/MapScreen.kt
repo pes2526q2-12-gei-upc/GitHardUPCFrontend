@@ -89,8 +89,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -105,6 +103,9 @@ import com.safesteps.R
 import com.safesteps.auth.UserInfo
 import com.safesteps.data.Feature
 import com.safesteps.domain.RoutePriority
+import com.safesteps.i18n.AppLanguage
+import com.safesteps.i18n.appPlural
+import com.safesteps.i18n.appString
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.annotations.MarkerOptions
@@ -245,7 +246,7 @@ private fun TopPanelHeader(
     onLoginClick: () -> Unit,
     onProfileClick: () -> Unit
 ) {
-    val profilePhotoLabel = stringResource(R.string.profile_photo)
+    val profilePhotoLabel = appString(R.string.profile_photo)
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
@@ -256,7 +257,7 @@ private fun TopPanelHeader(
         Spacer(modifier = Modifier.width(12.dp))
         Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.app_name),
+                text = appString(R.string.app_name),
                 color = Color(0xFF33413B),
                 fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.titleMedium
@@ -296,7 +297,7 @@ private fun TopPanelHeader(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6DD29A))
             ) {
                 Text(
-                    text = stringResource(R.string.log_in),
+                    text = appString(R.string.log_in),
                     color = Color.White,
                     style = MaterialTheme.typography.labelLarge
                 )
@@ -327,7 +328,7 @@ private fun OriginSearchSection(
         SearchBarItem(
             value = origen,
             onValueChange = onOrigenChange,
-            placeholder = stringResource(R.string.my_location),
+            placeholder = appString(R.string.my_location),
             borderColor = actualBorderColor,
             textColor = actualTextColor,
             placeholderColor = actualPlaceholderColor,
@@ -405,7 +406,7 @@ private fun TopSearchPanel(
             SearchBarItem(
                 value = destino,
                 onValueChange = onDestinoChange,
-                placeholder = stringResource(R.string.destination_label),
+                placeholder = appString(R.string.destination_label),
                 borderColor = Color(0xFFF2D8D4),
                 leadingIcon = { Icon(Icons.Default.LocationOn, null, tint = Color(0xFFFF8A80), modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
@@ -551,7 +552,7 @@ private fun RoutePlannerSheet(
     onClose: () -> Unit,
     onStartRoute: () -> Unit
 ) {
-    val closeLabel = stringResource(R.string.close)
+    val closeLabel = appString(R.string.close)
 
     Card(
         modifier = modifier
@@ -580,7 +581,7 @@ private fun RoutePlannerSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = stringResource(R.string.route_priorities),
+                    text = appString(R.string.route_priorities),
                     color = Color(0xFF1F2C3B),
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.headlineSmall,
@@ -620,7 +621,7 @@ private fun RoutePlannerSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 RoutePriorityCompactOption(
-                    title = stringResource(R.string.filter_safety),
+                    title = appString(R.string.filter_safety),
                     selected = selectedPriority == RoutePriority.SAFETY,
                     icon = Icons.Default.Security,
                     activeColor = Color(0xFF1F4A85),
@@ -629,7 +630,7 @@ private fun RoutePlannerSheet(
                 )
 
                 RoutePriorityCompactOption(
-                    title = stringResource(R.string.filter_comfort),
+                    title = appString(R.string.filter_comfort),
                     selected = selectedPriority == RoutePriority.ACCESSIBILITY,
                     icon = Icons.Default.Accessible,
                     activeColor = Color(0xFF7FD7AA),
@@ -638,7 +639,7 @@ private fun RoutePlannerSheet(
                 )
 
                 RoutePriorityCompactOption(
-                    title = stringResource(R.string.filter_climate),
+                    title = appString(R.string.filter_climate),
                     selected = selectedPriority == RoutePriority.HEAT,
                     icon = Icons.Default.WbSunny,
                     activeColor = Color(0xFFFF7B42),
@@ -663,21 +664,21 @@ private fun RoutePlannerSheet(
                 ) {
                     if (fonts > 0) {
                         Text(
-                            text = "\uD83D\uDCA7 ${pluralStringResource(R.plurals.poi_fountains, fonts, fonts)}",
+                            text = "\uD83D\uDCA7 ${appPlural(R.plurals.poi_fountains, fonts, fonts)}",
                             style = MaterialTheme.typography.labelLarge,
                             color = Color(0xFF3D4A45)
                         )
                     }
                     if (bancs > 0) {
                         Text(
-                            text = "\uD83E\uDE91 ${pluralStringResource(R.plurals.poi_benches, bancs, bancs)}",
+                            text = "\uD83E\uDE91 ${appPlural(R.plurals.poi_benches, bancs, bancs)}",
                             style = MaterialTheme.typography.labelLarge,
                             color = Color(0xFF3D4A45)
                         )
                     }
                     if (comisaries > 0) {
                         Text(
-                            text = "\uD83D\uDC6E ${pluralStringResource(R.plurals.poi_police_stations, comisaries, comisaries)}",
+                            text = "\uD83D\uDC6E ${appPlural(R.plurals.poi_police_stations, comisaries, comisaries)}",
                             style = MaterialTheme.typography.labelLarge,
                             color = Color(0xFF3D4A45)
                         )
@@ -738,7 +739,7 @@ private fun RoutePlannerSheet(
                 )
             ) {
                 Text(
-                    text = stringResource(R.string.start_route),
+                    text = appString(R.string.start_route),
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleMedium
                 )
@@ -754,7 +755,7 @@ private fun RouteActiveBottomBar(
     etaText: String,
     onClose: () -> Unit
 ) {
-    val closeLabel = stringResource(R.string.close)
+    val closeLabel = appString(R.string.close)
 
     Card(
         modifier = Modifier
@@ -830,6 +831,7 @@ private fun RouteActiveBottomBar(
 fun MapLibreScreen(
     modifier: Modifier = Modifier,
     currentUser: UserInfo? = null,
+    currentLanguage: AppLanguage = AppLanguage.default,
     onLoginClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
 ) {
@@ -841,18 +843,22 @@ fun MapLibreScreen(
     val coroutineScope = rememberCoroutineScope()
     val mapView = rememberMapViewWithLifecycle()
     val uiState by viewModel.uiState.collectAsState()
-    val locationPermissionRequiredMessage = stringResource(R.string.location_permission_required)
-    val waitingGpsLocationMessage = stringResource(R.string.waiting_gps_location)
-    val searchingGpsSignalMessage = stringResource(R.string.searching_gps_signal)
-    val originLabel = stringResource(R.string.origin_label)
-    val destinationLabel = stringResource(R.string.destination_label)
-    val hideExtraInfoLabel = stringResource(R.string.hide_extra_info)
-    val showExtraInfoLabel = stringResource(R.string.show_extra_info)
-    val changeMapStyleLabel = stringResource(R.string.change_map_style)
-    val standardMapStyleLabel = stringResource(R.string.map_style_standard)
-    val satelliteMapStyleLabel = stringResource(R.string.map_style_satellite)
-    val myLocationLabel = stringResource(R.string.my_location)
-    val calculatingBestRouteLabel = stringResource(R.string.calculating_best_route)
+    val locationPermissionRequiredMessage = appString(R.string.location_permission_required)
+    val waitingGpsLocationMessage = appString(R.string.waiting_gps_location)
+    val searchingGpsSignalMessage = appString(R.string.searching_gps_signal)
+    val originLabel = appString(R.string.origin_label)
+    val destinationLabel = appString(R.string.destination_label)
+    val hideExtraInfoLabel = appString(R.string.hide_extra_info)
+    val showExtraInfoLabel = appString(R.string.show_extra_info)
+    val changeMapStyleLabel = appString(R.string.change_map_style)
+    val standardMapStyleLabel = appString(R.string.map_style_standard)
+    val satelliteMapStyleLabel = appString(R.string.map_style_satellite)
+    val myLocationLabel = appString(R.string.my_location)
+    val calculatingBestRouteLabel = appString(R.string.calculating_best_route)
+
+    LaunchedEffect(currentLanguage) {
+        viewModel.onLanguageChanged(currentLanguage)
+    }
 
     var sheetHeightPx by remember { mutableStateOf(0f) }
     var sheetOffsetPx by remember { mutableStateOf(0f) }
@@ -969,7 +975,9 @@ fun MapLibreScreen(
                         coordenades = uiState.rutaCoordenades,
                         origen = origenPoint,
                         desti = uiState.destinoSeleccionado,
-                        context = context
+                        context = context,
+                        originTitle = originLabel,
+                        destinationTitle = destinationLabel
                     )
 
                     if (uiState.mostrarPuntsInteres) {

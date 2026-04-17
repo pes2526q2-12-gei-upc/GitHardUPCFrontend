@@ -1,6 +1,7 @@
 package com.safesteps.auth
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -15,6 +16,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.safesteps.R
@@ -27,9 +29,7 @@ fun rememberGoogleSignInAction(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val googleSignInOptions = remember {
-        createGoogleSignInOptions()
-    }
+    val googleSignInOptions = remember { createGoogleSignInOptions() }
     val googleSignInClient = remember(context, googleSignInOptions) {
         GoogleSignIn.getClient(context, googleSignInOptions)
     }
@@ -51,14 +51,22 @@ fun rememberGoogleSignInAction(
         }
     }
 
-    LaunchedEffect(context) {
-        onSessionRestored(GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo())
+    LaunchedEffect(googleSignInClient, context) {
+        restoreSession(
+            googleSignInClient = googleSignInClient,
+            context = context,
+            onSessionRestored = onSessionRestored
+        )
     }
 
-    DisposableEffect(lifecycleOwner, context) {
+    DisposableEffect(lifecycleOwner, googleSignInClient, context) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                onSessionRestored(GoogleSignIn.getLastSignedInAccount(context)?.toUserInfo())
+                restoreSession(
+                    googleSignInClient = googleSignInClient,
+                    context = context,
+                    onSessionRestored = onSessionRestored
+                )
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -77,9 +85,7 @@ fun rememberGoogleSignOutAction(
     onLoggedOut: () -> Unit
 ): () -> Unit {
     val context = LocalContext.current
-    val googleSignInOptions = remember {
-        createGoogleSignInOptions()
-    }
+    val googleSignInOptions = remember { createGoogleSignInOptions() }
     val googleSignInClient = remember(context, googleSignInOptions) {
         GoogleSignIn.getClient(context, googleSignInOptions)
     }
@@ -102,7 +108,7 @@ private fun GoogleSignInAccount.toUserInfo(): UserInfo {
     return UserInfo(
         username = resolvedUsername,
         email = resolvedEmail,
-        photoUrl = photoUrl?.toString(),
+        photoUrl = resolvePhotoUrl(),
         idToken = idToken
     )
 }
@@ -112,6 +118,34 @@ private fun createGoogleSignInOptions(): GoogleSignInOptions {
         .requestEmail()
         .requestProfile()
         .build()
+}
+
+private fun GoogleSignInAccount.resolvePhotoUrl(): String? {
+    return photoUrl
+        ?.withLargerSize(size = 256)
+        ?.toString()
+}
+
+private fun Uri.withLargerSize(size: Int): Uri {
+    return buildUpon()
+        .appendQueryParameter("sz", size.toString())
+        .build()
+}
+
+private fun restoreSession(
+    googleSignInClient: GoogleSignInClient,
+    context: Context,
+    onSessionRestored: (UserInfo?) -> Unit
+) {
+    googleSignInClient.silentSignIn().addOnCompleteListener { task ->
+        val account = if (task.isSuccessful) {
+            task.result
+        } else {
+            GoogleSignIn.getLastSignedInAccount(context)
+        }
+
+        onSessionRestored(account?.toUserInfo())
+    }
 }
 
 private fun notifySignInFailure(context: Context) {

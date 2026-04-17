@@ -23,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.safesteps.R
@@ -35,7 +34,7 @@ fun LanguageSelector(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val changeLanguageLabel = stringResource(R.string.change_language)
+    val changeLanguageLabel = appString(R.string.change_language)
 
     Box(modifier = modifier) {
         Surface(
