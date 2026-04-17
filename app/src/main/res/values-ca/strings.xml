@@ -1,0 +1,48 @@
+<resources>
+    <string name="app_name" translatable="false">SafeSteps</string>
+    <string name="change_language">Canvia l\'idioma</string>
+    <string name="log_in">Inicia sessi&#243;</string>
+    <string name="log_out">Tanca la sessi&#243;</string>
+    <string name="profile_title">Perfil</string>
+    <string name="profile_photo">Foto de perfil</string>
+    <string name="back">Torna</string>
+    <string name="filter_safety">Seguretat</string>
+    <string name="filter_comfort">Confort</string>
+    <string name="filter_climate">Clima</string>
+    <string name="filter_level_low">Baix</string>
+    <string name="filter_level_medium">Mitj&#224;</string>
+    <string name="filter_level_high">Alt</string>
+    <string name="filter_level_required">Imprescindible</string>
+    <string name="preference_level">Nivell de prefer&#232;ncia</string>
+    <string name="my_location">La meva ubicaci&#243;</string>
+    <string name="origin_label">Origen</string>
+    <string name="destination_label">Dest&#237;</string>
+    <string name="searching_address">Buscant adre&#231;a...</string>
+    <string name="selected_map_location">Ubicaci&#243; seleccionada al mapa</string>
+    <string name="route_priorities">Prioritats de ruta</string>
+    <string name="close">Tanca</string>
+    <string name="start_route">Inicia la ruta</string>
+    <string name="location_permission_required">Cal el perm&#237;s d\'ubicaci&#243;.</string>
+    <string name="waiting_gps_location">Esperant la ubicaci&#243; del GPS...</string>
+    <string name="searching_gps_signal">Buscant senyal GPS...</string>
+    <string name="hide_extra_info">Amaga info extra</string>
+    <string name="show_extra_info">Mostra info extra</string>
+    <string name="change_map_style">Canvia l\'estil del mapa</string>
+    <string name="map_style_standard">Est&#224;ndard</string>
+    <string name="map_style_satellite">Sat&#232;l&#183;lit</string>
+    <string name="calculating_best_route">Calculant la millor ruta...</string>
+    <string name="sign_in_failed">No s\'ha pogut iniciar la sessi&#243;. Torna-ho a provar.</string>
+
+    <plurals name="poi_fountains">
+        <item quantity="one">%d font</item>
+        <item quantity="other">%d fonts</item>
+    </plurals>
+    <plurals name="poi_benches">
+        <item quantity="one">%d banc</item>
+        <item quantity="other">%d bancs</item>
+    </plurals>
+    <plurals name="poi_police_stations">
+        <item quantity="one">%d comissaria</item>
+        <item quantity="other">%d comissaries</item>
+    </plurals>
+</resources>

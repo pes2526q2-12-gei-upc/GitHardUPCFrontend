@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import com.safesteps.R
 import com.safesteps.data.Coordenada
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
@@ -59,14 +60,14 @@ fun drawRoute(
         origen?.let {
             map.addMarker(MarkerOptions()
                 .position(it)
-                .title("Origen")
+                .title(context.getString(R.string.origin_label))
                 .icon(crearIconaGrisa(context)))
         }
 
         desti?.let {
             map.addMarker(MarkerOptions()
                 .position(it)
-                .title("Destí"))
+                .title(context.getString(R.string.destination_label)))
         }
 
         if (puntsRuta.size > 1) {

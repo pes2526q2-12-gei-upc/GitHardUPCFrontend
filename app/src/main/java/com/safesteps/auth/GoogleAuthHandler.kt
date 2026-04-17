@@ -17,6 +17,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.safesteps.R
 
 @Composable
 fun rememberGoogleSignInAction(
@@ -116,7 +117,7 @@ private fun createGoogleSignInOptions(): GoogleSignInOptions {
 private fun notifySignInFailure(context: Context) {
     Toast.makeText(
         context,
-        "No s'ha pogut iniciar sessio, torna-ho a intentar",
+        context.getString(R.string.sign_in_failed),
         Toast.LENGTH_SHORT
     ).show()
 }

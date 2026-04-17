@@ -1,4 +1,49 @@
 <resources>
-    <string name="app_name">SafeSteps</string>
-    <string name="server_client_id">48435478487-tupu01hq8mjcjgvrm1ckh32ak4heff8q.apps.googleusercontent.com</string>
+    <string name="app_name" translatable="false">SafeSteps</string>
+    <string name="server_client_id" translatable="false">48435478487-tupu01hq8mjcjgvrm1ckh32ak4heff8q.apps.googleusercontent.com</string>
+    <string name="change_language">Change language</string>
+    <string name="log_in">Log in</string>
+    <string name="log_out">Log out</string>
+    <string name="profile_title">Profile</string>
+    <string name="profile_photo">Profile photo</string>
+    <string name="back">Back</string>
+    <string name="filter_safety">Safety</string>
+    <string name="filter_comfort">Comfort</string>
+    <string name="filter_climate">Climate</string>
+    <string name="filter_level_low">Low</string>
+    <string name="filter_level_medium">Medium</string>
+    <string name="filter_level_high">High</string>
+    <string name="filter_level_required">Required</string>
+    <string name="preference_level">Preference level</string>
+    <string name="my_location">My location</string>
+    <string name="origin_label">Origin</string>
+    <string name="destination_label">Destination</string>
+    <string name="searching_address">Searching address...</string>
+    <string name="selected_map_location">Location selected on map</string>
+    <string name="route_priorities">Route priorities</string>
+    <string name="close">Close</string>
+    <string name="start_route">Start route</string>
+    <string name="location_permission_required">Location permission is required.</string>
+    <string name="waiting_gps_location">Waiting for GPS location...</string>
+    <string name="searching_gps_signal">Searching for GPS signal...</string>
+    <string name="hide_extra_info">Hide extra info</string>
+    <string name="show_extra_info">Show extra info</string>
+    <string name="change_map_style">Change map style</string>
+    <string name="map_style_standard">Standard</string>
+    <string name="map_style_satellite">Satellite</string>
+    <string name="calculating_best_route">Calculating the best route...</string>
+    <string name="sign_in_failed">Sign in failed, please try again.</string>
+
+    <plurals name="poi_fountains">
+        <item quantity="one">%d fountain</item>
+        <item quantity="other">%d fountains</item>
+    </plurals>
+    <plurals name="poi_benches">
+        <item quantity="one">%d bench</item>
+        <item quantity="other">%d benches</item>
+    </plurals>
+    <plurals name="poi_police_stations">
+        <item quantity="one">%d police station</item>
+        <item quantity="other">%d police stations</item>
+    </plurals>
 </resources>

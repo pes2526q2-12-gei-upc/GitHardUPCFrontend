@@ -1,0 +1,48 @@
+<resources>
+    <string name="app_name" translatable="false">SafeSteps</string>
+    <string name="change_language">Cambiar idioma</string>
+    <string name="log_in">Iniciar sesi&#243;n</string>
+    <string name="log_out">Cerrar sesi&#243;n</string>
+    <string name="profile_title">Perfil</string>
+    <string name="profile_photo">Foto de perfil</string>
+    <string name="back">Volver</string>
+    <string name="filter_safety">Seguridad</string>
+    <string name="filter_comfort">Confort</string>
+    <string name="filter_climate">Clima</string>
+    <string name="filter_level_low">Bajo</string>
+    <string name="filter_level_medium">Medio</string>
+    <string name="filter_level_high">Alto</string>
+    <string name="filter_level_required">Imprescindible</string>
+    <string name="preference_level">Nivel de preferencia</string>
+    <string name="my_location">Mi ubicaci&#243;n</string>
+    <string name="origin_label">Origen</string>
+    <string name="destination_label">Destino</string>
+    <string name="searching_address">Buscando direcci&#243;n...</string>
+    <string name="selected_map_location">Ubicaci&#243;n seleccionada en el mapa</string>
+    <string name="route_priorities">Prioridades de ruta</string>
+    <string name="close">Cerrar</string>
+    <string name="start_route">Iniciar ruta</string>
+    <string name="location_permission_required">Se necesita el permiso de ubicaci&#243;n.</string>
+    <string name="waiting_gps_location">Esperando ubicaci&#243;n GPS...</string>
+    <string name="searching_gps_signal">Buscando se&#241;al GPS...</string>
+    <string name="hide_extra_info">Ocultar info extra</string>
+    <string name="show_extra_info">Mostrar info extra</string>
+    <string name="change_map_style">Cambiar estilo del mapa</string>
+    <string name="map_style_standard">Est&#225;ndar</string>
+    <string name="map_style_satellite">Sat&#233;lite</string>
+    <string name="calculating_best_route">Calculando la mejor ruta...</string>
+    <string name="sign_in_failed">No se ha podido iniciar sesi&#243;n. Int&#233;ntalo de nuevo.</string>
+
+    <plurals name="poi_fountains">
+        <item quantity="one">%d fuente</item>
+        <item quantity="other">%d fuentes</item>
+    </plurals>
+    <plurals name="poi_benches">
+        <item quantity="one">%d banco</item>
+        <item quantity="other">%d bancos</item>
+    </plurals>
+    <plurals name="poi_police_stations">
+        <item quantity="one">%d comisar&#237;a</item>
+        <item quantity="other">%d comisar&#237;as</item>
+    </plurals>
+</resources>

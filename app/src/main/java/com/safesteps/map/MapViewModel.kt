@@ -20,7 +20,9 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-class MapViewModel : ViewModel() {
+class MapViewModel(
+    private val textProvider: MapTextProvider
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
@@ -101,7 +103,10 @@ class MapViewModel : ViewModel() {
             viewModelScope.launch {
                 kotlinx.coroutines.delay(300)
                 try {
-                    val respuesta = PhotonApi.service.findAddress(query = texto)
+                    val respuesta = PhotonApi.service.findAddress(
+                        query = texto,
+                        lang = textProvider.photonLanguage()
+                    )
                     _uiState.update { state ->
                         state.copy(adrecesSuggerides = respuesta.features.distinctBy { it.properties.getAddress() })
                     }
@@ -163,7 +168,7 @@ class MapViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 destinoSeleccionado = point,
-                textoDestino = "Buscant adreça...",
+                textoDestino = textProvider.searchingAddress(),
                 mostrarOrigen = true,
                 distanceText = "-- km",
                 durationText = "-- min",
@@ -266,7 +271,8 @@ class MapViewModel : ViewModel() {
         return try {
             val resposta = PhotonApi.service.reverseGeocode(
                 lat = point.latitude,
-                lon = point.longitude
+                lon = point.longitude,
+                lang = textProvider.photonLanguage()
             )
             val adreca = resposta.features.firstOrNull()?.properties?.getAddress()
 
@@ -276,7 +282,7 @@ class MapViewModel : ViewModel() {
                 adreca
             }
         } catch (_: Exception) {
-            "Ubicació seleccionada al mapa"
+            textProvider.selectedMapLocation()
         }
     }
 

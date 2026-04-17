@@ -89,6 +89,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -237,13 +239,14 @@ private fun DropdownSuggeriments(
     }
 }
 
-
 @Composable
 private fun TopPanelHeader(
     currentUser: UserInfo?,
     onLoginClick: () -> Unit,
     onProfileClick: () -> Unit
 ) {
+    val profilePhotoLabel = stringResource(R.string.profile_photo)
+
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
             Box(contentAlignment = Alignment.Center) {
@@ -252,14 +255,19 @@ private fun TopPanelHeader(
         }
         Spacer(modifier = Modifier.width(12.dp))
         Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
-            Text("SafeSteps", color = Color(0xFF33413B), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = stringResource(R.string.app_name),
+                color = Color(0xFF33413B),
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleMedium
+            )
         }
 
         if (currentUser != null) {
             if (!currentUser.photoUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = currentUser.photoUrl,
-                    contentDescription = "Foto de perfil",
+                    contentDescription = profilePhotoLabel,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(36.dp)
@@ -287,7 +295,11 @@ private fun TopPanelHeader(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6DD29A))
             ) {
-                Text("Log-in", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                Text(
+                    text = stringResource(R.string.log_in),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelLarge
+                )
             }
         }
     }
@@ -315,7 +327,7 @@ private fun OriginSearchSection(
         SearchBarItem(
             value = origen,
             onValueChange = onOrigenChange,
-            placeholder = "La meva ubicaci\u00F3",
+            placeholder = stringResource(R.string.my_location),
             borderColor = actualBorderColor,
             textColor = actualTextColor,
             placeholderColor = actualPlaceholderColor,
@@ -393,7 +405,7 @@ private fun TopSearchPanel(
             SearchBarItem(
                 value = destino,
                 onValueChange = onDestinoChange,
-                placeholder = "Dest\u00ED",
+                placeholder = stringResource(R.string.destination_label),
                 borderColor = Color(0xFFF2D8D4),
                 leadingIcon = { Icon(Icons.Default.LocationOn, null, tint = Color(0xFFFF8A80), modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
@@ -539,6 +551,8 @@ private fun RoutePlannerSheet(
     onClose: () -> Unit,
     onStartRoute: () -> Unit
 ) {
+    val closeLabel = stringResource(R.string.close)
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -566,7 +580,7 @@ private fun RoutePlannerSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Prioritats de Ruta",
+                    text = stringResource(R.string.route_priorities),
                     color = Color(0xFF1F2C3B),
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.headlineSmall,
@@ -593,7 +607,7 @@ private fun RoutePlannerSheet(
                 IconButton(onClick = onClose) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Cerrar",
+                        contentDescription = closeLabel,
                         tint = Color(0xFF6C7772)
                     )
                 }
@@ -606,7 +620,7 @@ private fun RoutePlannerSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 RoutePriorityCompactOption(
-                    title = "Seguretat",
+                    title = stringResource(R.string.filter_safety),
                     selected = selectedPriority == RoutePriority.SAFETY,
                     icon = Icons.Default.Security,
                     activeColor = Color(0xFF1F4A85),
@@ -615,7 +629,7 @@ private fun RoutePlannerSheet(
                 )
 
                 RoutePriorityCompactOption(
-                    title = "Confort",
+                    title = stringResource(R.string.filter_comfort),
                     selected = selectedPriority == RoutePriority.ACCESSIBILITY,
                     icon = Icons.Default.Accessible,
                     activeColor = Color(0xFF7FD7AA),
@@ -624,7 +638,7 @@ private fun RoutePlannerSheet(
                 )
 
                 RoutePriorityCompactOption(
-                    title = "Clima",
+                    title = stringResource(R.string.filter_climate),
                     selected = selectedPriority == RoutePriority.HEAT,
                     icon = Icons.Default.WbSunny,
                     activeColor = Color(0xFFFF7B42),
@@ -647,9 +661,27 @@ private fun RoutePlannerSheet(
                         .padding(12.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    if (fonts > 0) Text("\uD83D\uDCA7 $fonts Fonts", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
-                    if (bancs > 0) Text("\uD83E\uDE91 $bancs Bancs", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
-                    if (comisaries > 0) Text("\uD83D\uDC6E $comisaries Comisaries", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
+                    if (fonts > 0) {
+                        Text(
+                            text = "\uD83D\uDCA7 ${pluralStringResource(R.plurals.poi_fountains, fonts, fonts)}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color(0xFF3D4A45)
+                        )
+                    }
+                    if (bancs > 0) {
+                        Text(
+                            text = "\uD83E\uDE91 ${pluralStringResource(R.plurals.poi_benches, bancs, bancs)}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color(0xFF3D4A45)
+                        )
+                    }
+                    if (comisaries > 0) {
+                        Text(
+                            text = "\uD83D\uDC6E ${pluralStringResource(R.plurals.poi_police_stations, comisaries, comisaries)}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color(0xFF3D4A45)
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -706,7 +738,7 @@ private fun RoutePlannerSheet(
                 )
             ) {
                 Text(
-                    text = "Iniciar Ruta",
+                    text = stringResource(R.string.start_route),
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleMedium
                 )
@@ -722,6 +754,8 @@ private fun RouteActiveBottomBar(
     etaText: String,
     onClose: () -> Unit
 ) {
+    val closeLabel = stringResource(R.string.close)
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -744,7 +778,7 @@ private fun RouteActiveBottomBar(
                 IconButton(onClick = onClose, modifier = Modifier.fillMaxSize()) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Cerrar",
+                        contentDescription = closeLabel,
                         tint = Color(0xFF3D4A45)
                     )
                 }
@@ -798,13 +832,27 @@ fun MapLibreScreen(
     currentUser: UserInfo? = null,
     onLoginClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    viewModel: MapViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val viewModel: MapViewModel = viewModel(
+        factory = MapViewModelFactory(context.applicationContext)
+    )
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     val mapView = rememberMapViewWithLifecycle()
     val uiState by viewModel.uiState.collectAsState()
+    val locationPermissionRequiredMessage = stringResource(R.string.location_permission_required)
+    val waitingGpsLocationMessage = stringResource(R.string.waiting_gps_location)
+    val searchingGpsSignalMessage = stringResource(R.string.searching_gps_signal)
+    val originLabel = stringResource(R.string.origin_label)
+    val destinationLabel = stringResource(R.string.destination_label)
+    val hideExtraInfoLabel = stringResource(R.string.hide_extra_info)
+    val showExtraInfoLabel = stringResource(R.string.show_extra_info)
+    val changeMapStyleLabel = stringResource(R.string.change_map_style)
+    val standardMapStyleLabel = stringResource(R.string.map_style_standard)
+    val satelliteMapStyleLabel = stringResource(R.string.map_style_satellite)
+    val myLocationLabel = stringResource(R.string.my_location)
+    val calculatingBestRouteLabel = stringResource(R.string.calculating_best_route)
 
     var sheetHeightPx by remember { mutableStateOf(0f) }
     var sheetOffsetPx by remember { mutableStateOf(0f) }
@@ -828,7 +876,9 @@ fun MapLibreScreen(
         val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         val granted = fine || coarse || hasLocationPermission(context)
         viewModel.onLocationPermissionsResult(granted)
-        if (!granted) Toast.makeText(context, "Perm\u00EDs d'ubicaci\u00F3 necessari.", Toast.LENGTH_SHORT).show()
+        if (!granted) {
+            Toast.makeText(context, locationPermissionRequiredMessage, Toast.LENGTH_SHORT).show()
+        }
     }
 
     val sheetDragState = rememberDraggableState { delta ->
@@ -940,10 +990,15 @@ fun MapLibreScreen(
                     }
                 } else {
                     uiState.origenSeleccionado?.let { ori ->
-                        map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context)))
+                        map.addMarker(
+                            MarkerOptions()
+                                .position(ori)
+                                .title(originLabel)
+                                .icon(crearIconaGrisa(context))
+                        )
                     }
                     uiState.destinoSeleccionado?.let { dest ->
-                        map.addMarker(MarkerOptions().position(dest).title("Dest\u00ED"))
+                        map.addMarker(MarkerOptions().position(dest).title(destinationLabel))
                     }
                 }
             }
@@ -1096,7 +1151,7 @@ fun MapLibreScreen(
                                 destiLat = destination.latitude
                             )
                         } else {
-                            Toast.makeText(context, "Esperant ubicaci\u00F3 GPS...", Toast.LENGTH_SHORT)
+                            Toast.makeText(context, waitingGpsLocationMessage, Toast.LENGTH_SHORT)
                                 .show()
                         }
                     }
@@ -1141,7 +1196,15 @@ fun MapLibreScreen(
                     ExtendedFloatingActionButton(
                         onClick = { viewModel.togglePuntsInteres() },
                         icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                        text = { Text(if (uiState.mostrarPuntsInteres) "Ocultar Info Extra" else "Mostrar Info Extra") },
+                        text = {
+                            Text(
+                                if (uiState.mostrarPuntsInteres) {
+                                    hideExtraInfoLabel
+                                } else {
+                                    showExtraInfoLabel
+                                }
+                            )
+                        },
                         containerColor = Color.White,
                         contentColor = Color(0xFFC86A37),
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -1150,8 +1213,16 @@ fun MapLibreScreen(
 
                 ExtendedFloatingActionButton(
                     onClick = { viewModel.toggleEstiloSatelite() },
-                    icon = { Icon(Icons.Default.Layers, contentDescription = "Canviar estil") },
-                    text = { Text(if (uiState.estiloSatelite) "Est\u00E0ndard" else "Sat\u00E8l\u00B7lit") },
+                    icon = { Icon(Icons.Default.Layers, contentDescription = changeMapStyleLabel) },
+                    text = {
+                        Text(
+                            if (uiState.estiloSatelite) {
+                                standardMapStyleLabel
+                            } else {
+                                satelliteMapStyleLabel
+                            }
+                        )
+                    },
                     containerColor = if (uiState.estiloSatelite) Color(0xFF2F3B44) else Color.White,
                     contentColor = if (uiState.estiloSatelite) Color.White else Color(0xFF3D4A45)
                 )
@@ -1175,7 +1246,7 @@ fun MapLibreScreen(
                                     )
                                 }
                             } else {
-                                Toast.makeText(context, "Buscant senyal GPS...", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
                             }
                         } else {
                             permissionLauncher.launch(
@@ -1189,7 +1260,7 @@ fun MapLibreScreen(
                     containerColor = Color.White,
                     contentColor = Color(0xFF49B97E)
                 ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "La meva ubicaci\u00F3")
+                    Icon(Icons.Default.MyLocation, contentDescription = myLocationLabel)
                 }
             }
         }
@@ -1223,7 +1294,7 @@ fun MapLibreScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
-                        text = "Calculant la millor ruta...",
+                        text = calculatingBestRouteLabel,
                         color = Color.DarkGray,
                         style = MaterialTheme.typography.titleMedium
                     )
