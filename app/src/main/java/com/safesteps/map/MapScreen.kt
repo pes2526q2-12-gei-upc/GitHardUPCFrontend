@@ -542,13 +542,49 @@ private fun RoutePriorityOption(
 }
 
 @Composable
+private fun PuntsInteresSection(puntsInteres: List<com.safesteps.data.PuntInteres>) {
+    if (puntsInteres.isEmpty()) return
+
+    val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
+    val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
+    val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        if (fonts > 0) {
+            Text(
+                text = "\uD83D\uDCA7 ${appPlural(R.plurals.poi_fountains, fonts, fonts)}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFF3D4A45)
+            )
+        }
+        if (bancs > 0) {
+            Text(
+                text = "\uD83E\uDE91 ${appPlural(R.plurals.poi_benches, bancs, bancs)}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFF3D4A45)
+            )
+        }
+        if (comisaries > 0) {
+            Text(
+                text = "\uD83D\uDC6E ${appPlural(R.plurals.poi_police_stations, comisaries, comisaries)}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFF3D4A45)
+            )
+        }
+    }
+    Spacer(modifier = Modifier.height(16.dp))
+}
+@Composable
 private fun RoutePlannerSheet(
+    data: RoutePlannerData, // Usamos la clase que creaste en el UiState
     modifier: Modifier = Modifier,
-    selectedPriority: RoutePriority,
     onPrioritySelected: (RoutePriority) -> Unit,
-    distanceText: String,
-    durationText: String,
-    puntsInteres: List<com.safesteps.data.PuntInteres>,
     onClose: () -> Unit,
     onStartRoute: () -> Unit
 ) {
@@ -622,7 +658,7 @@ private fun RoutePlannerSheet(
             ) {
                 RoutePriorityCompactOption(
                     title = appString(R.string.filter_safety),
-                    selected = selectedPriority == RoutePriority.SAFETY,
+                    selected = data.selectedPriority == RoutePriority.SAFETY,
                     icon = Icons.Default.Security,
                     activeColor = Color(0xFF1F4A85),
                     onClick = { onPrioritySelected(RoutePriority.SAFETY) },
@@ -631,7 +667,7 @@ private fun RoutePlannerSheet(
 
                 RoutePriorityCompactOption(
                     title = appString(R.string.filter_comfort),
-                    selected = selectedPriority == RoutePriority.ACCESSIBILITY,
+                    selected = data.selectedPriority == RoutePriority.ACCESSIBILITY,
                     icon = Icons.Default.Accessible,
                     activeColor = Color(0xFF7FD7AA),
                     onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
@@ -640,7 +676,7 @@ private fun RoutePlannerSheet(
 
                 RoutePriorityCompactOption(
                     title = appString(R.string.filter_climate),
-                    selected = selectedPriority == RoutePriority.HEAT,
+                    selected = data.selectedPriority == RoutePriority.HEAT,
                     icon = Icons.Default.WbSunny,
                     activeColor = Color(0xFFFF7B42),
                     onClick = { onPrioritySelected(RoutePriority.HEAT) },
@@ -650,42 +686,7 @@ private fun RoutePlannerSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (puntsInteres.isNotEmpty()) {
-                val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
-                val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
-                val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    if (fonts > 0) {
-                        Text(
-                            text = "\uD83D\uDCA7 ${appPlural(R.plurals.poi_fountains, fonts, fonts)}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color(0xFF3D4A45)
-                        )
-                    }
-                    if (bancs > 0) {
-                        Text(
-                            text = "\uD83E\uDE91 ${appPlural(R.plurals.poi_benches, bancs, bancs)}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color(0xFF3D4A45)
-                        )
-                    }
-                    if (comisaries > 0) {
-                        Text(
-                            text = "\uD83D\uDC6E ${appPlural(R.plurals.poi_police_stations, comisaries, comisaries)}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color(0xFF3D4A45)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+            PuntsInteresSection(data.puntsInteres)
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -700,13 +701,13 @@ private fun RoutePlannerSheet(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = distanceText,
+                    text = data.distanceText,
                     color = Color(0xFF5E6763),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "\u2022",
+                    text = "•",
                     color = Color(0xFF88D1A6),
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -719,7 +720,7 @@ private fun RoutePlannerSheet(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = durationText,
+                    text = data.durationText,
                     color = Color(0xFF5E6763),
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -1140,7 +1141,12 @@ fun MapLibreScreen(
                             }
                         }
                     ),
-                selectedPriority = uiState.prioridadSeleccionada,
+                data = RoutePlannerData(
+                    selectedPriority = uiState.prioridadSeleccionada,
+                    distanceText = uiState.distanceText,
+                    durationText = uiState.durationText,
+                    puntsInteres = uiState.puntsInteres
+                ),
                 onPrioritySelected = { priority ->
                     viewModel.onPrioritySelected(priority)
                     val destination = uiState.destinoSeleccionado
@@ -1164,10 +1170,7 @@ fun MapLibreScreen(
                         }
                     }
                 },
-                distanceText = uiState.distanceText,
-                durationText = uiState.durationText,
                 onClose = resetToMainMenu,
-                puntsInteres = uiState.puntsInteres,
                 onStartRoute = {
                     viewModel.iniciarNavegacio()
                 }

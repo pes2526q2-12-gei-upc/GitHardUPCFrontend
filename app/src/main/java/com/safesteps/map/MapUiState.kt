@@ -13,6 +13,13 @@ enum class textField {
     DESTINY
 }
 
+data class RoutePlannerData(
+    val selectedPriority: RoutePriority,
+    val distanceText: String,
+    val durationText: String,
+    val puntsInteres: List<PuntInteres>
+)
+
 data class MapUiState(
     val destinoSeleccionado: LatLng? = null,
     val textoOrigen: String = "",
