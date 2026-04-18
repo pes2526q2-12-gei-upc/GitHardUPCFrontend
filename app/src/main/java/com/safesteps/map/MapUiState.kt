@@ -44,4 +44,7 @@ data class MapUiState(
     val puntsInteres: List<PuntInteres> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
     val puntInteresSeleccionat: PuntInteres? = null
-)
+){
+    val mostrarPlanificador: Boolean
+        get() = destinoSeleccionado != null && !modoRuta
+}

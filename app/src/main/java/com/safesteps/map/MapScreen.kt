@@ -828,6 +828,78 @@ private fun RouteActiveBottomBar(
     }
 }
 
+private fun calcularPaddingInferior(
+    modoRuta: Boolean,
+    mostrarPlanificador: Boolean,
+    sheetHeightPx: Float,
+    sheetOffsetPx: Float,
+    density: androidx.compose.ui.unit.Density
+): androidx.compose.ui.unit.Dp {
+    if (modoRuta) return 110.dp
+    if (!mostrarPlanificador) return 16.dp
+
+    val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
+    return with(density) { currentVisibleHeightPx.toDp() } + 16.dp
+}
+
+private fun comprobarPermisosUbicacion(fine: Boolean, coarse: Boolean, context: android.content.Context): Boolean {
+    return fine || coarse || hasLocationPermission(context)
+}
+
+private fun gestionarResultadoPermisos(
+    permissions: Map<String, @JvmSuppressWildcards Boolean>,
+    context: android.content.Context,
+    viewModel: MapViewModel,
+    mensajeError: String
+) {
+    val fine = permissions[android.Manifest.permission.ACCESS_FINE_LOCATION] == true
+    val coarse = permissions[android.Manifest.permission.ACCESS_COARSE_LOCATION] == true
+
+    val granted = comprobarPermisosUbicacion(fine, coarse, context)
+
+    viewModel.onLocationPermissionsResult(granted)
+
+    if (!granted) {
+        android.widget.Toast.makeText(context, mensajeError, android.widget.Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun calcularNuevoOffset(
+    delta: Float,
+    offsetActual: Float,
+    mostrarPlanificador: Boolean,
+    collapsedOffset: Float
+): Float {
+    if (!mostrarPlanificador) return offsetActual
+
+    return (offsetActual + delta).coerceIn(0f, collapsedOffset)
+}
+
+private fun procesarClickMapa(
+    point: org.maplibre.android.geometry.LatLng,
+    modoRuta: Boolean,
+    viewModel: MapViewModel,
+    map: org.maplibre.android.maps.MapLibreMap
+): Boolean {
+    if (modoRuta) return true
+
+    viewModel.onMapClicked(point)
+    map.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 15.0), 1000)
+    return true
+}
+
+private fun procesarClickMarcador(
+    marker: org.maplibre.android.annotations.Marker,
+    puntsInteres: List<com.safesteps.data.PuntInteres>,
+    viewModel: MapViewModel
+): Boolean {
+    val puntPulsat = puntsInteres.find {
+        it.latitud == marker.position.latitude && it.longitud == marker.position.longitude
+    }
+    viewModel.onPuntInteresSeleccionat(puntPulsat)
+    return false
+}
+
 @Composable
 fun MapLibreScreen(
     modifier: Modifier = Modifier,
@@ -867,31 +939,31 @@ fun MapLibreScreen(
     val collapsedSheetOffset = max(0f, sheetHeightPx - visibleSheetHeightPx)
 
     val dynamicBottomPadding by animateDpAsState(
-        targetValue = when {
-            uiState.modoRuta -> 110.dp
-            uiState.destinoSeleccionado != null -> {
-                val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
-                val currentVisibleHeightDp = with(density) { currentVisibleHeightPx.toDp() }
-                currentVisibleHeightDp + 16.dp
-            }
-            else -> 16.dp
-        },
+        targetValue = calcularPaddingInferior(
+            modoRuta = uiState.modoRuta,
+            mostrarPlanificador = uiState.mostrarPlanificador,
+            sheetHeightPx = sheetHeightPx,
+            sheetOffsetPx = sheetOffsetPx,
+            density = density
+        ),
         label = "buttonPadding"
     )
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        val granted = fine || coarse || hasLocationPermission(context)
-        viewModel.onLocationPermissionsResult(granted)
-        if (!granted) {
-            Toast.makeText(context, locationPermissionRequiredMessage, Toast.LENGTH_SHORT).show()
-        }
+        gestionarResultadoPermisos(
+            permissions = permissions,
+            context = context,
+            viewModel = viewModel,
+            mensajeError = locationPermissionRequiredMessage
+        )
     }
 
     val sheetDragState = rememberDraggableState { delta ->
-        if (uiState.destinoSeleccionado != null && !uiState.modoRuta) {
-            sheetOffsetPx = (sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset)
-        }
+        sheetOffsetPx = calcularNuevoOffset(
+            delta = delta,
+            offsetActual = sheetOffsetPx,
+            mostrarPlanificador = uiState.mostrarPlanificador,
+            collapsedOffset = collapsedSheetOffset
+        )
     }
 
     val resetToMainMenu = {
@@ -916,14 +988,14 @@ fun MapLibreScreen(
         val yaTengoPermiso = hasLocationPermission(context)
         viewModel.onLocationPermissionsResult(yaTengoPermiso)
 
-        if (!yaTengoPermiso) {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
+        if (yaTengoPermiso) return@LaunchedEffect
+
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
             )
-        }
+        )
     }
 
     LaunchedEffect(uiState.locationGranted, uiState.mapaListo) {
@@ -1049,22 +1121,11 @@ fun MapLibreScreen(
                         map.uiSettings.isAttributionEnabled = false
 
                         map.setOnMarkerClickListener { marker ->
-                            val puntPulsat = uiState.puntsInteres.find {
-                                it.latitud == marker.position.latitude && it.longitud == marker.position.longitude
-                            }
-                            viewModel.onPuntInteresSeleccionat(puntPulsat)
-
-                            false
+                            procesarClickMarcador(marker, uiState.puntsInteres, viewModel)
                         }
 
                         map.addOnMapClickListener { point ->
-                            if (uiState.modoRuta) {
-                                true
-                            } else {
-                                viewModel.onMapClicked(point)
-                                map.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 15.0), 1000)
-                                true
-                            }
+                            procesarClickMapa(point, uiState.modoRuta, viewModel, map)
                         }
                     }
                 }
@@ -1115,7 +1176,7 @@ fun MapLibreScreen(
         }
 
         AnimatedVisibility(
-            visible = uiState.destinoSeleccionado != null && !uiState.modoRuta,
+            visible = uiState.mostrarPlanificador,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it }),
             modifier = Modifier
@@ -1204,18 +1265,11 @@ fun MapLibreScreen(
                 horizontalAlignment = Alignment.End
             ) {
                 AnimatedVisibility(visible = uiState.puntsInteres.isNotEmpty() && !uiState.modoRuta) {
+                    val textoBotonPois = if (uiState.mostrarPuntsInteres) hideExtraInfoLabel else showExtraInfoLabel
                     ExtendedFloatingActionButton(
                         onClick = { viewModel.togglePuntsInteres() },
                         icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                        text = {
-                            Text(
-                                if (uiState.mostrarPuntsInteres) {
-                                    hideExtraInfoLabel
-                                } else {
-                                    showExtraInfoLabel
-                                }
-                            )
-                        },
+                        text = { Text(text = textoBotonPois) }, // <-- TEXTO LIMPIO SIN IFS
                         containerColor = Color.White,
                         contentColor = Color(0xFFC86A37),
                         modifier = Modifier.padding(bottom = 12.dp)
