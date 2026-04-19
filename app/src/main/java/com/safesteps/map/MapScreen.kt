@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -274,12 +275,14 @@ private fun TopPanelHeader(
                         .size(36.dp)
                         .clip(CircleShape)
                         .clickable(onClick = onProfileClick)
+                        .testTag("btn_perfil")
                 )
             } else {
                 Surface(
                     modifier = Modifier
                         .size(36.dp)
-                        .clickable(onClick = onProfileClick),
+                        .clickable(onClick = onProfileClick)
+                        .testTag("btn_perfil"),
                     shape = CircleShape,
                     color = Color(0xFF6DD29A)
                 ) {
@@ -326,6 +329,7 @@ private fun OriginSearchSection(
 
     Column {
         SearchBarItem(
+            modifier = Modifier.testTag("input_origen"),
             value = origen,
             onValueChange = onOrigenChange,
             placeholder = appString(R.string.my_location),
@@ -404,6 +408,7 @@ private fun TopSearchPanel(
             }
 
             SearchBarItem(
+                modifier = Modifier.testTag("input_desti"),
                 value = destino,
                 onValueChange = onDestinoChange,
                 placeholder = appString(R.string.destination_label),
@@ -626,7 +631,9 @@ private fun RoutePlannerSheet(
                     icon = Icons.Default.Security,
                     activeColor = Color(0xFF1F4A85),
                     onClick = { onPrioritySelected(RoutePriority.SAFETY) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("btn_prioritat_seguretat")
                 )
 
                 RoutePriorityCompactOption(
@@ -635,7 +642,9 @@ private fun RoutePlannerSheet(
                     icon = Icons.Default.Accessible,
                     activeColor = Color(0xFF7FD7AA),
                     onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("btn_prioritat_accessibilitat")
                 )
 
                 RoutePriorityCompactOption(
@@ -644,7 +653,9 @@ private fun RoutePlannerSheet(
                     icon = Icons.Default.WbSunny,
                     activeColor = Color(0xFFFF7B42),
                     onClick = { onPrioritySelected(RoutePriority.HEAT) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("btn_prioritat_clima")
                 )
             }
 
@@ -967,6 +978,8 @@ fun MapLibreScreen(
                 viewModel.onMapaListo()
                 if (uiState.locationGranted) activateLocationComponent(mapView)
 
+                map.clear()
+
                 if (uiState.rutaCoordenades.isNotEmpty()) {
                     val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
 
@@ -1221,6 +1234,7 @@ fun MapLibreScreen(
 
                 ExtendedFloatingActionButton(
                     onClick = { viewModel.toggleEstiloSatelite() },
+                    modifier = Modifier.testTag("btn_satellit"),
                     icon = { Icon(Icons.Default.Layers, contentDescription = changeMapStyleLabel) },
                     text = {
                         Text(
@@ -1265,6 +1279,7 @@ fun MapLibreScreen(
                             )
                         }
                     },
+                    modifier = Modifier.testTag("btn_ubicacio_actual"),
                     containerColor = Color.White,
                     contentColor = Color(0xFF49B97E)
                 ) {

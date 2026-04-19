@@ -20,6 +20,7 @@ import java.util.Calendar
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
+import java.text.Normalizer
 
 class MapViewModel(
     private val textProvider: MapTextProvider
@@ -109,8 +110,10 @@ class MapViewModel(
             viewModelScope.launch {
                 kotlinx.coroutines.delay(300)
                 try {
+                    val textNet = texto.treureAccents()
+
                     val respuesta = PhotonApi.service.findAddress(
-                        query = texto,
+                        query = textNet,
                         lang = textProvider.photonLanguage(currentLanguage)
                     )
                     _uiState.update { state ->
@@ -319,5 +322,14 @@ class MapViewModel(
 
     private fun localeForCurrentLanguage(): Locale {
         return Locale.forLanguageTag(currentLanguage.languageTag)
+    }
+
+
+
+    fun String.treureAccents(): String {
+        val textSenseC = this.replace("ç", "c").replace("Ç", "C")
+
+        val normalitzat = Normalizer.normalize(textSenseC, Normalizer.Form.NFD)
+        return normalitzat.replace("\\p{Mn}+".toRegex(), "")
     }
 }

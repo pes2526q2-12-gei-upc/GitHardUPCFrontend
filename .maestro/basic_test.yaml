@@ -1,4 +1,48 @@
 appId: com.safesteps
+name: Sanity Test
 ---
-- launchApp
-- assertVisible: ".*" # Aquesta expressió regular simplement comprova que l'app s'ha obert i hi ha text o elements a la pantalla
+- launchApp:
+      clearState: true
+      permissions:
+          location: allow
+
+# 1. PANTALLA INICIAL I AUTENTICACIÓ
+- assertVisible: ".*"
+- tapOn:
+      id: "btn_perfil"
+- back
+
+# 2. CONFIGURACIÓ DE RUTA
+- tapOn:
+      id: "input_desti"
+- inputText: "Sagrada Família, Barcelona"
+- tapOn: "Sagrada Família.*"
+
+# Modificar Origen
+- tapOn:
+      id: "input_origen"
+- inputText: "Plaça Catalunya, Barcelona"
+- tapOn: "Plaça Catalunya.*"
+
+# 3. CÀLCUL DE RUTA I INFO
+- extendedWaitUntil:
+      visible: ".*km|.*m"
+      timeout: 10000
+
+# 4. CANVI DE MODES DE RUTA
+- tapOn:
+      id: "btn_prioritat_seguretat"
+- assertVisible: ".*comis.*"
+
+- tapOn:
+      id: "btn_prioritat_clima"
+- assertVisible: ".*bancs.*"
+
+- tapOn:
+      id: "btn_prioritat_accessibilitat"
+
+# 5. INTERACCIONS DEL MAPA
+- tapOn:
+      id: "btn_satellit"
+- tapOn:
+      id: "btn_ubicacio_actual"

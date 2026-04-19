@@ -27,6 +27,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
 
+
 fun hasFineLocationPermission(context: Context): Boolean {
     return ContextCompat.checkSelfPermission(
         context,
@@ -174,3 +175,4 @@ fun crearIconaGrisa(context: android.content.Context): Icon {
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
 }
+

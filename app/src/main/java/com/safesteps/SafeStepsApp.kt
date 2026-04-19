@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.safesteps.auth.AuthScreen
 import com.safesteps.auth.AuthViewModel
 import com.safesteps.auth.rememberGoogleSignOutAction
 import com.safesteps.auth.rememberGoogleSignInAction
@@ -24,7 +25,8 @@ import com.safesteps.profile.ProfileScreen
 
 private enum class SafeStepsDestination {
     MAP,
-    PROFILE
+    PROFILE,
+    AUTH
 }
 
 @Composable
@@ -80,12 +82,29 @@ fun SafeStepsApp(
                 )
             }
 
+            currentDestination == SafeStepsDestination.AUTH -> {
+                AuthScreen(
+                    onBack = { currentDestination = SafeStepsDestination.MAP },
+                    onGoogleSignInClick = onLoginClick,
+                    onEmailLoginClick = { username, password ->
+                        authViewModel.loginWithEmail(username, password)
+                        currentDestination = SafeStepsDestination.MAP
+                    },
+                    onEmailRegisterClick = { username, email, password ->
+                        authViewModel.registerWithEmail(username, email, password)
+                        currentDestination = SafeStepsDestination.MAP
+                    }
+                )
+            }
+
             else -> {
                 MapLibreScreen(
                     modifier = modifier,
                     currentUser = authUiState.currentUser,
                     currentLanguage = languageUiState.currentLanguage,
-                    onLoginClick = onLoginClick,
+                    onLoginClick = {
+                        currentDestination = SafeStepsDestination.AUTH
+                    },
                     onProfileClick = {
                         if (authUiState.currentUser != null) {
                             currentDestination = SafeStepsDestination.PROFILE

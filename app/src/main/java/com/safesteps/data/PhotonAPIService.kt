@@ -66,20 +66,19 @@ data class Properties(
     @SerializedName("osm_value")
     val osmValue: String?       // Per saber si és un carrer, un edifici, una ciutat...
 ) {
-    // 💡 Funció extra de regal: Formatador automàtic per mostrar a la pantalla
     fun getAddress(): String {
         val trossos = mutableListOf<String>()
 
-        // Si hi ha carrer i número, els ajuntem
-        if (!street.isNullOrEmpty()) {
+        if (!name.isNullOrEmpty()) {
+            trossos.add(name)
+            city?.let { if (it != name) trossos.add(it) }
+        } else if (!street.isNullOrEmpty()) {
             val carrerNum = if (!housenumber.isNullOrEmpty()) "$street, $housenumber" else street
             trossos.add(carrerNum)
-        } else if (!name.isNullOrEmpty()) {
-            trossos.add(name) // Si no hi ha carrer, posem el nom del lloc
+            city?.let { trossos.add(it) }
+        } else {
+            city?.let { trossos.add(it) }
         }
-
-        city?.let { trossos.add(it) }
-        postcode?.let { trossos.add(it) }
 
         return trossos.joinToString(", ")
     }
