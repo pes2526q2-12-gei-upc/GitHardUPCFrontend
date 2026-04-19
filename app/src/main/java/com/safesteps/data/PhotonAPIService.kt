@@ -14,8 +14,10 @@ interface PhotonApiService {
     suspend fun findAddress(
         @Query("q") query: String,
         @Query("bbox") bbox: String = "2.052,41.317,2.228,41.468",
-        @Query("lang") lang: String = "en",
-        @Query("limit") limit: Int = 5,
+        @Query("lang") lang: String,
+        @Query("limit") limit: Int = 15,
+        @Query("lat") lat: Double? = null, // Afegit per prioritzar proximitat
+        @Query("lon") lon: Double? = null, // Afegit per prioritzar proximitat
         @Query("suggest_addresses") suggestAddresses: Boolean = true
 
     ): PhotonResponse
@@ -24,14 +26,13 @@ interface PhotonApiService {
     suspend fun reverseGeocode(
         @Query("lat") lat: Double,
         @Query("lon") lon: Double,
-        @Query("lang") lang: String = "en"
+        @Query("lang") lang: String
     ): PhotonResponse
 }
 
 object PhotonApi {
     private const val BASE_URL = "https://photon.komoot.io/"
 
-    // El 'by lazy' fa que només es construeixi la primera vegada que es crida, estalviant memòria
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
@@ -39,7 +40,6 @@ object PhotonApi {
             .build()
     }
 
-    // Aquesta és la variable que utilitzaràs des de la MainActivity
     val service: PhotonApiService by lazy {
         retrofit.create(PhotonApiService::class.java)
     }
@@ -67,28 +67,22 @@ data class Properties(
     val osmValue: String?       // Per saber si és un carrer, un edifici, una ciutat...
 ) {
     fun getAddress(): String {
-        val trossos = mutableListOf<String>()
-
-        if (!name.isNullOrEmpty()) {
-            trossos.add(name)
-            city?.let { if (it != name) trossos.add(it) }
-        } else if (!street.isNullOrEmpty()) {
-            val carrerNum = if (!housenumber.isNullOrEmpty()) "$street, $housenumber" else street
-            trossos.add(carrerNum)
-            city?.let { trossos.add(it) }
-        } else {
-            city?.let { trossos.add(it) }
+        if (!name.isNullOrEmpty() && name != city && name != street) {
+            return if (!city.isNullOrEmpty()) "$name, $city" else name
         }
 
-        return trossos.joinToString(", ")
+        if (!street.isNullOrEmpty()) {
+            val carrerNum = if (!housenumber.isNullOrEmpty()) "$street, $housenumber" else street
+            return if (!city.isNullOrEmpty()) "$carrerNum, $city" else carrerNum
+        }
+
+        return city ?: ""
     }
 }
 
-// 4. Les coordenades per poder posar la xinxeta al mapa
 data class Geometry(
     val coordinates: List<Double>
 ) {
-    // Photon retorna [Longitud, Latitud], a Google Maps es fa servir (Latitud, Longitud)
     val latitud: Double
         get() = coordinates.getOrNull(1) ?: 0.0
 

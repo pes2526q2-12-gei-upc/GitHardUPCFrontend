@@ -20,9 +20,9 @@ class MapTextProvider(
     fun photonLanguage(language: AppLanguage): String {
         return when (language.languageTag.lowercase(Locale.ROOT)) {
             "en" -> "en"
-            "de" -> "de"
-            "fr" -> "fr"
-            else -> "default"
+            "ca" -> "en" //Photon no suporta catala
+            "es" -> "en" //Photon no suporta castella
+            else -> "en"
         }
     }
 }
