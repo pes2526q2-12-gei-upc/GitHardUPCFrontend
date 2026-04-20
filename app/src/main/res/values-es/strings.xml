@@ -32,6 +32,11 @@
     <string name="map_style_satellite">Sat&#233;lite</string>
     <string name="calculating_best_route">Calculando la mejor ruta...</string>
     <string name="sign_in_failed">No se ha podido iniciar sesi&#243;n. Int&#233;ntalo de nuevo.</string>
+    <string name="delete_account_short">Eliminar cuenta</string>
+    <string name="delete_account_banner_title">&#191;Eliminar la cuenta definitivamente?</string>
+    <string name="delete_account_banner_message">Toda tu informaci&#243;n, incluidas las incidencias reportadas y el historial de rutas, se borrar&#225; de forma definitiva. &#191;Quieres continuar?</string>
+    <string name="cancel_action">Cancelar</string>
+    <string name="confirm_action">Confirmar</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d fuente</item>

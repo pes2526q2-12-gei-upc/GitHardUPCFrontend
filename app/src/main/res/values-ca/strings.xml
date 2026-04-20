@@ -32,6 +32,11 @@
     <string name="map_style_satellite">Sat&#232;l&#183;lit</string>
     <string name="calculating_best_route">Calculant la millor ruta...</string>
     <string name="sign_in_failed">No s\'ha pogut iniciar la sessi&#243;. Torna-ho a provar.</string>
+    <string name="delete_account_short">Eliminar el compte</string>
+    <string name="delete_account_banner_title">Eliminar el compte definitivament?</string>
+    <string name="delete_account_banner_message">Tota la teva informaci&#243;, incloses les incid&#232;ncies reportades i l\'historial de rutes, s\'esborrar&#224; de forma definitiva. Vols continuar?</string>
+    <string name="cancel_action">Cancel&#183;la</string>
+    <string name="confirm_action">Confirma</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d font</item>

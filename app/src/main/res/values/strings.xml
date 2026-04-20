@@ -33,6 +33,11 @@
     <string name="map_style_satellite">Satellite</string>
     <string name="calculating_best_route">Calculating the best route...</string>
     <string name="sign_in_failed">Sign in failed, please try again.</string>
+    <string name="delete_account_short">Delete account</string>
+    <string name="delete_account_banner_title">Delete account permanently?</string>
+    <string name="delete_account_banner_message">All your information, including reported incidents and route history, will be permanently deleted. Do you want to continue?</string>
+    <string name="cancel_action">Cancel</string>
+    <string name="confirm_action">Confirm</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d fountain</item>

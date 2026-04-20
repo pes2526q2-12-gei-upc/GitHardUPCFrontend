@@ -106,7 +106,6 @@ import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appPlural
 import com.safesteps.i18n.appString
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -882,6 +881,9 @@ fun MapLibreScreen(
         val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         val granted = fine || coarse || hasLocationPermission(context)
         viewModel.onLocationPermissionsResult(granted)
+        if (granted) {
+            getBestLastKnownLocation(context)?.let(viewModel::updateLocation)
+        }
         if (!granted) {
             Toast.makeText(context, locationPermissionRequiredMessage, Toast.LENGTH_SHORT).show()
         }
@@ -899,21 +901,20 @@ fun MapLibreScreen(
         sheetOffsetPx = 0f
         mapView.getMapAsync { map ->
             map.clear()
-            uiState.ultimaUbicacion?.let { loc ->
-                map.animateCamera(
-                    CameraUpdateFactory.newLatLngZoom(
-                        LatLng(loc.latitude, loc.longitude),
-                        15.0
-                    ),
-                    1000
-                )
-            }
         }
+        uiState.ultimaUbicacion?.let { loc ->
+            centerMapOnLocation(mapView, loc)
+        }
+        Unit
     }
 
     LaunchedEffect(Unit) {
         val yaTengoPermiso = hasLocationPermission(context)
         viewModel.onLocationPermissionsResult(yaTengoPermiso)
+
+        if (yaTengoPermiso) {
+            getBestLastKnownLocation(context)?.let(viewModel::updateLocation)
+        }
 
         if (!yaTengoPermiso) {
             permissionLauncher.launch(
@@ -1024,18 +1025,14 @@ fun MapLibreScreen(
     }
 
     LaunchedEffect(uiState.ultimaUbicacion, uiState.mapaListo) {
-        if (uiState.ultimaUbicacion != null && uiState.mapaListo && !uiState.firstLocationZoomDone) {
+        val currentLocation = uiState.ultimaUbicacion
+        if (currentLocation != null && uiState.mapaListo && !uiState.firstLocationZoomDone) {
+            centerMapOnLocation(
+                mapView = mapView,
+                location = currentLocation,
+                durationMs = 1500
+            )
             viewModel.marcarZoomInicialHecho()
-            delay(500)
-            mapView.getMapAsync { map ->
-                map.animateCamera(
-                    CameraUpdateFactory.newLatLngZoom(
-                        LatLng(uiState.ultimaUbicacion!!.latitude, uiState.ultimaUbicacion!!.longitude),
-                        15.0
-                    ),
-                    1500
-                )
-            }
         }
     }
 
@@ -1243,16 +1240,9 @@ fun MapLibreScreen(
                             viewModel.limpiarOrigen()
                             activateLocationComponent(mapView)
 
-                            if (uiState.ultimaUbicacion != null) {
-                                mapView.getMapAsync { map ->
-                                    map.animateCamera(
-                                        CameraUpdateFactory.newLatLngZoom(
-                                            LatLng(uiState.ultimaUbicacion!!.latitude, uiState.ultimaUbicacion!!.longitude),
-                                            15.0
-                                        ),
-                                        1000
-                                    )
-                                }
+                            val currentLocation = uiState.ultimaUbicacion
+                            if (currentLocation != null) {
+                                centerMapOnLocation(mapView, currentLocation)
                             } else {
                                 Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
                             }

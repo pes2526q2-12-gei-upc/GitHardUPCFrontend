@@ -19,13 +19,15 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.annotations.Icon
+import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapView
-import org.maplibre.android.annotations.Icon
-import org.maplibre.android.annotations.IconFactory
 
 fun hasFineLocationPermission(context: Context): Boolean {
     return ContextCompat.checkSelfPermission(
@@ -43,6 +45,34 @@ fun hasCoarseLocationPermission(context: Context): Boolean {
 
 fun hasLocationPermission(context: Context): Boolean {
     return hasFineLocationPermission(context) || hasCoarseLocationPermission(context)
+}
+
+fun getBestLastKnownLocation(context: Context): Location? {
+    if (!hasLocationPermission(context)) return null
+
+    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    val fineGranted = hasFineLocationPermission(context)
+    val coarseGranted = hasCoarseLocationPermission(context)
+
+    val providers = buildList {
+        if (fineGranted) add(LocationManager.GPS_PROVIDER)
+        if (fineGranted || coarseGranted) add(LocationManager.NETWORK_PROVIDER)
+        add(LocationManager.PASSIVE_PROVIDER)
+    }.distinct()
+
+    return providers
+        .mapNotNull { provider ->
+            try {
+                if (provider != LocationManager.PASSIVE_PROVIDER && !locationManager.isProviderEnabled(provider)) {
+                    null
+                } else {
+                    locationManager.getLastKnownLocation(provider)
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
+        .maxByOrNull { it.time }
 }
 
 @Composable
@@ -115,6 +145,23 @@ fun pushLocationToMap(mapView: MapView, location: Location) {
         if (locationComponent.isLocationComponentActivated) {
             locationComponent.forceLocationUpdate(location)
         }
+    }
+}
+
+fun centerMapOnLocation(
+    mapView: MapView,
+    location: Location,
+    zoom: Double = 15.0,
+    durationMs: Int = 1000
+) {
+    mapView.getMapAsync { map ->
+        map.animateCamera(
+            CameraUpdateFactory.newLatLngZoom(
+                LatLng(location.latitude, location.longitude),
+                zoom
+            ),
+            durationMs
+        )
     }
 }
 
