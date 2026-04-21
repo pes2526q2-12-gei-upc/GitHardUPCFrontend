@@ -541,6 +541,168 @@ private fun RoutePriorityOption(
 }
 
 @Composable
+private fun RoutePlannerHeader(onClose: () -> Unit) {
+    val closeLabel = appString(R.string.close)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = appString(R.string.route_priorities),
+            color = Color(0xFF1F2C3B),
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.weight(1f)
+        )
+
+        Surface(
+            modifier = Modifier.size(36.dp),
+            shape = CircleShape,
+            color = Color(0xFFEAF9EF)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.DirectionsWalk,
+                    contentDescription = null,
+                    tint = Color(0xFF5CCF8A),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(6.dp))
+
+        IconButton(onClick = onClose) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = closeLabel,
+                tint = Color(0xFF6C7772)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RoutePrioritySelector(
+    selectedPriority: RoutePriority,
+    onPrioritySelected: (RoutePriority) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        RoutePriorityCompactOption(
+            title = appString(R.string.filter_safety),
+            selected = selectedPriority == RoutePriority.SAFETY,
+            icon = Icons.Default.Security,
+            activeColor = Color(0xFF1F4A85),
+            onClick = { onPrioritySelected(RoutePriority.SAFETY) },
+            modifier = Modifier.weight(1f)
+        )
+
+        RoutePriorityCompactOption(
+            title = appString(R.string.filter_comfort),
+            selected = selectedPriority == RoutePriority.ACCESSIBILITY,
+            icon = Icons.Default.Accessible,
+            activeColor = Color(0xFF7FD7AA),
+            onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
+            modifier = Modifier.weight(1f)
+        )
+
+        RoutePriorityCompactOption(
+            title = appString(R.string.filter_climate),
+            selected = selectedPriority == RoutePriority.HEAT,
+            icon = Icons.Default.WbSunny,
+            activeColor = Color(0xFFFF7B42),
+            onClick = { onPrioritySelected(RoutePriority.HEAT) },
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
+    if (puntsInteres.isEmpty()) return
+
+    val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
+    val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
+    val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        if (fonts > 0) {
+            Text(
+                text = "\uD83D\uDCA7 ${appPlural(R.plurals.poi_fountains, fonts, fonts)}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFF3D4A45)
+            )
+        }
+        if (bancs > 0) {
+            Text(
+                text = "\uD83E\uDE91 ${appPlural(R.plurals.poi_benches, bancs, bancs)}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFF3D4A45)
+            )
+        }
+        if (comisaries > 0) {
+            Text(
+                text = "\uD83D\uDC6E ${appPlural(R.plurals.poi_police_stations, comisaries, comisaries)}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFF3D4A45)
+            )
+        }
+    }
+    Spacer(modifier = Modifier.height(16.dp))
+}
+
+@Composable
+private fun RouteDetails(distanceText: String, durationText: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.LocationOn,
+            contentDescription = null,
+            tint = Color(0xFF5E6763),
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = distanceText,
+            color = Color(0xFF5E6763),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = "\u2022",
+            color = Color(0xFF88D1A6),
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Icon(
+            imageVector = Icons.Default.AccessTime,
+            contentDescription = null,
+            tint = Color(0xFF5E6763),
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = durationText,
+            color = Color(0xFF5E6763),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
 private fun RoutePlannerSheet(
     modifier: Modifier = Modifier,
     selectedPriority: RoutePriority,
@@ -551,8 +713,6 @@ private fun RoutePlannerSheet(
     onClose: () -> Unit,
     onStartRoute: () -> Unit
 ) {
-    val closeLabel = appString(R.string.close)
-
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -575,154 +735,20 @@ private fun RoutePlannerSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = appString(R.string.route_priorities),
-                    color = Color(0xFF1F2C3B),
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Surface(
-                    modifier = Modifier.size(36.dp),
-                    shape = CircleShape,
-                    color = Color(0xFFEAF9EF)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.DirectionsWalk,
-                            contentDescription = null,
-                            tint = Color(0xFF5CCF8A),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                IconButton(onClick = onClose) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = closeLabel,
-                        tint = Color(0xFF6C7772)
-                    )
-                }
-            }
+            RoutePlannerHeader(onClose = onClose)
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                RoutePriorityCompactOption(
-                    title = appString(R.string.filter_safety),
-                    selected = selectedPriority == RoutePriority.SAFETY,
-                    icon = Icons.Default.Security,
-                    activeColor = Color(0xFF1F4A85),
-                    onClick = { onPrioritySelected(RoutePriority.SAFETY) },
-                    modifier = Modifier.weight(1f)
-                )
-
-                RoutePriorityCompactOption(
-                    title = appString(R.string.filter_comfort),
-                    selected = selectedPriority == RoutePriority.ACCESSIBILITY,
-                    icon = Icons.Default.Accessible,
-                    activeColor = Color(0xFF7FD7AA),
-                    onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
-                    modifier = Modifier.weight(1f)
-                )
-
-                RoutePriorityCompactOption(
-                    title = appString(R.string.filter_climate),
-                    selected = selectedPriority == RoutePriority.HEAT,
-                    icon = Icons.Default.WbSunny,
-                    activeColor = Color(0xFFFF7B42),
-                    onClick = { onPrioritySelected(RoutePriority.HEAT) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            RoutePrioritySelector(
+                selectedPriority = selectedPriority,
+                onPrioritySelected = onPrioritySelected
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (puntsInteres.isNotEmpty()) {
-                val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
-                val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
-                val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
+            PoiSummary(puntsInteres = puntsInteres)
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    if (fonts > 0) {
-                        Text(
-                            text = "\uD83D\uDCA7 ${appPlural(R.plurals.poi_fountains, fonts, fonts)}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color(0xFF3D4A45)
-                        )
-                    }
-                    if (bancs > 0) {
-                        Text(
-                            text = "\uD83E\uDE91 ${appPlural(R.plurals.poi_benches, bancs, bancs)}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color(0xFF3D4A45)
-                        )
-                    }
-                    if (comisaries > 0) {
-                        Text(
-                            text = "\uD83D\uDC6E ${appPlural(R.plurals.poi_police_stations, comisaries, comisaries)}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color(0xFF3D4A45)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = Color(0xFF5E6763),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = distanceText,
-                    color = Color(0xFF5E6763),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "\u2022",
-                    color = Color(0xFF88D1A6),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Icon(
-                    imageVector = Icons.Default.AccessTime,
-                    contentDescription = null,
-                    tint = Color(0xFF5E6763),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = durationText,
-                    color = Color(0xFF5E6763),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+            RouteDetails(distanceText = distanceText, durationText = durationText)
 
             Spacer(modifier = Modifier.height(16.dp))
 
