@@ -15,6 +15,17 @@
     <string name="filter_level_high">High</string>
     <string name="filter_level_required">Required</string>
     <string name="preference_level">Preference level</string>
+    <string name="profile_filter_security_cameras">Security cameras</string>
+    <string name="profile_filter_police_stations">Police stations</string>
+    <string name="profile_filter_criminal_incidents">Criminal incidents</string>
+    <string name="profile_filter_user_reported_incidents">Incidents reported by other users</string>
+    <string name="profile_filter_benches">Benches</string>
+    <string name="profile_filter_noise_pollution">Noise pollution</string>
+    <string name="profile_filter_escalators">Escalators</string>
+    <string name="profile_filter_drinking_fountains">Drinking fountains</string>
+    <string name="profile_filter_trees">Trees</string>
+    <string name="profile_filter_air_quality">Air quality</string>
+    <string name="profile_filter_climate_shelters">Climate shelters</string>
     <string name="my_location">My location</string>
     <string name="origin_label">Origin</string>
     <string name="destination_label">Destination</string>
@@ -50,5 +61,9 @@
     <plurals name="poi_police_stations">
         <item quantity="one">%d police station</item>
         <item quantity="other">%d police stations</item>
+    </plurals>
+    <plurals name="profile_filter_count">
+        <item quantity="one">%d filter</item>
+        <item quantity="other">%d filters</item>
     </plurals>
 </resources>

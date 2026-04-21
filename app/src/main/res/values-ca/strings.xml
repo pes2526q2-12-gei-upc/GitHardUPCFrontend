@@ -14,6 +14,17 @@
     <string name="filter_level_high">Alt</string>
     <string name="filter_level_required">Imprescindible</string>
     <string name="preference_level">Nivell de prefer&#232;ncia</string>
+    <string name="profile_filter_security_cameras">C&#224;meres de seguretat</string>
+    <string name="profile_filter_police_stations">Comissaries</string>
+    <string name="profile_filter_criminal_incidents">Fets penals</string>
+    <string name="profile_filter_user_reported_incidents">Incid&#232;ncies reportades per altres usuaris</string>
+    <string name="profile_filter_benches">Bancs</string>
+    <string name="profile_filter_noise_pollution">Contaminaci&#243; ac&#250;stica</string>
+    <string name="profile_filter_escalators">Escales mec&#224;niques</string>
+    <string name="profile_filter_drinking_fountains">Fonts d\'aigua</string>
+    <string name="profile_filter_trees">Arbres</string>
+    <string name="profile_filter_air_quality">Qualitat de l\'aire</string>
+    <string name="profile_filter_climate_shelters">Refugis clim&#224;tics</string>
     <string name="my_location">La meva ubicaci&#243;</string>
     <string name="origin_label">Origen</string>
     <string name="destination_label">Dest&#237;</string>
@@ -49,5 +60,9 @@
     <plurals name="poi_police_stations">
         <item quantity="one">%d comissaria</item>
         <item quantity="other">%d comissaries</item>
+    </plurals>
+    <plurals name="profile_filter_count">
+        <item quantity="one">%d filtre</item>
+        <item quantity="other">%d filtres</item>
     </plurals>
 </resources>

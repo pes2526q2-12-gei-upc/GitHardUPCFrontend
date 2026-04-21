@@ -14,6 +14,17 @@
     <string name="filter_level_high">Alto</string>
     <string name="filter_level_required">Imprescindible</string>
     <string name="preference_level">Nivel de preferencia</string>
+    <string name="profile_filter_security_cameras">C&#225;maras de seguridad</string>
+    <string name="profile_filter_police_stations">Comisar&#237;as</string>
+    <string name="profile_filter_criminal_incidents">Hechos penales</string>
+    <string name="profile_filter_user_reported_incidents">Incidencias reportadas por otros usuarios</string>
+    <string name="profile_filter_benches">Bancos</string>
+    <string name="profile_filter_noise_pollution">Contaminaci&#243;n ac&#250;stica</string>
+    <string name="profile_filter_escalators">Escaleras mec&#225;nicas</string>
+    <string name="profile_filter_drinking_fountains">Fuentes de agua</string>
+    <string name="profile_filter_trees">&#193;rboles</string>
+    <string name="profile_filter_air_quality">Calidad del aire</string>
+    <string name="profile_filter_climate_shelters">Refugios clim&#225;ticos</string>
     <string name="my_location">Mi ubicaci&#243;n</string>
     <string name="origin_label">Origen</string>
     <string name="destination_label">Destino</string>
@@ -49,5 +60,9 @@
     <plurals name="poi_police_stations">
         <item quantity="one">%d comisar&#237;a</item>
         <item quantity="other">%d comisar&#237;as</item>
+    </plurals>
+    <plurals name="profile_filter_count">
+        <item quantity="one">%d filtro</item>
+        <item quantity="other">%d filtros</item>
     </plurals>
 </resources>

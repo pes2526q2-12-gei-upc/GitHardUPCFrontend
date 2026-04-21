@@ -40,7 +40,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -57,13 +56,49 @@ import com.safesteps.R
 import com.safesteps.auth.UserInfo
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.LanguageSelector
+import com.safesteps.i18n.appPlural
 import com.safesteps.i18n.appString
+import kotlin.math.roundToInt
 
 private val filterLevelResIds = listOf(
     R.string.filter_level_low,
     R.string.filter_level_medium,
     R.string.filter_level_high,
     R.string.filter_level_required
+)
+
+private data class ProfileFilterGroup(
+    val titleResId: Int,
+    val filterResIds: List<Int>
+)
+
+private val profileFilterGroups = listOf(
+    ProfileFilterGroup(
+        titleResId = R.string.filter_safety,
+        filterResIds = listOf(
+            R.string.profile_filter_security_cameras,
+            R.string.profile_filter_police_stations,
+            R.string.profile_filter_criminal_incidents,
+            R.string.profile_filter_user_reported_incidents
+        )
+    ),
+    ProfileFilterGroup(
+        titleResId = R.string.filter_comfort,
+        filterResIds = listOf(
+            R.string.profile_filter_benches,
+            R.string.profile_filter_noise_pollution,
+            R.string.profile_filter_escalators,
+            R.string.profile_filter_drinking_fountains
+        )
+    ),
+    ProfileFilterGroup(
+        titleResId = R.string.filter_climate,
+        filterResIds = listOf(
+            R.string.profile_filter_trees,
+            R.string.profile_filter_air_quality,
+            R.string.profile_filter_climate_shelters
+        )
+    )
 )
 
 @Composable
@@ -75,14 +110,15 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var seguridadExpanded by rememberSaveable { mutableStateOf(false) }
-    var confortExpanded by rememberSaveable { mutableStateOf(false) }
-    var climaExpanded by rememberSaveable { mutableStateOf(false) }
-    var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
+    val totalFilterCount = profileFilterGroups.sumOf { it.filterResIds.size }
 
-    var seguridadValue by rememberSaveable { mutableIntStateOf(0) }
-    var confortValue by rememberSaveable { mutableIntStateOf(2) }
-    var climaValue by rememberSaveable { mutableIntStateOf(2) }
+    var expandedGroups by rememberSaveable {
+        mutableStateOf(List(profileFilterGroups.size) { false })
+    }
+    var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
+    var filterValues by rememberSaveable {
+        mutableStateOf(List(totalFilterCount) { 1 })
+    }
 
     Column(
         modifier = modifier
@@ -158,36 +194,40 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                FilterAccordion(
-                    title = appString(R.string.filter_safety),
-                    selectedLabel = appString(filterLevelResIds[seguridadValue]),
-                    expanded = seguridadExpanded,
-                    sliderValue = seguridadValue,
-                    onExpandedChange = { seguridadExpanded = !seguridadExpanded },
-                    onValueChange = { seguridadValue = it }
-                )
+                var filterOffset = 0
+                profileFilterGroups.forEachIndexed { groupIndex, group ->
+                    val groupStartIndex = filterOffset
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    FilterAccordion(
+                        title = appString(group.titleResId),
+                        subtitle = appPlural(
+                            R.plurals.profile_filter_count,
+                            group.filterResIds.size,
+                            group.filterResIds.size
+                        ),
+                        expanded = expandedGroups[groupIndex],
+                        filterLabels = group.filterResIds.map { appString(it) },
+                        filterValues = group.filterResIds.indices.map { localIndex ->
+                            filterValues[groupStartIndex + localIndex]
+                        },
+                        onExpandedChange = {
+                            expandedGroups = expandedGroups.toMutableList().also { groups ->
+                                groups[groupIndex] = !groups[groupIndex]
+                            }
+                        },
+                        onValueChange = { localIndex, newValue ->
+                            filterValues = filterValues.toMutableList().also { values ->
+                                values[groupStartIndex + localIndex] = newValue
+                            }
+                        }
+                    )
 
-                FilterAccordion(
-                    title = appString(R.string.filter_comfort),
-                    selectedLabel = appString(filterLevelResIds[confortValue]),
-                    expanded = confortExpanded,
-                    sliderValue = confortValue,
-                    onExpandedChange = { confortExpanded = !confortExpanded },
-                    onValueChange = { confortValue = it }
-                )
+                    filterOffset += group.filterResIds.size
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                FilterAccordion(
-                    title = appString(R.string.filter_climate),
-                    selectedLabel = appString(filterLevelResIds[climaValue]),
-                    expanded = climaExpanded,
-                    sliderValue = climaValue,
-                    onExpandedChange = { climaExpanded = !climaExpanded },
-                    onValueChange = { climaValue = it }
-                )
+                    if (groupIndex < profileFilterGroups.lastIndex) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(28.dp))
 
@@ -304,17 +344,17 @@ private fun ProfileHeader(user: UserInfo) {
 @Composable
 private fun FilterAccordion(
     title: String,
-    selectedLabel: String,
+    subtitle: String,
     expanded: Boolean,
-    sliderValue: Int,
+    filterLabels: List<String>,
+    filterValues: List<Int>,
     onExpandedChange: () -> Unit,
-    onValueChange: (Int) -> Unit
+    onValueChange: (Int, Int) -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, Color(0xFFE5ECE7), RoundedCornerShape(18.dp))
-            .clickable(onClick = onExpandedChange),
+            .border(1.dp, Color(0xFFE5ECE7), RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(18.dp),
         color = Color(0xFFF9FBFA)
     ) {
@@ -324,7 +364,9 @@ private fun FilterAccordion(
                 .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onExpandedChange),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -336,7 +378,7 @@ private fun FilterAccordion(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = selectedLabel,
+                        text = subtitle,
                         color = Color(0xFF77837D),
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -352,48 +394,80 @@ private fun FilterAccordion(
             if (expanded) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                FilterSlider(
-                    value = sliderValue,
-                    onValueChange = onValueChange
-                )
+                filterLabels.forEachIndexed { index, label ->
+                    FilterPreferenceControl(
+                        title = label,
+                        value = filterValues[index],
+                        onValueChange = { onValueChange(index, it) }
+                    )
+
+                    if (index < filterLabels.lastIndex) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun FilterSlider(
+private fun FilterPreferenceControl(
+    title: String,
     value: Int,
     onValueChange: (Int) -> Unit
 ) {
     val selectedLabel = appString(filterLevelResIds[value])
 
-    Text(
-        text = appString(R.string.preference_level),
-        color = Color(0xFF5C6A64),
-        style = MaterialTheme.typography.labelLarge
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            modifier = Modifier.weight(1f),
+            text = title,
+            color = Color(0xFF23333A),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium
+        )
 
-    Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Text(
+            text = selectedLabel,
+            color = Color(0xFF5C6A64),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+
+    Spacer(modifier = Modifier.height(6.dp))
 
     Slider(
         value = value.toFloat(),
-        onValueChange = { onValueChange(it.toInt()) },
+        onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 3)) },
         valueRange = 0f..3f,
         steps = 2,
         modifier = Modifier.fillMaxWidth()
     )
 
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center
+    Row(
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Text(
-            text = selectedLabel,
-            color = Color(0xFF23333A),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold
-        )
+        filterLevelResIds.forEachIndexed { index, labelResId ->
+            Text(
+                modifier = Modifier.weight(1f),
+                text = appString(labelResId),
+                color = if (index == value) Color(0xFF23333A) else Color(0xFF8A948F),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (index == value) FontWeight.SemiBold else FontWeight.Normal,
+                textAlign = when (index) {
+                    0 -> TextAlign.Start
+                    filterLevelResIds.lastIndex -> TextAlign.End
+                    else -> TextAlign.Center
+                },
+                maxLines = 2
+            )
+        }
     }
 }
 
