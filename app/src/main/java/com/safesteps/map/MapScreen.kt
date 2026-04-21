@@ -5,6 +5,7 @@ import android.location.LocationListener
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
@@ -83,6 +84,10 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import org.maplibre.android.maps.MapView
+import androidx.compose.ui.unit.Dp
+import androidx.activity.compose.ManagedActivityResultLauncher
+import androidx.compose.runtime.State
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -853,6 +858,510 @@ private fun RouteActiveBottomBar(
 }
 
 @Composable
+private fun rememberDynamicBottomPadding(
+    modoRuta: Boolean,
+    destinoSeleccionado: org.maplibre.android.geometry.LatLng?,
+    sheetHeightPx: Float,
+    sheetOffsetPx: Float
+): Dp {
+    val density = LocalDensity.current
+    return animateDpAsState(
+        targetValue = when {
+            modoRuta -> 110.dp
+            destinoSeleccionado != null -> {
+                val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
+                val currentVisibleHeightDp = with(density) { currentVisibleHeightPx.toDp() }
+                currentVisibleHeightDp + 16.dp
+            }
+            else -> 16.dp
+        },
+        label = "buttonPadding"
+    ).value
+}
+
+@Composable
+private fun rememberLocationPermissionLauncher(
+    viewModel: MapViewModel,
+    onPermissionDenied: () -> Unit
+): ManagedActivityResultLauncher<Array<String>, Map<String, Boolean>> {
+    val context = LocalContext.current
+    return rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        val granted = fine || coarse || hasLocationPermission(context)
+        viewModel.onLocationPermissionsResult(granted)
+        if (granted) {
+            getBestLastKnownLocation(context)?.let(viewModel::updateLocation)
+        } else {
+            onPermissionDenied()
+        }
+    }
+}
+
+@Composable
+private fun rememberSheetDragState(
+    isDraggable: Boolean,
+    collapsedSheetOffset: Float,
+    sheetOffsetPx: Float,
+    onOffsetUpdate: (Float) -> Unit
+) = rememberDraggableState { delta ->
+    if (isDraggable) {
+        onOffsetUpdate((sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset))
+    }
+}
+
+@Composable
+private fun LocationInitializationEffect(
+    viewModel: MapViewModel,
+    permissionLauncher: ManagedActivityResultLauncher<Array<String>, Map<String, Boolean>>
+) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        val hasPermission = hasLocationPermission(context)
+        viewModel.onLocationPermissionsResult(hasPermission)
+
+        if (hasPermission) {
+            getBestLastKnownLocation(context)?.let(viewModel::updateLocation)
+        } else {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocationActivationEffect(
+    locationGranted: Boolean,
+    mapaListo: Boolean,
+    mapView: MapView
+) {
+    LaunchedEffect(locationGranted, mapaListo) {
+        if (locationGranted && mapaListo) {
+            activateLocationComponent(mapView)
+        }
+    }
+}
+
+@Composable
+private fun RouteCalculationEffect(
+    destinoSeleccionado: LatLng?,
+    origenSeleccionado: LatLng?,
+    ultimaUbicacion: android.location.Location?,
+    viewModel: MapViewModel
+) {
+    LaunchedEffect(destinoSeleccionado, origenSeleccionado) {
+        val destination = destinoSeleccionado ?: return@LaunchedEffect
+        val origenPoint = origenSeleccionado ?: ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) } ?: return@LaunchedEffect
+
+        viewModel.calcularRuta(
+            origenLong = origenPoint.longitude,
+            origenLat = origenPoint.latitude,
+            destiLong = destination.longitude,
+            destiLat = destination.latitude
+        )
+    }
+}
+
+@Composable
+private fun MapStylingAndMarkersEffect(
+    uiState: MapUiState,
+    mapView: MapView,
+    viewModel: MapViewModel,
+    originLabel: String,
+    destinationLabel: String
+) {
+    val context = LocalContext.current
+    LaunchedEffect(
+        uiState.estiloSatelite,
+        uiState.modoRuta,
+        uiState.rutaCoordenades,
+        uiState.mostrarPuntsInteres,
+        uiState.puntsInteres,
+        uiState.origenSeleccionado,
+        uiState.destinoSeleccionado
+    ) {
+        mapView.getMapAsync { map ->
+            map.setStyle(getStyleUrl(uiState.estiloSatelite)) {
+                updateMapElements(map, mapView, uiState, viewModel, context, originLabel, destinationLabel)
+            }
+        }
+    }
+}
+
+private fun getStyleUrl(estiloSatelite: Boolean): String = if (estiloSatelite) {
+    "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+} else {
+    "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+}
+
+private fun updateMapElements(
+    map: org.maplibre.android.maps.MapLibreMap,
+    mapView: MapView,
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    context: android.content.Context,
+    originLabel: String,
+    destinationLabel: String
+) {
+    viewModel.onMapaListo()
+    if (uiState.locationGranted) activateLocationComponent(mapView)
+
+    if (uiState.rutaCoordenades.isNotEmpty()) {
+        renderRouteAndPois(map, mapView, uiState, context, originLabel, destinationLabel)
+    } else {
+        addSimpleMarkers(map, uiState.origenSeleccionado, uiState.destinoSeleccionado, originLabel, destinationLabel, context)
+    }
+}
+
+private fun renderRouteAndPois(
+    map: org.maplibre.android.maps.MapLibreMap,
+    mapView: MapView,
+    uiState: MapUiState,
+    context: android.content.Context,
+    originLabel: String,
+    destinationLabel: String
+) {
+    val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
+
+    drawRoute(
+        mapView = mapView,
+        coordenades = uiState.rutaCoordenades,
+        origen = origenPoint,
+        desti = uiState.destinoSeleccionado,
+        context = context,
+        originTitle = originLabel,
+        destinationTitle = destinationLabel
+    )
+
+    if (uiState.mostrarPuntsInteres) {
+        addPoiMarkers(map, uiState.puntsInteres, context)
+    }
+}
+
+private fun addPoiMarkers(
+    map: org.maplibre.android.maps.MapLibreMap,
+    puntsInteres: List<com.safesteps.data.PuntInteres>,
+    context: android.content.Context
+) {
+    val filteredPois = puntsInteres.filter { punt ->
+        punt.tipus.trim().uppercase() in setOf("FONT", "COMISSARIA")
+    }
+    
+    filteredPois.forEach { punt ->
+        val titulo = punt.nom ?: punt.tipus.lowercase().replaceFirstChar { it.uppercase() }
+        map.addMarker(
+            MarkerOptions()
+                .position(LatLng(punt.latitud, punt.longitud))
+                .title(titulo)
+                .icon(crearIconaPoi(context, punt.tipus))
+        )
+    }
+}
+
+private fun addSimpleMarkers(
+    map: org.maplibre.android.maps.MapLibreMap,
+    origenSeleccionado: LatLng?,
+    destinoSeleccionado: LatLng?,
+    originLabel: String,
+    destinationLabel: String,
+    context: android.content.Context
+) {
+    origenSeleccionado?.let { ori ->
+        map.addMarker(
+            MarkerOptions()
+                .position(ori)
+                .title(originLabel)
+                .icon(crearIconaGrisa(context))
+        )
+    }
+    destinoSeleccionado?.let { dest ->
+        map.addMarker(MarkerOptions().position(dest).title(destinationLabel))
+    }
+}
+
+private fun configureMapHandlers(
+    map: org.maplibre.android.maps.MapLibreMap,
+    uiState: MapUiState,
+    viewModel: MapViewModel
+) {
+    map.uiSettings.isLogoEnabled = false
+    map.uiSettings.isAttributionEnabled = false
+
+    map.setOnMarkerClickListener { marker ->
+        val puntPulsat = uiState.puntsInteres.find {
+            it.latitud == marker.position.latitude && it.longitud == marker.position.longitude
+        }
+        viewModel.onPuntInteresSeleccionat(puntPulsat)
+        false
+    }
+
+    map.addOnMapClickListener { point ->
+        if (!uiState.modoRuta) {
+            viewModel.onMapClicked(point)
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 15.0), 1000)
+        }
+        true
+    }
+}
+
+@Composable
+private fun LocationUpdatesEffect(
+    locationGranted: Boolean,
+    mapView: MapView,
+    viewModel: MapViewModel
+) {
+    val context = LocalContext.current
+    DisposableEffect(locationGranted) {
+        var listener: android.location.LocationListener? = null
+        if (locationGranted) {
+            listener = startAndroidLocationUpdates(context, mapView) { loc ->
+                viewModel.updateLocation(loc)
+            }
+        }
+        onDispose { stopAndroidLocationUpdates(context, listener) }
+    }
+}
+
+@Composable
+private fun InitialMapCenteringEffect(
+    ultimaUbicacion: android.location.Location?,
+    mapaListo: Boolean,
+    firstLocationZoomDone: Boolean,
+    mapView: MapView,
+    viewModel: MapViewModel
+) {
+    LaunchedEffect(ultimaUbicacion, mapaListo) {
+        if (ultimaUbicacion != null && mapaListo && !firstLocationZoomDone) {
+            centerMapOnLocation(
+                mapView = mapView,
+                location = ultimaUbicacion,
+                durationMs = 1500
+            )
+            viewModel.marcarZoomInicialHecho()
+        }
+    }
+}
+
+@Composable
+private fun SearchPanelSection(
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    currentUser: UserInfo?,
+    onLoginClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    mapView: MapView
+) {
+    AnimatedVisibility(visible = !uiState.modoRuta) {
+        TopSearchPanel(
+            origen = uiState.textoOrigen,
+            onOrigenChange = { text ->
+                viewModel.onTextoBuscadorModificado(text, textField.ORIGIN)
+                if (text.isEmpty()) {
+                    viewModel.limpiarOrigen()
+                    viewModel.cancelarRutaVisual()
+                }
+            },
+            destino = uiState.textoDestino,
+            onDestinoChange = { text ->
+                viewModel.onTextoBuscadorModificado(text, textField.DESTINY)
+                if (text.isEmpty()) {
+                    viewModel.limpiarDestino()
+                    viewModel.cancelarRutaVisual()
+                }
+            },
+            mostrarOrigen = uiState.mostrarOrigen,
+            onOrigenFocus = { viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN) },
+            onDestinoFocus = { viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY) },
+            adrecesSuggerides = uiState.adrecesSuggerides,
+            onAdrecaSeleccionada = { feature ->
+                val estavemBuscantOrigen = uiState.campActiu == textField.ORIGIN
+                viewModel.onAdrecaSeleccionada(feature)
+                if (estavemBuscantOrigen) {
+                    val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
+                    mapView.getMapAsync { map ->
+                        map.animateCamera(CameraUpdateFactory.newLatLngZoom(puntSeleccionat, 15.0), 1500)
+                    }
+                }
+            },
+            campActiu = uiState.campActiu,
+            currentUser = currentUser,
+            onLoginClick = onLoginClick,
+            onProfileClick = onProfileClick
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.RoutePlannerSection(
+    uiState: MapUiState,
+    sheetOffsetPx: Float,
+    onSheetOffsetChange: (Float) -> Unit,
+    sheetHeightPx: Float,
+    onSheetHeightChange: (Float) -> Unit,
+    collapsedSheetOffset: Float,
+    sheetDragState: androidx.compose.foundation.gestures.DraggableState,
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    viewModel: MapViewModel,
+    waitingGpsLocationMessage: String,
+    resetToMainMenu: () -> Unit
+) {
+    val density = LocalDensity.current
+    val context = LocalContext.current
+
+    AnimatedVisibility(
+        visible = uiState.destinoSeleccionado != null && !uiState.modoRuta,
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it }),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 10.dp)
+    ) {
+        RoutePlannerSheet(
+            modifier = Modifier
+                .offset(y = with(density) { sheetOffsetPx.toDp() })
+                .onGloballyPositioned {
+                    val height = it.size.height.toFloat()
+                    onSheetHeightChange(height)
+                    if (sheetOffsetPx > collapsedSheetOffset) onSheetOffsetChange(collapsedSheetOffset)
+                }
+                .draggable(
+                    orientation = Orientation.Vertical,
+                    state = sheetDragState,
+                    onDragStopped = {
+                        val target = if (sheetOffsetPx > collapsedSheetOffset / 2f) collapsedSheetOffset else 0f
+                        coroutineScope.launch {
+                            animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ ->
+                                onSheetOffsetChange(value)
+                            }
+                        }
+                    }
+                ),
+            selectedPriority = uiState.prioridadSeleccionada,
+            onPrioritySelected = { priority ->
+                viewModel.onPrioritySelected(priority)
+                val destination = uiState.destinoSeleccionado ?: return@RoutePlannerSheet
+                val selectedOrigin = uiState.origenSeleccionado
+                val currentLocation = uiState.ultimaUbicacion
+
+                val origenLong = selectedOrigin?.longitude ?: currentLocation?.longitude
+                val origenLat = selectedOrigin?.latitude ?: currentLocation?.latitude
+
+                if (origenLong != null && origenLat != null) {
+                    viewModel.calcularRuta(
+                        origenLong = origenLong,
+                        origenLat = origenLat,
+                        destiLong = destination.longitude,
+                        destiLat = destination.latitude
+                    )
+                } else {
+                    Toast.makeText(context, waitingGpsLocationMessage, Toast.LENGTH_SHORT).show()
+                }
+            },
+            distanceText = uiState.distanceText,
+            durationText = uiState.durationText,
+            onClose = resetToMainMenu,
+            puntsInteres = uiState.puntsInteres,
+            onStartRoute = {
+                viewModel.iniciarNavegacio()
+            }
+        )
+    }
+}
+
+@Composable
+private fun PoiToggleFAB(
+    visible: Boolean,
+    mostrarPuntsInteres: Boolean,
+    onToggle: () -> Unit,
+    hideLabel: String,
+    showLabel: String
+) {
+    AnimatedVisibility(visible = visible) {
+        ExtendedFloatingActionButton(
+            onClick = onToggle,
+            icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
+            text = {
+                Text(if (mostrarPuntsInteres) hideLabel else showLabel)
+            },
+            containerColor = Color.White,
+            contentColor = Color(0xFFC86A37),
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+    }
+}
+
+@Composable
+private fun MapStyleFAB(
+    estiloSatelite: Boolean,
+    onToggle: () -> Unit,
+    changeStyleLabel: String,
+    standardLabel: String,
+    satelliteLabel: String
+) {
+    ExtendedFloatingActionButton(
+        onClick = onToggle,
+        icon = { Icon(Icons.Default.Layers, contentDescription = changeStyleLabel) },
+        text = {
+            Text(if (estiloSatelite) standardLabel else satelliteLabel)
+        },
+        containerColor = if (estiloSatelite) Color(0xFF2F3B44) else Color.White,
+        contentColor = if (estiloSatelite) Color.White else Color(0xFF3D4A45)
+    )
+}
+
+@Composable
+private fun MyLocationFAB(
+    locationGranted: Boolean,
+    ultimaUbicacion: android.location.Location?,
+    mapView: MapView,
+    viewModel: MapViewModel,
+    permissionLauncher: ManagedActivityResultLauncher<Array<String>, Map<String, Boolean>>,
+    searchingGpsSignalMessage: String,
+    myLocationLabel: String
+) {
+    val context = LocalContext.current
+    FloatingActionButton(
+        onClick = {
+            if (locationGranted) {
+                onMyLocationClick(viewModel, mapView, ultimaUbicacion, context, searchingGpsSignalMessage)
+            } else {
+                permissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            }
+        },
+        containerColor = Color.White,
+        contentColor = Color(0xFF49B97E)
+    ) {
+        Icon(Icons.Default.MyLocation, contentDescription = myLocationLabel)
+    }
+}
+
+private fun onMyLocationClick(
+    viewModel: MapViewModel,
+    mapView: MapView,
+    ultimaUbicacion: android.location.Location?,
+    context: android.content.Context,
+    searchingGpsSignalMessage: String
+) {
+    viewModel.limpiarOrigen()
+    activateLocationComponent(mapView)
+
+    if (ultimaUbicacion != null) {
+        centerMapOnLocation(mapView, ultimaUbicacion)
+    } else {
+        Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
+    }
+}
+
+@Composable
 fun MapLibreScreen(
     modifier: Modifier = Modifier,
     currentUser: UserInfo? = null,
@@ -890,36 +1399,26 @@ fun MapLibreScreen(
     val visibleSheetHeightPx = with(density) { 150.dp.toPx() }
     val collapsedSheetOffset = max(0f, sheetHeightPx - visibleSheetHeightPx)
 
-    val dynamicBottomPadding by animateDpAsState(
-        targetValue = when {
-            uiState.modoRuta -> 110.dp
-            uiState.destinoSeleccionado != null -> {
-                val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
-                val currentVisibleHeightDp = with(density) { currentVisibleHeightPx.toDp() }
-                currentVisibleHeightDp + 16.dp
-            }
-            else -> 16.dp
-        },
-        label = "buttonPadding"
+    val dynamicBottomPadding = rememberDynamicBottomPadding(
+        modoRuta = uiState.modoRuta,
+        destinoSeleccionado = uiState.destinoSeleccionado,
+        sheetHeightPx = sheetHeightPx,
+        sheetOffsetPx = sheetOffsetPx
     )
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        val granted = fine || coarse || hasLocationPermission(context)
-        viewModel.onLocationPermissionsResult(granted)
-        if (granted) {
-            getBestLastKnownLocation(context)?.let(viewModel::updateLocation)
-        }
-        if (!granted) {
+
+    val permissionLauncher = rememberLocationPermissionLauncher(
+        viewModel = viewModel,
+        onPermissionDenied = {
             Toast.makeText(context, locationPermissionRequiredMessage, Toast.LENGTH_SHORT).show()
         }
-    }
+    )
 
-    val sheetDragState = rememberDraggableState { delta ->
-        if (uiState.destinoSeleccionado != null && !uiState.modoRuta) {
-            sheetOffsetPx = (sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset)
-        }
-    }
+    val sheetDragState = rememberSheetDragState(
+        isDraggable = uiState.destinoSeleccionado != null && !uiState.modoRuta,
+        collapsedSheetOffset = collapsedSheetOffset,
+        sheetOffsetPx = sheetOffsetPx,
+        onOffsetUpdate = { sheetOffsetPx = it }
+    )
 
     val resetToMainMenu = {
         viewModel.clearRuta()
@@ -934,268 +1433,77 @@ fun MapLibreScreen(
         Unit
     }
 
-    LaunchedEffect(Unit) {
-        val yaTengoPermiso = hasLocationPermission(context)
-        viewModel.onLocationPermissionsResult(yaTengoPermiso)
+    LocationInitializationEffect(viewModel, permissionLauncher)
 
-        if (yaTengoPermiso) {
-            getBestLastKnownLocation(context)?.let(viewModel::updateLocation)
-        }
+    LocationActivationEffect(
+        locationGranted = uiState.locationGranted,
+        mapaListo = uiState.mapaListo,
+        mapView = mapView
+    )
 
-        if (!yaTengoPermiso) {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
-        }
-    }
+    RouteCalculationEffect(
+        destinoSeleccionado = uiState.destinoSeleccionado,
+        origenSeleccionado = uiState.origenSeleccionado,
+        ultimaUbicacion = uiState.ultimaUbicacion,
+        viewModel = viewModel
+    )
 
-    LaunchedEffect(uiState.locationGranted, uiState.mapaListo) {
-        if (uiState.locationGranted && uiState.mapaListo) {
-            activateLocationComponent(mapView)
-        }
-    }
+    MapStylingAndMarkersEffect(
+        uiState = uiState,
+        mapView = mapView,
+        viewModel = viewModel,
+        originLabel = originLabel,
+        destinationLabel = destinationLabel
+    )
 
-    LaunchedEffect(uiState.destinoSeleccionado, uiState.origenSeleccionado) {
-        val destination = uiState.destinoSeleccionado
-        if (destination != null) {
-            val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
+    LocationUpdatesEffect(
+        locationGranted = uiState.locationGranted,
+        mapView = mapView,
+        viewModel = viewModel
+    )
 
-            if (origenPoint != null) {
-                viewModel.calcularRuta(
-                    origenLong = origenPoint.longitude,
-                    origenLat = origenPoint.latitude,
-                    destiLong = destination.longitude,
-                    destiLat = destination.latitude
-                )
-            }
-        }
-    }
-
-    LaunchedEffect(
-        uiState.estiloSatelite,
-        uiState.modoRuta,
-        uiState.rutaCoordenades,
-        uiState.mostrarPuntsInteres,
-        uiState.puntsInteres,
-        uiState.origenSeleccionado,
-        uiState.destinoSeleccionado
-    ) {
-        mapView.getMapAsync { map ->
-            val styleUrl = if (uiState.estiloSatelite) {
-                "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            } else {
-                "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
-            }
-
-            map.setStyle(styleUrl) {
-                viewModel.onMapaListo()
-                if (uiState.locationGranted) activateLocationComponent(mapView)
-
-                if (uiState.rutaCoordenades.isNotEmpty()) {
-                    val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
-
-                    drawRoute(
-                        mapView = mapView,
-                        coordenades = uiState.rutaCoordenades,
-                        origen = origenPoint,
-                        desti = uiState.destinoSeleccionado,
-                        context = context,
-                        originTitle = originLabel,
-                        destinationTitle = destinationLabel
-                    )
-
-                    if (uiState.mostrarPuntsInteres) {
-                        uiState.puntsInteres
-                            .filter { punt ->
-                                val tipus = punt.tipus.trim().uppercase()
-                                tipus == "FONT" || tipus == "COMISSARIA"
-                            }
-                            .forEach { punt ->
-                                val titulo = punt.nom ?: punt.tipus.lowercase().replaceFirstChar { it.uppercase() }
-                                map.addMarker(
-                                    MarkerOptions()
-                                        .position(LatLng(punt.latitud, punt.longitud))
-                                        .title(titulo)
-                                        .icon(crearIconaPoi(context, punt.tipus))
-                                )
-                            }
-                    }
-                } else {
-                    uiState.origenSeleccionado?.let { ori ->
-                        map.addMarker(
-                            MarkerOptions()
-                                .position(ori)
-                                .title(originLabel)
-                                .icon(crearIconaGrisa(context))
-                        )
-                    }
-                    uiState.destinoSeleccionado?.let { dest ->
-                        map.addMarker(MarkerOptions().position(dest).title(destinationLabel))
-                    }
-                }
-            }
-        }
-    }
-
-    DisposableEffect(uiState.locationGranted) {
-        var listener: LocationListener? = null
-        if (uiState.locationGranted) {
-            listener = startAndroidLocationUpdates(context, mapView) { loc ->
-                viewModel.updateLocation(loc)
-            }
-        }
-        onDispose { stopAndroidLocationUpdates(context, listener) }
-    }
-
-    LaunchedEffect(uiState.ultimaUbicacion, uiState.mapaListo) {
-        val currentLocation = uiState.ultimaUbicacion
-        if (currentLocation != null && uiState.mapaListo && !uiState.firstLocationZoomDone) {
-            centerMapOnLocation(
-                mapView = mapView,
-                location = currentLocation,
-                durationMs = 1500
-            )
-            viewModel.marcarZoomInicialHecho()
-        }
-    }
+    InitialMapCenteringEffect(
+        ultimaUbicacion = uiState.ultimaUbicacion,
+        mapaListo = uiState.mapaListo,
+        firstLocationZoomDone = uiState.firstLocationZoomDone,
+        mapView = mapView,
+        viewModel = viewModel
+    )
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
             factory = {
                 mapView.apply {
                     getMapAsync { map ->
-                        map.uiSettings.isLogoEnabled = false
-                        map.uiSettings.isAttributionEnabled = false
-
-                        map.setOnMarkerClickListener { marker ->
-                            val puntPulsat = uiState.puntsInteres.find {
-                                it.latitud == marker.position.latitude && it.longitud == marker.position.longitude
-                            }
-                            viewModel.onPuntInteresSeleccionat(puntPulsat)
-
-                            false
-                        }
-
-                        map.addOnMapClickListener { point ->
-                            if (uiState.modoRuta) {
-                                true
-                            } else {
-                                viewModel.onMapClicked(point)
-                                map.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 15.0), 1000)
-                                true
-                            }
-                        }
+                        configureMapHandlers(map, uiState, viewModel)
                     }
                 }
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        AnimatedVisibility(visible = !uiState.modoRuta) {
-            TopSearchPanel(
-                origen = uiState.textoOrigen,
-                onOrigenChange = { text ->
-                    viewModel.onTextoBuscadorModificado(text, textField.ORIGIN)
-                    if (text.isEmpty()) {
-                        viewModel.limpiarOrigen()
-                        viewModel.cancelarRutaVisual()
-                    }
-                },
-                destino = uiState.textoDestino,
-                onDestinoChange = { text ->
-                    viewModel.onTextoBuscadorModificado(text, textField.DESTINY)
-                    if (text.isEmpty()) {
-                        viewModel.limpiarDestino()
-                        viewModel.cancelarRutaVisual()
-                    }
-                },
-                mostrarOrigen = uiState.mostrarOrigen,
-                onOrigenFocus = { viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN) },
-                onDestinoFocus = { viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY) },
-                adrecesSuggerides = uiState.adrecesSuggerides,
-                onAdrecaSeleccionada = { feature ->
-                    val estavemBuscantOrigen = uiState.campActiu == textField.ORIGIN
-                    viewModel.onAdrecaSeleccionada(feature)
-                    if (estavemBuscantOrigen) {
-                        val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
-                        mapView.getMapAsync { map ->
-                            map.animateCamera(
-                                CameraUpdateFactory.newLatLngZoom(puntSeleccionat, 15.0),
-                                1500
-                            )
-                        }
-                    }
-                },
-                campActiu = uiState.campActiu,
-                currentUser = currentUser,
-                onLoginClick = onLoginClick,
-                onProfileClick = onProfileClick
-            )
-        }
+        SearchPanelSection(
+            uiState = uiState,
+            viewModel = viewModel,
+            currentUser = currentUser,
+            onLoginClick = onLoginClick,
+            onProfileClick = onProfileClick,
+            mapView = mapView
+        )
 
-        AnimatedVisibility(
-            visible = uiState.destinoSeleccionado != null && !uiState.modoRuta,
-            enter = slideInVertically(initialOffsetY = { it }),
-            exit = slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 10.dp)
-        ) {
-            RoutePlannerSheet(
-                modifier = Modifier
-                    .offset(y = with(density) { sheetOffsetPx.toDp() })
-                    .onGloballyPositioned {
-                        sheetHeightPx = it.size.height.toFloat()
-                        if (sheetOffsetPx > collapsedSheetOffset) sheetOffsetPx = collapsedSheetOffset
-                    }
-                    .draggable(
-                        orientation = Orientation.Vertical,
-                        state = sheetDragState,
-                        onDragStopped = {
-                            val target = if (sheetOffsetPx > collapsedSheetOffset / 2f) collapsedSheetOffset else 0f
-                            coroutineScope.launch {
-                                animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ ->
-                                    sheetOffsetPx = value
-                                }
-                            }
-                        }
-                    ),
-                selectedPriority = uiState.prioridadSeleccionada,
-                onPrioritySelected = { priority ->
-                    viewModel.onPrioritySelected(priority)
-                    val destination = uiState.destinoSeleccionado
-                    val selectedOrigin = uiState.origenSeleccionado
-                    val currentLocation = uiState.ultimaUbicacion
-
-                    if (destination != null) {
-                        val origenLong = selectedOrigin?.longitude ?: currentLocation?.longitude
-                        val origenLat = selectedOrigin?.latitude ?: currentLocation?.latitude
-
-                        if (origenLong != null && origenLat != null) {
-                            viewModel.calcularRuta(
-                                origenLong = origenLong,
-                                origenLat = origenLat,
-                                destiLong = destination.longitude,
-                                destiLat = destination.latitude
-                            )
-                        } else {
-                            Toast.makeText(context, waitingGpsLocationMessage, Toast.LENGTH_SHORT)
-                                .show()
-                        }
-                    }
-                },
-                distanceText = uiState.distanceText,
-                durationText = uiState.durationText,
-                onClose = resetToMainMenu,
-                puntsInteres = uiState.puntsInteres,
-                onStartRoute = {
-                    viewModel.iniciarNavegacio()
-                }
-            )
-        }
+        RoutePlannerSection(
+            uiState = uiState,
+            sheetOffsetPx = sheetOffsetPx,
+            onSheetOffsetChange = { sheetOffsetPx = it },
+            sheetHeightPx = sheetHeightPx,
+            onSheetHeightChange = { sheetHeightPx = it },
+            collapsedSheetOffset = collapsedSheetOffset,
+            sheetDragState = sheetDragState,
+            coroutineScope = coroutineScope,
+            viewModel = viewModel,
+            waitingGpsLocationMessage = waitingGpsLocationMessage,
+            resetToMainMenu = resetToMainMenu
+        )
 
         AnimatedVisibility(
             visible = uiState.modoRuta,
@@ -1223,69 +1531,33 @@ fun MapLibreScreen(
                     .padding(end = 16.dp, bottom = dynamicBottomPadding),
                 horizontalAlignment = Alignment.End
             ) {
-                AnimatedVisibility(visible = uiState.puntsInteres.isNotEmpty() && !uiState.modoRuta) {
-                    ExtendedFloatingActionButton(
-                        onClick = { viewModel.togglePuntsInteres() },
-                        icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                        text = {
-                            Text(
-                                if (uiState.mostrarPuntsInteres) {
-                                    hideExtraInfoLabel
-                                } else {
-                                    showExtraInfoLabel
-                                }
-                            )
-                        },
-                        containerColor = Color.White,
-                        contentColor = Color(0xFFC86A37),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                }
+                PoiToggleFAB(
+                    visible = uiState.puntsInteres.isNotEmpty() && !uiState.modoRuta,
+                    mostrarPuntsInteres = uiState.mostrarPuntsInteres,
+                    onToggle = { viewModel.togglePuntsInteres() },
+                    hideLabel = hideExtraInfoLabel,
+                    showLabel = showExtraInfoLabel
+                )
 
-                ExtendedFloatingActionButton(
-                    onClick = { viewModel.toggleEstiloSatelite() },
-                    icon = { Icon(Icons.Default.Layers, contentDescription = changeMapStyleLabel) },
-                    text = {
-                        Text(
-                            if (uiState.estiloSatelite) {
-                                standardMapStyleLabel
-                            } else {
-                                satelliteMapStyleLabel
-                            }
-                        )
-                    },
-                    containerColor = if (uiState.estiloSatelite) Color(0xFF2F3B44) else Color.White,
-                    contentColor = if (uiState.estiloSatelite) Color.White else Color(0xFF3D4A45)
+                MapStyleFAB(
+                    estiloSatelite = uiState.estiloSatelite,
+                    onToggle = { viewModel.toggleEstiloSatelite() },
+                    changeStyleLabel = changeMapStyleLabel,
+                    standardLabel = standardMapStyleLabel,
+                    satelliteLabel = satelliteMapStyleLabel
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                FloatingActionButton(
-                    onClick = {
-                        if (uiState.locationGranted) {
-                            viewModel.limpiarOrigen()
-                            activateLocationComponent(mapView)
-
-                            val currentLocation = uiState.ultimaUbicacion
-                            if (currentLocation != null) {
-                                centerMapOnLocation(mapView, currentLocation)
-                            } else {
-                                Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
-                            }
-                        } else {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
-                        }
-                    },
-                    containerColor = Color.White,
-                    contentColor = Color(0xFF49B97E)
-                ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = myLocationLabel)
-                }
+                MyLocationFAB(
+                    locationGranted = uiState.locationGranted,
+                    ultimaUbicacion = uiState.ultimaUbicacion,
+                    mapView = mapView,
+                    viewModel = viewModel,
+                    permissionLauncher = permissionLauncher,
+                    searchingGpsSignalMessage = searchingGpsSignalMessage,
+                    myLocationLabel = myLocationLabel
+                )
             }
         }
         if (uiState.calculantRuta) {
