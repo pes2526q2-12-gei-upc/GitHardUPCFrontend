@@ -108,8 +108,8 @@ private fun GoogleSignInAccount.toUserInfo(): UserInfo {
     return UserInfo(
         username = resolvedUsername,
         email = resolvedEmail,
-        photoUrl = resolvePhotoUrl(),
-        idToken = idToken
+        googleId = id.orEmpty(),
+        photoUrl = resolvePhotoUrl()
     )
 }
 
