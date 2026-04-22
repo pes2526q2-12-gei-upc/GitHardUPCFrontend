@@ -7,6 +7,7 @@ import com.safesteps.data.eliminarUsuarioDelBackend
 import com.safesteps.data.UserSyncOutcome
 import com.safesteps.data.sincronizarUsuarioConBackend as sincronizarUsuarioConBackendApi
 import com.safesteps.data.UserSyncResult
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -15,7 +16,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
@@ -80,7 +83,7 @@ class AuthViewModel : ViewModel() {
 
         viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     sincronizarUsuarioConBackendApi(user)
                 }
             }.onSuccess { result ->
@@ -125,7 +128,7 @@ class AuthViewModel : ViewModel() {
 
         viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     eliminarUsuarioDelBackend(user.googleId)
                 }
             }.onSuccess {

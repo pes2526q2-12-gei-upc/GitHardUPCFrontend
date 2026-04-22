@@ -3,11 +3,29 @@ package com.safesteps.data
 import android.util.Log
 import com.google.gson.JsonObject
 import java.io.IOException
+import java.util.UUID
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
+
+data class RouteFilterWeights(
+    val seguretat: Float,
+    val fontsAigua: Float,
+    val ombra: Float,
+    val eMecaniques: Float,
+    val bancs: Float
+)
+
+data class RouteCoordinatesRequest(
+    val origenLong: Double,
+    val origenLat: Double,
+    val destiLong: Double,
+    val destiLat: Double,
+    val nRoutes: Int = 1,
+    val filters: RouteFilterWeights
+)
 
 private data class RoutePointRequest(
     val lat: Double,
@@ -29,7 +47,7 @@ private data class RouteFilterRequest(
     val bancs: Float
 )
 
-private interface RouteCoordinatesApi {
+private fun interface RouteCoordinatesApi {
     @POST("api/v1/calculate-route")
     suspend fun calcularRuta(
         @Body request: RouteRequestWithNRoutes
@@ -52,39 +70,32 @@ private object RouteCoordinatesBackend {
 }
 
 suspend fun obtenirCoordenadesRuta(
-    origenLong: Double,
-    origenLat: Double,
-    destiLong: Double,
-    destiLat: Double,
-    nRoutes: Int = 1,
-    seguretat: Float,
-    fontsAigua: Float,
-    ombra: Float,
-    eMecaniques: Float,
-    bancs: Float
-): Triple<List<Coordenada>, Pair<Int, Double>, List<PuntInteres>> { // ⬅️ Aquí usamos el Triple para los POIs
-
-    Log.d("ROUTE_API", "Enviando petición al servidor")
-    Log.d("ROUTE_API", "origin=($origenLat, $origenLong), destination=($destiLat, $destiLong), nRoutes=$nRoutes")
+    request: RouteCoordinatesRequest
+): Triple<List<Coordenada>, Pair<Int, Double>, List<PuntInteres>> {
+    Log.d("ROUTE_API", "Enviando peticion al servidor")
+    Log.d(
+        "ROUTE_API",
+        "origin=(${request.origenLat}, ${request.origenLong}), " +
+            "destination=(${request.destiLat}, ${request.destiLong}), nRoutes=${request.nRoutes}"
+    )
 
     val response = RouteCoordinatesBackend.service.calcularRuta(
         RouteRequestWithNRoutes(
             origin = RoutePointRequest(
-                lat = origenLat,
-                lon = origenLong
+                lat = request.origenLat,
+                lon = request.origenLong
             ),
             destination = RoutePointRequest(
-                lat = destiLat,
-                lon = destiLong
+                lat = request.destiLat,
+                lon = request.destiLong
             ),
-            nRoutes = nRoutes,
-
+            nRoutes = request.nRoutes,
             filtre = RouteFilterRequest(
-                seguretat = seguretat,
-                fontsAigua = fontsAigua,
-                ombra = ombra,
-                escalesMecaniques = eMecaniques,
-                bancs = bancs
+                seguretat = request.filters.seguretat,
+                fontsAigua = request.filters.fontsAigua,
+                ombra = request.filters.ombra,
+                escalesMecaniques = request.filters.eMecaniques,
+                bancs = request.filters.bancs
             )
         )
     )
@@ -95,18 +106,13 @@ suspend fun obtenirCoordenadesRuta(
         throw IOException("Error calculant la ruta: ${response.code()} ${response.message()}")
     }
 
-    val body = response.body() ?: throw IOException("La resposta del servidor és buida")
-
-    // normalizarResposta debe estar configurada en tu nueva versión para devolver el Triple
-    val resultatNormalitzat = normalizarResposta(body)
-
-    return resultatNormalitzat
+    val body = response.body() ?: throw IOException("La resposta del servidor es buida")
+    return normalizarResposta(body)
 }
 
 fun normalizarResposta(
     response: JsonObject
 ): Triple<List<Coordenada>, Pair<Int, Double>, List<PuntInteres>> {
-
     val routes = response.getAsJsonArray("routes")
         ?: throw IOException("No hi ha routes")
 
@@ -115,7 +121,6 @@ fun normalizarResposta(
     }
 
     val primeraRuta = routes[0].asJsonObject
-
     val coordinatesJson = primeraRuta.getAsJsonArray("coordinates")
         ?: throw IOException("No hi ha coordinates")
 
@@ -124,26 +129,34 @@ fun normalizarResposta(
         Coordenada(lat = point[1].asDouble, lon = point[0].asDouble)
     }
 
-    val temps = if (primeraRuta.has("estimatedTimeMinutes") && !primeraRuta.get("estimatedTimeMinutes").isJsonNull) {
-        primeraRuta.get("estimatedTimeMinutes").asDouble.toInt()
-    } else 0
+    val estimatedTimeMinutes = primeraRuta["estimatedTimeMinutes"]
+    val temps = if (primeraRuta.has("estimatedTimeMinutes") && !estimatedTimeMinutes.isJsonNull) {
+        estimatedTimeMinutes.asDouble.toInt()
+    } else {
+        0
+    }
 
-    val distancia = if (primeraRuta.has("distanceMeters") && !primeraRuta.get("distanceMeters").isJsonNull) {
-        primeraRuta.get("distanceMeters").asDouble
-    } else 0.0
+    val distanceMeters = primeraRuta["distanceMeters"]
+    val distancia = if (primeraRuta.has("distanceMeters") && !distanceMeters.isJsonNull) {
+        distanceMeters.asDouble
+    } else {
+        0.0
+    }
 
     val puntsInteresList = mutableListOf<PuntInteres>()
-    if (primeraRuta.has("pois") && !primeraRuta.get("pois").isJsonNull) {
+    val pois = primeraRuta["pois"]
+    if (primeraRuta.has("pois") && !pois.isJsonNull) {
         val poisJson = primeraRuta.getAsJsonArray("pois")
         poisJson.forEach { element ->
             val obj = element.asJsonObject
+            val name = obj["name"]
             puntsInteresList.add(
                 PuntInteres(
-                    id = java.util.UUID.randomUUID().toString(), // Generamos ID único
-                    tipus = obj.get("type").asString,
-                    latitud = obj.get("lat").asDouble,
-                    longitud = obj.get("lon").asDouble,
-                    nom = if (obj.has("name") && !obj.get("name").isJsonNull) obj.get("name").asString else null
+                    id = UUID.randomUUID().toString(),
+                    tipus = obj["type"].asString,
+                    latitud = obj["lat"].asDouble,
+                    longitud = obj["lon"].asDouble,
+                    nom = if (obj.has("name") && !name.isJsonNull) name.asString else null
                 )
             )
         }

@@ -8,6 +8,8 @@ import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
 import com.safesteps.data.PhotonApi
 import com.safesteps.data.PuntInteres
+import com.safesteps.data.RouteCoordinatesRequest
+import com.safesteps.data.RouteFilterWeights
 import com.safesteps.data.obtenirCoordenadesRuta
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
@@ -210,16 +212,20 @@ class MapViewModel(
             _uiState.update { it.copy(calculantRuta = true) }
             try {
                 val infoRuta = obtenirCoordenadesRuta(
-                    origenLong = origenLong,
-                    origenLat = origenLat,
-                    destiLong = destiLong,
-                    destiLat = destiLat,
-                    nRoutes = 1,
-                    seguretat = routeWeights.seguretat,
-                    fontsAigua = routeWeights.fontsAigua,
-                    ombra = routeWeights.ombra,
-                    eMecaniques = routeWeights.eMecaniques,
-                    bancs = routeWeights.bancs
+                    RouteCoordinatesRequest(
+                        origenLong = origenLong,
+                        origenLat = origenLat,
+                        destiLong = destiLong,
+                        destiLat = destiLat,
+                        nRoutes = 1,
+                        filters = RouteFilterWeights(
+                            seguretat = routeWeights.seguretat,
+                            fontsAigua = routeWeights.fontsAigua,
+                            ombra = routeWeights.ombra,
+                            eMecaniques = routeWeights.eMecaniques,
+                            bancs = routeWeights.bancs
+                        )
+                    )
                 )
 
                 val coordenadas = infoRuta.first
