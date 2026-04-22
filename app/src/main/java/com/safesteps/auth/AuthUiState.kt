@@ -7,6 +7,18 @@ data class UserInfo(
     val photoUrl: String? = null
 )
 
+enum class AuthNoticeMessage {
+    LOGIN_SUCCESS,
+    REGISTER_SUCCESS,
+    SERVER_ERROR
+}
+
+data class AuthNotice(
+    val id: Long,
+    val message: AuthNoticeMessage
+)
+
 data class AuthUiState(
-    val currentUser: UserInfo? = null
+    val currentUser: UserInfo? = null,
+    val authNotice: AuthNotice? = null
 )
