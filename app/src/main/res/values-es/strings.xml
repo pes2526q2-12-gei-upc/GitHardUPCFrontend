@@ -9,6 +9,7 @@
     <string name="filter_safety">Seguridad</string>
     <string name="filter_comfort">Confort</string>
     <string name="filter_climate">Clima</string>
+    <string name="filter_preferences">Preferencias</string>
     <string name="filter_level_low">Bajo</string>
     <string name="filter_level_medium">Medio</string>
     <string name="filter_level_high">Alto</string>

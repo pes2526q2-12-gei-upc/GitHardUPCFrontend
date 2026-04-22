@@ -586,38 +586,56 @@ private fun RoutePlannerHeader(onClose: () -> Unit) {
 @Composable
 private fun RoutePrioritySelector(
     selectedPriority: RoutePriority,
-    onPrioritySelected: (RoutePriority) -> Unit
+    onPrioritySelected: (RoutePriority) -> Unit,
+    showProfilePreferences: Boolean = false,
+    onProfilePreferencesClick: () -> Unit = {}
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        RoutePriorityCompactOption(
-            title = appString(R.string.filter_safety),
-            selected = selectedPriority == RoutePriority.SAFETY,
-            icon = Icons.Default.Security,
-            activeColor = Color(0xFF1F4A85),
-            onClick = { onPrioritySelected(RoutePriority.SAFETY) },
-            modifier = Modifier.weight(1f)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            RoutePriorityCompactOption(
+                title = appString(R.string.filter_safety),
+                selected = selectedPriority == RoutePriority.SAFETY,
+                icon = Icons.Default.Security,
+                activeColor = Color(0xFF1F4A85),
+                onClick = { onPrioritySelected(RoutePriority.SAFETY) },
+                modifier = Modifier.weight(1f)
+            )
 
-        RoutePriorityCompactOption(
-            title = appString(R.string.filter_comfort),
-            selected = selectedPriority == RoutePriority.ACCESSIBILITY,
-            icon = Icons.Default.Accessible,
-            activeColor = Color(0xFF7FD7AA),
-            onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
-            modifier = Modifier.weight(1f)
-        )
+            RoutePriorityCompactOption(
+                title = appString(R.string.filter_comfort),
+                selected = selectedPriority == RoutePriority.ACCESSIBILITY,
+                icon = Icons.Default.Accessible,
+                activeColor = Color(0xFF7FD7AA),
+                onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
+                modifier = Modifier.weight(1f)
+            )
 
-        RoutePriorityCompactOption(
-            title = appString(R.string.filter_climate),
-            selected = selectedPriority == RoutePriority.HEAT,
-            icon = Icons.Default.WbSunny,
-            activeColor = Color(0xFFFF7B42),
-            onClick = { onPrioritySelected(RoutePriority.HEAT) },
-            modifier = Modifier.weight(1f)
-        )
+            RoutePriorityCompactOption(
+                title = appString(R.string.filter_climate),
+                selected = selectedPriority == RoutePriority.HEAT,
+                icon = Icons.Default.WbSunny,
+                activeColor = Color(0xFFFF7B42),
+                onClick = { onPrioritySelected(RoutePriority.HEAT) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (showProfilePreferences) {
+            RoutePriorityCompactOption(
+                title = appString(R.string.filter_preferences),
+                selected = false,
+                icon = Icons.Default.Person,
+                activeColor = Color(0xFF6A768F),
+                onClick = onProfilePreferencesClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -707,6 +725,7 @@ private fun RoutePlannerSheet(
     modifier: Modifier = Modifier,
     selectedPriority: RoutePriority,
     onPrioritySelected: (RoutePriority) -> Unit,
+    showProfilePreferences: Boolean = false,
     distanceText: String,
     durationText: String,
     puntsInteres: List<com.safesteps.data.PuntInteres>,
@@ -741,7 +760,8 @@ private fun RoutePlannerSheet(
 
             RoutePrioritySelector(
                 selectedPriority = selectedPriority,
-                onPrioritySelected = onPrioritySelected
+                onPrioritySelected = onPrioritySelected,
+                showProfilePreferences = showProfilePreferences
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -1187,6 +1207,7 @@ fun MapLibreScreen(
                         }
                     }
                 },
+                showProfilePreferences = currentUser != null,
                 distanceText = uiState.distanceText,
                 durationText = uiState.durationText,
                 onClose = resetToMainMenu,

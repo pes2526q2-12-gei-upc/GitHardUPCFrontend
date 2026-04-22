@@ -9,6 +9,7 @@
     <string name="filter_safety">Seguretat</string>
     <string name="filter_comfort">Confort</string>
     <string name="filter_climate">Clima</string>
+    <string name="filter_preferences">Preferències</string>
     <string name="filter_level_low">Baix</string>
     <string name="filter_level_medium">Mitj&#224;</string>
     <string name="filter_level_high">Alt</string>
