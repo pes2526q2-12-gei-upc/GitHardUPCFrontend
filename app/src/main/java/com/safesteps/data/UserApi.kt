@@ -8,6 +8,7 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -56,6 +57,11 @@ private interface UserApiService {
         @Path("googleId") googleId: String,
         @Body request: UserRequest
     ): Response<UserResponse>
+
+    @DELETE("$USERS_PATH/{googleId}")
+    suspend fun deleteUser(
+        @Path("googleId") googleId: String
+    ): Response<Unit>
 }
 
 private object UserBackend {
@@ -113,6 +119,27 @@ suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncResult {
             )
         }
     }
+}
+
+suspend fun eliminarUsuarioDelBackend(googleId: String) {
+    if (googleId.isBlank()) {
+        throw IOException("Falta el googleId para eliminar el usuario del backend")
+    }
+
+    Log.d("USER_API", "Eliminando usuario del backend: googleId=$googleId")
+
+    val response = UserBackend.service.deleteUser(googleId)
+
+    Log.d(
+        "USER_API",
+        "Respuesta HTTP al eliminar usuario: code=${response.code()} success=${response.isSuccessful}"
+    )
+
+    if (response.isSuccessful || response.code() == 404) {
+        return
+    }
+
+    throw IOException("Error eliminando el usuario: ${response.code()} ${response.message()}")
 }
 
 private fun validarDatosUsuario(user: UserInfo) {

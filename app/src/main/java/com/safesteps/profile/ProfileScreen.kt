@@ -108,6 +108,7 @@ fun ProfileScreen(
     onLanguageSelected: (AppLanguage) -> Unit,
     onBack: () -> Unit,
     onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val totalFilterCount = profileFilterGroups.sumOf { it.filterResIds.size }
@@ -286,7 +287,7 @@ fun ProfileScreen(
                         onDismiss = { showDeleteBanner = false },
                         onConfirm = {
                             showDeleteBanner = false
-                            onLogout()
+                            onDeleteAccount()
                         }
                     )
                 }

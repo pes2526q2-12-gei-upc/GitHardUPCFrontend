@@ -75,8 +75,10 @@ fun SafeStepsApp(
         val loginSuccessText = appString(R.string.auth_banner_login_success)
         val registerSuccessText = appString(R.string.auth_banner_register_success)
         val serverErrorText = appString(R.string.auth_banner_server_error)
+        val deleteAccountSuccessText = appString(R.string.delete_account_success)
+        val deleteAccountErrorText = appString(R.string.delete_account_error)
 
-        LaunchedEffect(authUiState.authNotice?.id) {
+        LaunchedEffect(authUiState.authNotice?.id, authUiState.pendingDeleteAccountSignOut) {
             val notice = authUiState.authNotice ?: return@LaunchedEffect
             Toast.makeText(
                 context,
@@ -84,10 +86,18 @@ fun SafeStepsApp(
                     AuthNoticeMessage.LOGIN_SUCCESS -> loginSuccessText
                     AuthNoticeMessage.REGISTER_SUCCESS -> registerSuccessText
                     AuthNoticeMessage.SERVER_ERROR -> serverErrorText
+                    AuthNoticeMessage.DELETE_ACCOUNT_SUCCESS -> deleteAccountSuccessText
+                    AuthNoticeMessage.DELETE_ACCOUNT_ERROR -> deleteAccountErrorText
                 },
                 Toast.LENGTH_SHORT
             ).show()
-            authViewModel.clearAuthNotice(notice.id)
+
+            if (authUiState.pendingDeleteAccountSignOut) {
+                currentDestination = SafeStepsDestination.MAP
+                onLogoutClick()
+            } else {
+                authViewModel.clearAuthNotice(notice.id)
+            }
         }
 
         Box(modifier = modifier.fillMaxSize()) {
@@ -102,6 +112,9 @@ fun SafeStepsApp(
                         onLogout = {
                             onLogoutClick()
                             currentDestination = SafeStepsDestination.MAP
+                        },
+                        onDeleteAccount = {
+                            authViewModel.onDeleteAccountRequested(authUiState.currentUser!!)
                         }
                     )
                 }

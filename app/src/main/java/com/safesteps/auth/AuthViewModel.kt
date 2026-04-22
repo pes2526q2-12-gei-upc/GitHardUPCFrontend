@@ -3,6 +3,7 @@ package com.safesteps.auth
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.safesteps.data.eliminarUsuarioDelBackend
 import com.safesteps.data.sincronizarUsuarioConBackend as sincronizarUsuarioConBackendApi
 import com.safesteps.data.UserSyncResult
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +49,14 @@ class AuthViewModel : ViewModel() {
     fun onLogout() {
         blockedRestoreGoogleUserId = null
         syncingGoogleUserId = null
-        _uiState.update { it.copy(currentUser = null, authNotice = null) }
+        _uiState.update {
+            it.copy(
+                currentUser = null,
+                authNotice = null,
+                isDeletingAccount = false,
+                pendingDeleteAccountSignOut = false
+            )
+        }
     }
 
     fun clearAuthNotice(noticeId: Long) {
@@ -63,7 +71,7 @@ class AuthViewModel : ViewModel() {
 
     private fun sincronizarUsuarioConBackendAsync(user: UserInfo) {
         val syncKey = user.googleId.ifBlank { user.email }
-        if (syncKey.isBlank() || syncingGoogleUserId == syncKey) {
+        if (syncKey.isBlank() || syncingGoogleUserId == syncKey || _uiState.value.isDeletingAccount) {
             return
         }
 
@@ -95,6 +103,50 @@ class AuthViewModel : ViewModel() {
                 Log.e(
                     "AUTH_VIEW_MODEL",
                     "No se pudo sincronizar el usuario autenticado con el backend",
+                    error
+                )
+            }
+        }
+    }
+
+    fun onDeleteAccountRequested(user: UserInfo) {
+        val deleteKey = user.googleId.ifBlank { user.email }
+        if (
+            deleteKey.isBlank() ||
+            _uiState.value.isDeletingAccount ||
+            _uiState.value.pendingDeleteAccountSignOut
+        ) {
+            return
+        }
+
+        _uiState.update { it.copy(isDeletingAccount = true) }
+
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    eliminarUsuarioDelBackend(user.googleId)
+                }
+            }.onSuccess {
+                blockedRestoreGoogleUserId = deleteKey
+                syncingGoogleUserId = null
+                _uiState.update {
+                    it.copy(
+                        authNotice = createNotice(AuthNoticeMessage.DELETE_ACCOUNT_SUCCESS),
+                        isDeletingAccount = false,
+                        pendingDeleteAccountSignOut = true
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        authNotice = createNotice(AuthNoticeMessage.DELETE_ACCOUNT_ERROR),
+                        isDeletingAccount = false,
+                        pendingDeleteAccountSignOut = false
+                    )
+                }
+                Log.e(
+                    "AUTH_VIEW_MODEL",
+                    "No se pudo eliminar el usuario del backend",
                     error
                 )
             }

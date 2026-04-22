@@ -46,6 +46,8 @@
     <string name="auth_banner_login_success">Inici de sessi&#243; correcte.</string>
     <string name="auth_banner_register_success">Usuari registrat correctament.</string>
     <string name="auth_banner_server_error">Error del servidor. No s\'ha pogut iniciar la sessi&#243;.</string>
+    <string name="delete_account_success">Compte eliminat correctament.</string>
+    <string name="delete_account_error">Error del servidor. No s\'ha pogut eliminar el compte.</string>
     <string name="delete_account_short">Eliminar el compte</string>
     <string name="delete_account_banner_title">Eliminar el compte definitivament?</string>
     <string name="delete_account_banner_message">Tota la teva informaci&#243;, incloses les incid&#232;ncies reportades i l\'historial de rutes, s\'esborrar&#224; de forma definitiva. Vols continuar?</string>

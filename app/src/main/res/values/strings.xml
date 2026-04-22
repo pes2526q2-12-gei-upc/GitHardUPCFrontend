@@ -47,6 +47,8 @@
     <string name="auth_banner_login_success">Sign-in completed successfully.</string>
     <string name="auth_banner_register_success">User registered successfully.</string>
     <string name="auth_banner_server_error">Server error. Sign-in could not be completed.</string>
+    <string name="delete_account_success">Account deleted successfully.</string>
+    <string name="delete_account_error">Server error. The account could not be deleted.</string>
     <string name="delete_account_short">Delete account</string>
     <string name="delete_account_banner_title">Delete account permanently?</string>
     <string name="delete_account_banner_message">All your information, including reported incidents and route history, will be permanently deleted. Do you want to continue?</string>

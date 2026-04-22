@@ -10,7 +10,9 @@ data class UserInfo(
 enum class AuthNoticeMessage {
     LOGIN_SUCCESS,
     REGISTER_SUCCESS,
-    SERVER_ERROR
+    SERVER_ERROR,
+    DELETE_ACCOUNT_SUCCESS,
+    DELETE_ACCOUNT_ERROR
 }
 
 data class AuthNotice(
@@ -20,5 +22,7 @@ data class AuthNotice(
 
 data class AuthUiState(
     val currentUser: UserInfo? = null,
-    val authNotice: AuthNotice? = null
+    val authNotice: AuthNotice? = null,
+    val isDeletingAccount: Boolean = false,
+    val pendingDeleteAccountSignOut: Boolean = false
 )
