@@ -1,0 +1,155 @@
+package com.safesteps.data
+
+import android.util.Log
+import com.safesteps.auth.UserInfo
+import java.io.IOException
+import java.util.Locale
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
+
+private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40382/"
+private const val USERS_PATH = "api/v1/users"
+
+enum class UserSyncResult {
+    EXISTING_USER_UPDATED,
+    NEW_USER_CREATED
+}
+
+private data class UserRequest(
+    val email: String,
+    val username: String,
+    val googleId: String,
+    val pictureUrl: String? = null,
+    val language: String? = null,
+    val isAnonymous: Boolean
+)
+
+private data class UserResponse(
+    val id: Long? = null,
+    val email: String? = null,
+    val username: String? = null,
+    val googleId: String? = null,
+    val pictureUrl: String? = null,
+    val language: String? = null,
+    val isAnonymous: Boolean? = null
+)
+
+private interface UserApiService {
+    @GET("$USERS_PATH/{googleId}")
+    suspend fun getUserByGoogleId(
+        @Path("googleId") googleId: String
+    ): Response<UserResponse>
+
+    @POST(USERS_PATH)
+    suspend fun createUser(
+        @Body request: UserRequest
+    ): Response<UserResponse>
+
+    @PUT("$USERS_PATH/{googleId}")
+    suspend fun updateUser(
+        @Path("googleId") googleId: String,
+        @Body request: UserRequest
+    ): Response<UserResponse>
+}
+
+private object UserBackend {
+    private val retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(USER_BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    val service: UserApiService by lazy {
+        retrofit.create(UserApiService::class.java)
+    }
+}
+
+suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncResult {
+    validarDatosUsuario(user)
+
+    val existingUserResponse = UserBackend.service.getUserByGoogleId(user.googleId)
+
+    when {
+        existingUserResponse.isSuccessful -> {
+            val existingUser = existingUserResponse.body()
+                ?: throw IOException("La respuesta del backend no contiene el usuario esperado")
+
+            Log.d("USER_API", "Usuario existente encontrado, actualizando datos")
+
+            val updateRequest = buildUserRequest(
+                user = user,
+                language = existingUser.language ?: defaultLanguage(),
+                isAnonymous = existingUser.isAnonymous ?: false
+            )
+
+            val updateResponse = UserBackend.service.updateUser(user.googleId, updateRequest)
+            ensureSuccess(updateResponse, "actualizando el usuario")
+            return UserSyncResult.EXISTING_USER_UPDATED
+        }
+
+        existingUserResponse.code() == 404 -> {
+            Log.d("USER_API", "Usuario no encontrado, creando registro")
+
+            val createRequest = buildUserRequest(
+                user = user,
+                language = defaultLanguage(),
+                isAnonymous = false
+            )
+            val createResponse = UserBackend.service.createUser(createRequest)
+            ensureSuccess(createResponse, "creando el usuario")
+            return UserSyncResult.NEW_USER_CREATED
+        }
+
+        else -> {
+            throw IOException(
+                "Error consultando el usuario: ${existingUserResponse.code()} ${existingUserResponse.message()}"
+            )
+        }
+    }
+}
+
+private fun validarDatosUsuario(user: UserInfo) {
+    if (user.email.isBlank() || user.username.isBlank() || user.googleId.isBlank()) {
+        throw IOException("Faltan datos de Google para sincronizar el usuario con el backend")
+    }
+}
+
+private fun buildUserRequest(
+    user: UserInfo,
+    language: String?,
+    isAnonymous: Boolean
+): UserRequest {
+    return UserRequest(
+        email = user.email,
+        username = user.username,
+        googleId = user.googleId,
+        pictureUrl = user.photoUrl,
+        language = language,
+        isAnonymous = isAnonymous
+    )
+}
+
+private fun defaultLanguage(): String? {
+    return Locale.getDefault().language.takeIf { it.isNotBlank() }
+}
+
+private fun <T> ensureSuccess(
+    response: Response<T>,
+    action: String
+) {
+    Log.d(
+        "USER_API",
+        "Respuesta HTTP al $action: code=${response.code()} success=${response.isSuccessful}"
+    )
+
+    if (!response.isSuccessful) {
+        throw IOException("Error $action: ${response.code()} ${response.message()}")
+    }
+}
