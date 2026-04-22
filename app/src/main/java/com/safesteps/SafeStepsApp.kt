@@ -62,8 +62,11 @@ fun SafeStepsApp(
         }
     }
 
-    LaunchedEffect(authUiState.currentUser?.email) {
-        languageViewModel.onUserChanged(authUiState.currentUser?.email)
+    LaunchedEffect(authUiState.currentUser?.email, authUiState.currentUser?.backendLanguageTag) {
+        languageViewModel.onUserChanged(
+            authUiState.currentUser?.email,
+            authUiState.currentUser?.backendLanguageTag
+        )
     }
 
     BackHandler(enabled = currentDestination == SafeStepsDestination.PROFILE) {

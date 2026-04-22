@@ -19,14 +19,25 @@ class LanguageViewModel(
     val uiState: StateFlow<LanguageUiState> = _uiState.asStateFlow()
 
     private var currentUserEmail: String? = null
+    private var currentBackendLanguageTag: String? = null
 
-    fun onUserChanged(email: String?) {
-        if (email == currentUserEmail) {
+    fun onUserChanged(email: String?, backendLanguageTag: String?) {
+        if (email == currentUserEmail && backendLanguageTag == currentBackendLanguageTag) {
             return
         }
 
         currentUserEmail = email
-        val resolvedLanguage = repository.getLanguageForUser(email)
+        currentBackendLanguageTag = backendLanguageTag
+
+        val resolvedLanguage = when {
+            !email.isNullOrBlank() && !backendLanguageTag.isNullOrBlank() -> {
+                val backendLanguage = AppLanguage.fromLanguageTag(backendLanguageTag)
+                repository.saveLanguageForUser(email, backendLanguage)
+                backendLanguage
+            }
+
+            else -> repository.getLanguageForUser(email)
+        }
 
         _uiState.update {
             it.copy(
@@ -40,6 +51,7 @@ class LanguageViewModel(
         val email = currentUserEmail ?: return
 
         repository.saveLanguageForUser(email, language)
+        currentBackendLanguageTag = language.languageTag
         _uiState.update { it.copy(currentLanguage = language) }
     }
 }

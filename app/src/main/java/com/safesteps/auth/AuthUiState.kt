@@ -4,7 +4,8 @@ data class UserInfo(
     val username: String,
     val email: String,
     val googleId: String,
-    val photoUrl: String? = null
+    val photoUrl: String? = null,
+    val backendLanguageTag: String? = null
 )
 
 enum class AuthNoticeMessage {

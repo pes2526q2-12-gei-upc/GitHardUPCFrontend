@@ -2,6 +2,7 @@ package com.safesteps.data
 
 import android.util.Log
 import com.safesteps.auth.UserInfo
+import com.safesteps.i18n.AppLanguage
 import java.io.IOException
 import java.util.Locale
 import retrofit2.Response
@@ -21,6 +22,11 @@ enum class UserSyncResult {
     EXISTING_USER_UPDATED,
     NEW_USER_CREATED
 }
+
+data class UserSyncOutcome(
+    val result: UserSyncResult,
+    val languageTag: String
+)
 
 private data class UserRequest(
     val email: String,
@@ -77,7 +83,7 @@ private object UserBackend {
     }
 }
 
-suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncResult {
+suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncOutcome {
     validarDatosUsuario(user)
 
     val existingUserResponse = UserBackend.service.getUserByGoogleId(user.googleId)
@@ -86,31 +92,41 @@ suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncResult {
         existingUserResponse.isSuccessful -> {
             val existingUser = existingUserResponse.body()
                 ?: throw IOException("La respuesta del backend no contiene el usuario esperado")
+            val resolvedLanguageTag = existingUser.language
+                ?.takeIf { it.isNotBlank() }
+                ?: defaultLanguage()
 
             Log.d("USER_API", "Usuario existente encontrado, actualizando datos")
 
             val updateRequest = buildUserRequest(
                 user = user,
-                language = existingUser.language ?: defaultLanguage(),
+                language = resolvedLanguageTag,
                 isAnonymous = existingUser.isAnonymous ?: false
             )
 
             val updateResponse = UserBackend.service.updateUser(user.googleId, updateRequest)
             ensureSuccess(updateResponse, "actualizando el usuario")
-            return UserSyncResult.EXISTING_USER_UPDATED
+            return UserSyncOutcome(
+                result = UserSyncResult.EXISTING_USER_UPDATED,
+                languageTag = resolvedLanguageTag
+            )
         }
 
         existingUserResponse.code() == 404 -> {
             Log.d("USER_API", "Usuario no encontrado, creando registro")
+            val resolvedLanguageTag = defaultLanguage()
 
             val createRequest = buildUserRequest(
                 user = user,
-                language = defaultLanguage(),
+                language = resolvedLanguageTag,
                 isAnonymous = false
             )
             val createResponse = UserBackend.service.createUser(createRequest)
             ensureSuccess(createResponse, "creando el usuario")
-            return UserSyncResult.NEW_USER_CREATED
+            return UserSyncOutcome(
+                result = UserSyncResult.NEW_USER_CREATED,
+                languageTag = resolvedLanguageTag
+            )
         }
 
         else -> {
@@ -163,8 +179,9 @@ private fun buildUserRequest(
     )
 }
 
-private fun defaultLanguage(): String? {
-    return Locale.getDefault().language.takeIf { it.isNotBlank() }
+private fun defaultLanguage(): String {
+    val languageTag = Locale.getDefault().language.takeIf { it.isNotBlank() }
+    return AppLanguage.fromLanguageTag(languageTag).languageTag
 }
 
 private fun <T> ensureSuccess(

@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.data.eliminarUsuarioDelBackend
+import com.safesteps.data.UserSyncOutcome
 import com.safesteps.data.sincronizarUsuarioConBackend as sincronizarUsuarioConBackendApi
 import com.safesteps.data.UserSyncResult
 import kotlinx.coroutines.Dispatchers
@@ -85,9 +86,10 @@ class AuthViewModel : ViewModel() {
             }.onSuccess { result ->
                 syncingGoogleUserId = null
                 blockedRestoreGoogleUserId = null
+                val syncedUser = user.copy(backendLanguageTag = result.languageTag)
                 _uiState.update {
                     it.copy(
-                        currentUser = user,
+                        currentUser = syncedUser,
                         authNotice = createNotice(result)
                     )
                 }
@@ -153,8 +155,8 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    private fun createNotice(result: UserSyncResult): AuthNotice {
-        return when (result) {
+    private fun createNotice(result: UserSyncOutcome): AuthNotice {
+        return when (result.result) {
             UserSyncResult.EXISTING_USER_UPDATED -> {
                 createNotice(AuthNoticeMessage.LOGIN_SUCCESS)
             }
