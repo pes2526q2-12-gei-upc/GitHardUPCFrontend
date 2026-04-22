@@ -9,7 +9,14 @@
     <string name="filter_safety">Seguretat</string>
     <string name="filter_comfort">Confort</string>
     <string name="filter_climate">Clima</string>
-    <string name="filter_preferences">Preferències</string>
+    <string name="filter_preferences">Prefer&#232;ncies</string>
+    <string name="navigation_active">Navegaci&#243; activa</string>
+    <string name="navigation_follow_route">Segueix la ruta recomanada</string>
+    <string name="navigation_walk_mode">A peu</string>
+    <string name="navigation_arrival">Arribada %1$s</string>
+    <string name="navigation_distance">Dist&#224;ncia</string>
+    <string name="navigation_arrival_short">Arribada</string>
+    <string name="navigation_remaining">restants</string>
     <string name="filter_level_low">Baix</string>
     <string name="filter_level_medium">Mitj&#224;</string>
     <string name="filter_level_high">Alt</string>
@@ -29,20 +36,20 @@
     <string name="my_location">La meva ubicaci&#243;</string>
     <string name="origin_label">Origen</string>
     <string name="destination_label">Dest&#237;</string>
-    <string name="searching_address">Buscant adre&#231;a...</string>
+    <string name="searching_address">Buscant adre&#231;a&#8230;</string>
     <string name="selected_map_location">Ubicaci&#243; seleccionada al mapa</string>
     <string name="route_priorities">Prioritats de ruta</string>
     <string name="close">Tanca</string>
     <string name="start_route">Inicia la ruta</string>
     <string name="location_permission_required">Cal el perm&#237;s d\'ubicaci&#243;.</string>
-    <string name="waiting_gps_location">Esperant la ubicaci&#243; del GPS...</string>
-    <string name="searching_gps_signal">Buscant senyal GPS...</string>
+    <string name="waiting_gps_location">Esperant la ubicaci&#243; del GPS&#8230;</string>
+    <string name="searching_gps_signal">Buscant senyal GPS&#8230;</string>
     <string name="hide_extra_info">Amaga info extra</string>
     <string name="show_extra_info">Mostra info extra</string>
     <string name="change_map_style">Canvia l\'estil del mapa</string>
     <string name="map_style_standard">Est&#224;ndard</string>
     <string name="map_style_satellite">Sat&#232;l&#183;lit</string>
-    <string name="calculating_best_route">Calculant la millor ruta...</string>
+    <string name="calculating_best_route">Calculant la millor ruta&#8230;</string>
     <string name="sign_in_failed">No s\'ha pogut iniciar la sessi&#243;. Torna-ho a provar.</string>
     <string name="auth_banner_login_success">Inici de sessi&#243; correcte.</string>
     <string name="auth_banner_register_success">Usuari registrat correctament.</string>
@@ -57,18 +64,22 @@
 
     <plurals name="poi_fountains">
         <item quantity="one">%d font</item>
+        <item quantity="many">%d fonts</item>
         <item quantity="other">%d fonts</item>
     </plurals>
     <plurals name="poi_benches">
         <item quantity="one">%d banc</item>
+        <item quantity="many">%d bancs</item>
         <item quantity="other">%d bancs</item>
     </plurals>
     <plurals name="poi_police_stations">
         <item quantity="one">%d comissaria</item>
+        <item quantity="many">%d comissaries</item>
         <item quantity="other">%d comissaries</item>
     </plurals>
     <plurals name="profile_filter_count">
         <item quantity="one">%d filtre</item>
+        <item quantity="many">%d filtres</item>
         <item quantity="other">%d filtres</item>
     </plurals>
 </resources>

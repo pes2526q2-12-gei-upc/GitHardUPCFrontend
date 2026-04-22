@@ -1,15 +1,17 @@
+@file:Suppress("DEPRECATION")
+
 package com.safesteps.map
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.toColorInt
 import com.safesteps.data.Coordenada
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
-import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.annotations.PolylineOptions
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -36,17 +38,24 @@ fun drawRoute(
             locationComponent.cameraMode = CameraMode.NONE
         }
 
-        map.clear()
+        clearLegacyAnnotations(map)
 
         val puntsRuta = coordenades.map { LatLng(it.lat, it.lon) }.toMutableList()
 
         origen?.let {
-            if (puntsRuta.isNotEmpty() && (it.latitude != puntsRuta.first().latitude || it.longitude != puntsRuta.first().longitude)) {
+            if (
+                puntsRuta.isNotEmpty() &&
+                (it.latitude != puntsRuta.first().latitude || it.longitude != puntsRuta.first().longitude)
+            ) {
                 puntsRuta.add(0, it)
             }
         }
+
         desti?.let {
-            if (puntsRuta.isNotEmpty() && (it.latitude != puntsRuta.last().latitude || it.longitude != puntsRuta.last().longitude)) {
+            if (
+                puntsRuta.isNotEmpty() &&
+                (it.latitude != puntsRuta.last().latitude || it.longitude != puntsRuta.last().longitude)
+            ) {
                 puntsRuta.add(it)
             }
         }
@@ -54,26 +63,30 @@ fun drawRoute(
         map.addPolyline(
             PolylineOptions()
                 .addAll(puntsRuta)
-                .color(Color.parseColor("#1E88E5"))
+                .color("#1E88E5".toColorInt())
                 .width(6f)
         )
 
         origen?.let {
-            map.addMarker(MarkerOptions()
-                .position(it)
-                .title(originTitle)
-                .icon(crearIconaGrisa(context)))
+            addLegacyMarker(
+                map = map,
+                position = it,
+                title = originTitle,
+                icon = crearIconaGrisa(context)
+            )
         }
 
         desti?.let {
-            map.addMarker(MarkerOptions()
-                .position(it)
-                .title(destinationTitle))
+            addLegacyMarker(
+                map = map,
+                position = it,
+                title = destinationTitle
+            )
         }
 
         if (puntsRuta.size > 1) {
             val boundsBuilder = LatLngBounds.Builder()
-            puntsRuta.forEach { boundsBuilder.include(it) }
+            puntsRuta.forEach(boundsBuilder::include)
 
             val bounds = boundsBuilder.build()
             map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 350), 1000)
@@ -84,13 +97,13 @@ fun drawRoute(
 fun crearIconaPoi(context: Context, tipus: String): Icon {
     val normalizedType = tipus.trim().uppercase()
     val (emoji, bgColor) = when (normalizedType) {
-        "FONT" -> "💧" to Color.parseColor("#3DA5F4")
-        "COMISSARIA" -> "👮" to Color.parseColor("#355C7D")
-        else -> "📍" to Color.parseColor("#C86A37")
+        "FONT" -> "\uD83D\uDCA7" to "#3DA5F4".toColorInt()
+        "COMISSARIA" -> "\uD83D\uDC6E" to "#355C7D".toColorInt()
+        else -> "\uD83D\uDCCD" to "#C86A37".toColorInt()
     }
 
     val size = 96
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
     val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -99,14 +112,14 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     }
 
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
+        color = android.graphics.Color.WHITE
         textAlign = Paint.Align.CENTER
         textSize = 42f
         typeface = Typeface.DEFAULT_BOLD
     }
 
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(55, 0, 0, 0)
+        color = android.graphics.Color.argb(55, 0, 0, 0)
         style = Paint.Style.FILL
     }
 

@@ -1,11 +1,14 @@
+@file:Suppress("DEPRECATION")
+
 package com.safesteps.map
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Paint
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Color as AndroidColor
 import android.location.Location
 import android.location.LocationListener
@@ -16,13 +19,15 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.toColorInt
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import org.maplibre.android.camera.CameraUpdateFactory
-import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.location.modes.CameraMode
@@ -47,6 +52,7 @@ fun hasLocationPermission(context: Context): Boolean {
     return hasFineLocationPermission(context) || hasCoarseLocationPermission(context)
 }
 
+@SuppressLint("MissingPermission")
 fun getBestLastKnownLocation(context: Context): Location? {
     if (!hasLocationPermission(context)) return null
 
@@ -63,12 +69,15 @@ fun getBestLastKnownLocation(context: Context): Location? {
     return providers
         .mapNotNull { provider ->
             try {
-                if (provider != LocationManager.PASSIVE_PROVIDER && !locationManager.isProviderEnabled(provider)) {
+                if (
+                    provider != LocationManager.PASSIVE_PROVIDER &&
+                    !locationManager.isProviderEnabled(provider)
+                ) {
                     null
                 } else {
                     locationManager.getLastKnownLocation(provider)
                 }
-            } catch (_: Exception) {
+            } catch (_: SecurityException) {
                 null
             }
         }
@@ -102,8 +111,14 @@ fun rememberMapViewWithLifecycle(): MapView {
 fun activateLocationComponent(mapView: MapView) {
     mapView.getMapAsync { map ->
         val context = mapView.context
-        val fineGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarseGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
         if (!fineGranted && !coarseGranted) return@getMapAsync
 
@@ -112,12 +127,12 @@ fun activateLocationComponent(mapView: MapView) {
 
         if (!locationComponent.isLocationComponentActivated) {
             val options = LocationComponentOptions.builder(context)
-                .foregroundTintColor(AndroidColor.parseColor("#1E88E5"))
+                .foregroundTintColor("#1E88E5".toColorInt())
                 .backgroundTintColor(AndroidColor.WHITE)
-                .bearingTintColor(AndroidColor.parseColor("#1E88E5"))
-                .accuracyColor(AndroidColor.parseColor("#5533B5E5"))
+                .bearingTintColor("#1E88E5".toColorInt())
+                .accuracyColor("#5533B5E5".toColorInt())
                 .pulseEnabled(false)
-                .pulseColor(AndroidColor.parseColor("#8833B5E5"))
+                .pulseColor("#8833B5E5".toColorInt())
                 .build()
 
             val activationOptions = LocationComponentActivationOptions
@@ -132,7 +147,6 @@ fun activateLocationComponent(mapView: MapView) {
         try {
             locationComponent.isLocationComponentEnabled = true
             locationComponent.renderMode = RenderMode.NORMAL
-            // LA CLAU ESTÀ AQUÍ: No forcem el tracking perquè no es baralli amb la nostra animació manual
             locationComponent.cameraMode = CameraMode.NONE
         } catch (_: SecurityException) {
         }
@@ -165,6 +179,7 @@ fun centerMapOnLocation(
     }
 }
 
+@SuppressLint("MissingPermission")
 fun startAndroidLocationUpdates(
     context: Context,
     mapView: MapView,
@@ -202,18 +217,19 @@ fun startAndroidLocationUpdates(
     return listener
 }
 
+@SuppressLint("MissingPermission")
 fun stopAndroidLocationUpdates(context: Context, listener: LocationListener?) {
     if (listener == null) return
     val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     locationManager.removeUpdates(listener)
 }
 
-fun crearIconaGrisa(context: android.content.Context): Icon {
-    val bitmap = Bitmap.createBitmap(40, 40, Bitmap.Config.ARGB_8888)
+fun crearIconaGrisa(context: Context): Icon {
+    val bitmap = createBitmap(40, 40, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
     val paint = Paint().apply {
-        color = android.graphics.Color.parseColor("#9EAEB5")
+        color = "#9EAEB5".toColorInt()
         isAntiAlias = true
     }
 
