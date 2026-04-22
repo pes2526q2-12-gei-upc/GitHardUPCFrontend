@@ -12,14 +12,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.safesteps.R
 import com.safesteps.auth.AuthNoticeMessage
+import com.safesteps.auth.AuthUiState
 import com.safesteps.auth.AuthViewModel
+import com.safesteps.auth.UserInfo
 import com.safesteps.auth.rememberGoogleSignOutAction
 import com.safesteps.auth.rememberGoogleSignInAction
+import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.LanguagePreferencesRepository
 import com.safesteps.i18n.LanguageViewModel
 import com.safesteps.i18n.LanguageViewModelFactory
@@ -32,6 +34,14 @@ private enum class SafeStepsDestination {
     MAP,
     PROFILE
 }
+
+private data class AuthNoticeTexts(
+    val loginSuccess: String,
+    val registerSuccess: String,
+    val serverError: String,
+    val deleteAccountSuccess: String,
+    val deleteAccountError: String
+)
 
 @Composable
 fun SafeStepsApp(
@@ -52,90 +62,196 @@ fun SafeStepsApp(
         onUserLoggedIn = authViewModel::onUserLoggedIn,
         onSessionRestored = authViewModel::restoreLoggedUser
     )
-    val onLogoutClick = rememberGoogleSignOutAction {
-        authViewModel.onLogout()
-    }
 
-    LaunchedEffect(authUiState.currentUser, currentDestination) {
-        if (authUiState.currentUser == null && currentDestination == SafeStepsDestination.PROFILE) {
-            currentDestination = SafeStepsDestination.MAP
-        }
-    }
+    HandleProfileRedirectEffect(
+        currentUser = authUiState.currentUser,
+        currentDestination = currentDestination,
+        onNavigateToMap = { currentDestination = SafeStepsDestination.MAP }
+    )
+    HandleLanguageSyncEffect(
+        currentUser = authUiState.currentUser,
+        onUserChanged = languageViewModel::onUserChanged
+    )
 
-    LaunchedEffect(authUiState.currentUser?.email, authUiState.currentUser?.backendLanguageTag) {
-        languageViewModel.onUserChanged(
-            authUiState.currentUser?.email,
-            authUiState.currentUser?.backendLanguageTag
-        )
-    }
-
-    BackHandler(enabled = currentDestination == SafeStepsDestination.PROFILE) {
+    BackHandler(enabled = isProfileDestination(currentDestination)) {
         currentDestination = SafeStepsDestination.MAP
     }
 
-    ProvideLocalizedStrings(languageUiState.currentLanguage) {
-        val context = LocalContext.current
-        val loginSuccessText = appString(R.string.auth_banner_login_success)
-        val registerSuccessText = appString(R.string.auth_banner_register_success)
-        val serverErrorText = appString(R.string.auth_banner_server_error)
-        val deleteAccountSuccessText = appString(R.string.delete_account_success)
-        val deleteAccountErrorText = appString(R.string.delete_account_error)
+    SafeStepsLocalizedContent(
+        modifier = modifier,
+        authUiState = authUiState,
+        currentLanguage = languageUiState.currentLanguage,
+        authViewModel = authViewModel,
+        currentDestination = currentDestination,
+        onLanguageSelected = languageViewModel::onLanguageSelected,
+        onLoginClick = onLoginClick,
+        onNavigateToMap = { currentDestination = SafeStepsDestination.MAP },
+        onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE }
+    )
+}
 
-        LaunchedEffect(authUiState.authNotice?.id, authUiState.pendingDeleteAccountSignOut) {
-            val notice = authUiState.authNotice ?: return@LaunchedEffect
-            Toast.makeText(
-                context,
-                when (notice.message) {
-                    AuthNoticeMessage.LOGIN_SUCCESS -> loginSuccessText
-                    AuthNoticeMessage.REGISTER_SUCCESS -> registerSuccessText
-                    AuthNoticeMessage.SERVER_ERROR -> serverErrorText
-                    AuthNoticeMessage.DELETE_ACCOUNT_SUCCESS -> deleteAccountSuccessText
-                    AuthNoticeMessage.DELETE_ACCOUNT_ERROR -> deleteAccountErrorText
-                },
-                Toast.LENGTH_SHORT
-            ).show()
-
-            if (authUiState.pendingDeleteAccountSignOut) {
-                currentDestination = SafeStepsDestination.MAP
-                onLogoutClick()
-            } else {
-                authViewModel.clearAuthNotice(notice.id)
-            }
-        }
-
-        Box(modifier = modifier.fillMaxSize()) {
-            when {
-                currentDestination == SafeStepsDestination.PROFILE && authUiState.currentUser != null -> {
-                    ProfileScreen(
-                        modifier = Modifier.fillMaxSize(),
-                        user = authUiState.currentUser!!,
-                        currentLanguage = languageUiState.currentLanguage,
-                        onLanguageSelected = languageViewModel::onLanguageSelected,
-                        onBack = { currentDestination = SafeStepsDestination.MAP },
-                        onLogout = {
-                            onLogoutClick()
-                            currentDestination = SafeStepsDestination.MAP
-                        },
-                        onDeleteAccount = {
-                            authViewModel.onDeleteAccountRequested(authUiState.currentUser!!)
-                        }
-                    )
-                }
-
-                else -> {
-                    MapLibreScreen(
-                        modifier = Modifier.fillMaxSize(),
-                        currentUser = authUiState.currentUser,
-                        currentLanguage = languageUiState.currentLanguage,
-                        onLoginClick = onLoginClick,
-                        onProfileClick = {
-                            if (authUiState.currentUser != null) {
-                                currentDestination = SafeStepsDestination.PROFILE
-                            }
-                        }
-                    )
-                }
-            }
+@Composable
+private fun HandleProfileRedirectEffect(
+    currentUser: UserInfo?,
+    currentDestination: SafeStepsDestination,
+    onNavigateToMap: () -> Unit
+) {
+    LaunchedEffect(currentUser, currentDestination) {
+        if (currentUser == null && isProfileDestination(currentDestination)) {
+            onNavigateToMap()
         }
     }
+}
+
+@Composable
+private fun HandleLanguageSyncEffect(
+    currentUser: UserInfo?,
+    onUserChanged: (String?, String?) -> Unit
+) {
+    LaunchedEffect(currentUser?.email, currentUser?.backendLanguageTag) {
+        onUserChanged(currentUser?.email, currentUser?.backendLanguageTag)
+    }
+}
+
+@Composable
+private fun SafeStepsLocalizedContent(
+    modifier: Modifier,
+    authUiState: AuthUiState,
+    currentLanguage: AppLanguage,
+    authViewModel: AuthViewModel,
+    currentDestination: SafeStepsDestination,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    onLoginClick: () -> Unit,
+    onNavigateToMap: () -> Unit,
+    onNavigateToProfile: () -> Unit
+) {
+    ProvideLocalizedStrings(currentLanguage) {
+        HandleAuthNoticeEffect(
+            authUiState = authUiState,
+            noticeTexts = AuthNoticeTexts(
+                loginSuccess = appString(R.string.auth_banner_login_success),
+                registerSuccess = appString(R.string.auth_banner_register_success),
+                serverError = appString(R.string.auth_banner_server_error),
+                deleteAccountSuccess = appString(R.string.delete_account_success),
+                deleteAccountError = appString(R.string.delete_account_error)
+            ),
+            onLogout = rememberLogoutToMapAction(
+                authViewModel = authViewModel,
+                onNavigateToMap = onNavigateToMap
+            ),
+            onClearAuthNotice = authViewModel::clearAuthNotice
+        )
+
+        SafeStepsBody(
+            modifier = modifier,
+            authUiState = authUiState,
+            currentLanguage = currentLanguage,
+            currentDestination = currentDestination,
+            onLanguageSelected = onLanguageSelected,
+            onLoginClick = onLoginClick,
+            onNavigateToMap = onNavigateToMap,
+            onNavigateToProfile = onNavigateToProfile,
+            onLogout = rememberLogoutToMapAction(
+                authViewModel = authViewModel,
+                onNavigateToMap = onNavigateToMap
+            ),
+            onDeleteAccount = authViewModel::onDeleteAccountRequested
+        )
+    }
+}
+
+@Composable
+private fun HandleAuthNoticeEffect(
+    authUiState: AuthUiState,
+    noticeTexts: AuthNoticeTexts,
+    onLogout: () -> Unit,
+    onClearAuthNotice: (Long) -> Unit
+) {
+    val context = LocalContext.current
+
+    LaunchedEffect(authUiState.authNotice?.id, authUiState.pendingDeleteAccountSignOut) {
+        val notice = authUiState.authNotice ?: return@LaunchedEffect
+
+        Toast.makeText(
+            context,
+            resolveAuthNoticeMessage(notice.message, noticeTexts),
+            Toast.LENGTH_SHORT
+        ).show()
+
+        if (authUiState.pendingDeleteAccountSignOut) {
+            onLogout()
+        } else {
+            onClearAuthNotice(notice.id)
+        }
+    }
+}
+
+@Composable
+private fun SafeStepsBody(
+    modifier: Modifier,
+    authUiState: AuthUiState,
+    currentLanguage: AppLanguage,
+    currentDestination: SafeStepsDestination,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    onLoginClick: () -> Unit,
+    onNavigateToMap: () -> Unit,
+    onNavigateToProfile: () -> Unit,
+    onLogout: () -> Unit,
+    onDeleteAccount: (UserInfo) -> Unit
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        val currentUser = authUiState.currentUser
+
+        if (isProfileDestination(currentDestination) && currentUser != null) {
+            ProfileScreen(
+                modifier = Modifier.fillMaxSize(),
+                user = currentUser,
+                currentLanguage = currentLanguage,
+                onLanguageSelected = onLanguageSelected,
+                onBack = onNavigateToMap,
+                onLogout = onLogout,
+                onDeleteAccount = { onDeleteAccount(currentUser) }
+            )
+        } else {
+            MapLibreScreen(
+                modifier = Modifier.fillMaxSize(),
+                currentUser = currentUser,
+                currentLanguage = currentLanguage,
+                onLoginClick = onLoginClick,
+                onProfileClick = {
+                    if (currentUser != null) {
+                        onNavigateToProfile()
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberLogoutToMapAction(
+    authViewModel: AuthViewModel,
+    onNavigateToMap: () -> Unit
+): () -> Unit {
+    return rememberGoogleSignOutAction {
+        authViewModel.onLogout()
+        onNavigateToMap()
+    }
+}
+
+private fun resolveAuthNoticeMessage(
+    message: AuthNoticeMessage,
+    noticeTexts: AuthNoticeTexts
+): String {
+    return when (message) {
+        AuthNoticeMessage.LOGIN_SUCCESS -> noticeTexts.loginSuccess
+        AuthNoticeMessage.REGISTER_SUCCESS -> noticeTexts.registerSuccess
+        AuthNoticeMessage.SERVER_ERROR -> noticeTexts.serverError
+        AuthNoticeMessage.DELETE_ACCOUNT_SUCCESS -> noticeTexts.deleteAccountSuccess
+        AuthNoticeMessage.DELETE_ACCOUNT_ERROR -> noticeTexts.deleteAccountError
+    }
+}
+
+private fun isProfileDestination(destination: SafeStepsDestination): Boolean {
+    return destination == SafeStepsDestination.PROFILE
 }
