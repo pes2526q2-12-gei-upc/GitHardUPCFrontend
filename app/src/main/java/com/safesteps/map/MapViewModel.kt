@@ -4,8 +4,10 @@ import android.location.Location
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
 import com.safesteps.data.PhotonApi
+import com.safesteps.data.PuntInteres
 import com.safesteps.data.obtenirCoordenadesRuta
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
@@ -24,6 +26,11 @@ import kotlin.math.roundToInt
 class MapViewModel(
     private val textProvider: MapTextProvider
 ) : ViewModel() {
+    private companion object {
+        const val DEFAULT_DISTANCE_TEXT = "-- km"
+        const val DEFAULT_DURATION_TEXT = "-- min"
+        const val DEFAULT_ETA_TEXT = "--:--"
+    }
 
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
@@ -50,9 +57,9 @@ class MapViewModel(
             it.copy(
                 destinoSeleccionado = null,
                 textoDestino = "",
-                distanceText = "-- km",
-                durationText = "-- min",
-                etaText = "--:--",
+                distanceText = DEFAULT_DISTANCE_TEXT,
+                durationText = DEFAULT_DURATION_TEXT,
+                etaText = DEFAULT_ETA_TEXT,
                 rutaCoordenades = emptyList(),
                 modoRuta = false,
                 adrecesSuggerides = emptyList(),
@@ -69,9 +76,9 @@ class MapViewModel(
         _uiState.update { it.copy(
             rutaCoordenades = emptyList(),
             modoRuta = false,
-            distanceText = "-- km",
-            durationText = "-- min",
-            etaText = "--:--",
+            distanceText = DEFAULT_DISTANCE_TEXT,
+            durationText = DEFAULT_DURATION_TEXT,
+            etaText = DEFAULT_ETA_TEXT,
             calculantRuta = false,
             puntsInteres = emptyList(),
             puntInteresSeleccionat = null
@@ -89,7 +96,7 @@ class MapViewModel(
                 isTyping = true,
                 textoOrigen = if (campo == textField.ORIGIN) texto else it.textoOrigen,
                 textoDestino = if (campo == textField.DESTINY) texto else it.textoDestino,
-                mostrarOrigen = if (campo == textField.DESTINY) true else it.mostrarOrigen
+                mostrarOrigen = campo == textField.DESTINY || it.mostrarOrigen
             )
         }
 
@@ -164,9 +171,9 @@ class MapViewModel(
                 destinoSeleccionado = point,
                 textoDestino = textProvider.searchingAddress(currentLanguage),
                 mostrarOrigen = true,
-                distanceText = "-- km",
-                durationText = "-- min",
-                etaText = "--:--"
+                distanceText = DEFAULT_DISTANCE_TEXT,
+                durationText = DEFAULT_DURATION_TEXT,
+                etaText = DEFAULT_ETA_TEXT
             )
         }
 
@@ -196,12 +203,8 @@ class MapViewModel(
         destiLat: Double
     ) {
         val prioridad = _uiState.value.prioridadSeleccionada
+        val routeWeights = routeWeightsFor(prioridad)
         Log.d("PRUEBA_RUTA", "Llamando a calcularRuta. Prioridad actual: $prioridad")
-        val seguretatWeight = if (prioridad == RoutePriority.SAFETY) 1f else 0f
-        val eMecaniquesWeight = if (prioridad == RoutePriority.ACCESSIBILITY) 1f else 0f
-        val bancsWeight = if (prioridad == RoutePriority.ACCESSIBILITY) 1f else 0f
-        val ombraWeight = if (prioridad == RoutePriority.HEAT) 1f else 0f
-        val fontsAiguaWeight = if (prioridad == RoutePriority.HEAT) 1f else 0f
 
         viewModelScope.launch {
             _uiState.update { it.copy(calculantRuta = true) }
@@ -212,11 +215,11 @@ class MapViewModel(
                     destiLong = destiLong,
                     destiLat = destiLat,
                     nRoutes = 1,
-                    seguretat = seguretatWeight,
-                    fontsAigua = fontsAiguaWeight,
-                    ombra = ombraWeight,
-                    eMecaniques = eMecaniquesWeight,
-                    bancs = bancsWeight
+                    seguretat = routeWeights.seguretat,
+                    fontsAigua = routeWeights.fontsAigua,
+                    ombra = routeWeights.ombra,
+                    eMecaniques = routeWeights.eMecaniques,
+                    bancs = routeWeights.bancs
                 )
 
                 val coordenadas = infoRuta.first
@@ -228,24 +231,13 @@ class MapViewModel(
                 Log.d("distance", "distancia = ${tiempoDistancia.second}")
                 Log.d("POIS", "Puntos encontrados = ${puntosInteres.size}")
 
-                val routeDurationMinutes = when {
-                    tiempoDistancia.first > 0 -> tiempoDistancia.first
-                    tiempoDistancia.second > 0.0 -> estimateMinutesFromDistanceMeters(tiempoDistancia.second)
-                    else -> 0
-                }
-
-                _uiState.update {
-                    it.copy(
-                        rutaCoordenades = coordenadas,
-                        distanceText = if (tiempoDistancia.second > 0.0) formatDistance(tiempoDistancia.second) else it.distanceText,
-                        durationText = if (routeDurationMinutes > 0) formatDuration(routeDurationMinutes) else it.durationText,
-                        etaText = if (routeDurationMinutes > 0) formatEta(routeDurationMinutes) else it.etaText,
-                        adrecesSuggerides = emptyList(),
-                        campActiu = textField.NONE,
-                        isTyping = false,
-                        puntsInteres = puntosInteres
-                    )
-                }
+                val routeDurationMinutes = resolveRouteDurationMinutes(tiempoDistancia)
+                applyCalculatedRoute(
+                    coordenadas = coordenadas,
+                    tiempoDistancia = tiempoDistancia,
+                    routeDurationMinutes = routeDurationMinutes,
+                    puntosInteres = puntosInteres
+                )
             } catch (e: Exception) {
                 Log.e("ROUTE_VM", "Error calculant la ruta: ${e.message}")
             } finally {
@@ -298,11 +290,11 @@ class MapViewModel(
     }
 
     private fun formatDuration(durationMinutes: Int): String {
-        return if (durationMinutes > 0) "$durationMinutes min" else "-- min"
+        return if (durationMinutes > 0) "$durationMinutes min" else DEFAULT_DURATION_TEXT
     }
 
     private fun formatEta(durationMinutes: Int): String {
-        if (durationMinutes <= 0) return "--:--"
+        if (durationMinutes <= 0) return DEFAULT_ETA_TEXT
         val calendar = Calendar.getInstance().apply {
             add(Calendar.MINUTE, durationMinutes)
         }
@@ -317,4 +309,57 @@ class MapViewModel(
     private fun localeForCurrentLanguage(): Locale {
         return Locale.forLanguageTag(currentLanguage.languageTag)
     }
+
+    private fun routeWeightsFor(priority: RoutePriority): RouteWeights {
+        return when (priority) {
+            RoutePriority.SAFETY -> RouteWeights(seguretat = 1f)
+            RoutePriority.ACCESSIBILITY -> RouteWeights(eMecaniques = 1f, bancs = 1f)
+            RoutePriority.HEAT -> RouteWeights(ombra = 1f, fontsAigua = 1f)
+        }
+    }
+
+    private fun resolveRouteDurationMinutes(tiempoDistancia: Pair<Int, Double>): Int {
+        return when {
+            tiempoDistancia.first > 0 -> tiempoDistancia.first
+            tiempoDistancia.second > 0.0 -> estimateMinutesFromDistanceMeters(tiempoDistancia.second)
+            else -> 0
+        }
+    }
+
+    private fun applyCalculatedRoute(
+        coordenadas: List<Coordenada>,
+        tiempoDistancia: Pair<Int, Double>,
+        routeDurationMinutes: Int,
+        puntosInteres: List<PuntInteres>
+    ) {
+        _uiState.update {
+            it.copy(
+                rutaCoordenades = coordenadas,
+                distanceText = tiempoDistancia.second
+                    .takeIf { distance -> distance > 0.0 }
+                    ?.let(::formatDistance)
+                    ?: it.distanceText,
+                durationText = routeDurationMinutes
+                    .takeIf { duration -> duration > 0 }
+                    ?.let(::formatDuration)
+                    ?: it.durationText,
+                etaText = routeDurationMinutes
+                    .takeIf { duration -> duration > 0 }
+                    ?.let(::formatEta)
+                    ?: it.etaText,
+                adrecesSuggerides = emptyList(),
+                campActiu = textField.NONE,
+                isTyping = false,
+                puntsInteres = puntosInteres
+            )
+        }
+    }
+
+    private data class RouteWeights(
+        val seguretat: Float = 0f,
+        val fontsAigua: Float = 0f,
+        val ombra: Float = 0f,
+        val eMecaniques: Float = 0f,
+        val bancs: Float = 0f
+    )
 }
