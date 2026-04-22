@@ -1,11 +1,13 @@
 package com.safesteps.map
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -35,8 +37,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -430,12 +431,96 @@ internal fun BoxScope.MainMapOverlay(
 }
 
 @Composable
+private fun MapActionPill(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) Color(0xFFE8F0FE) else Color.White,
+        label = "mapActionPillContainer"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (selected) Color(0xFFB9D4FB) else Color(0xFFE2E7E4),
+        label = "mapActionPillBorder"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) Color(0xFF1A73E8) else Color(0xFF44514B),
+        label = "mapActionPillContent"
+    )
+
+    Surface(
+        modifier = modifier
+            .shadow(12.dp, RoundedCornerShape(18.dp), clip = false)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick),
+        color = containerColor,
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .border(1.dp, borderColor, RoundedCornerShape(18.dp))
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = label,
+                color = contentColor,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
+    }
+}
+
+@Composable
+private fun MapActionCircleButton(
+    icon: ImageVector,
+    contentDescription: String,
+    iconTint: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .size(54.dp)
+            .shadow(12.dp, CircleShape, clip = false)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        color = Color.White,
+        shape = CircleShape
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(1.dp, Color(0xFFE2E7E4), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = iconTint,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+    }
+}
+
+@Composable
 internal fun BoxScope.MapFloatingActions(
     uiState: MapUiState,
     bottomPadding: Dp,
     hideExtraInfoLabel: String,
     showExtraInfoLabel: String,
-    changeMapStyleLabel: String,
     standardMapStyleLabel: String,
     satelliteMapStyleLabel: String,
     myLocationLabel: String,
@@ -453,62 +538,41 @@ internal fun BoxScope.MapFloatingActions(
             modifier = Modifier
                 .navigationBarsPadding()
                 .padding(end = 16.dp, bottom = bottomPadding),
-            horizontalAlignment = Alignment.End
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            AnimatedVisibility(visible = uiState.puntsInteres.isNotEmpty() && !uiState.modoRuta) {
-                ExtendedFloatingActionButton(
+            AnimatedVisibility(visible = uiState.puntsInteres.isNotEmpty()) {
+                MapActionPill(
+                    label = if (uiState.mostrarPuntsInteres) {
+                        hideExtraInfoLabel
+                    } else {
+                        showExtraInfoLabel
+                    },
+                    icon = Icons.Default.LocationOn,
+                    selected = uiState.mostrarPuntsInteres,
                     onClick = onTogglePuntsInteres,
-                    icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                    text = {
-                        Text(
-                            if (uiState.mostrarPuntsInteres) {
-                                hideExtraInfoLabel
-                            } else {
-                                showExtraInfoLabel
-                            }
-                        )
-                    },
-                    containerColor = Color.White,
-                    contentColor = Color(0xFFC86A37),
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier.width(132.dp)
                 )
             }
 
-            if (uiState.modoRuta) {
-                FloatingActionButton(
-                    onClick = onToggleMapStyle,
-                    containerColor = if (uiState.estiloSatelite) Color(0xFF2F3B44) else Color.White,
-                    contentColor = if (uiState.estiloSatelite) Color.White else Color(0xFF1A73E8)
-                ) {
-                    Icon(Icons.Default.Layers, contentDescription = changeMapStyleLabel)
-                }
-            } else {
-                ExtendedFloatingActionButton(
-                    onClick = onToggleMapStyle,
-                    icon = { Icon(Icons.Default.Layers, contentDescription = changeMapStyleLabel) },
-                    text = {
-                        Text(
-                            if (uiState.estiloSatelite) {
-                                standardMapStyleLabel
-                            } else {
-                                satelliteMapStyleLabel
-                            }
-                        )
-                    },
-                    containerColor = if (uiState.estiloSatelite) Color(0xFF2F3B44) else Color.White,
-                    contentColor = if (uiState.estiloSatelite) Color.White else Color(0xFF3D4A45)
-                )
-            }
+            MapActionPill(
+                label = if (uiState.estiloSatelite) {
+                    standardMapStyleLabel
+                } else {
+                    satelliteMapStyleLabel
+                },
+                icon = Icons.Default.Layers,
+                selected = uiState.estiloSatelite,
+                onClick = onToggleMapStyle,
+                modifier = Modifier.width(132.dp)
+            )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            FloatingActionButton(
+            MapActionCircleButton(
+                icon = Icons.Default.MyLocation,
+                contentDescription = myLocationLabel,
+                iconTint = if (uiState.modoRuta) Color(0xFF1A73E8) else Color(0xFF159957),
                 onClick = onMyLocationClick,
-                containerColor = Color.White,
-                contentColor = if (uiState.modoRuta) Color(0xFF1A73E8) else Color(0xFF49B97E)
-            ) {
-                Icon(Icons.Default.MyLocation, contentDescription = myLocationLabel)
-            }
+            )
         }
     }
 }

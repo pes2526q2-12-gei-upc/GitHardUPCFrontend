@@ -33,19 +33,7 @@ class MapViewModel(
         currentLanguage = language
     }
 
-    fun onOrigenChange(texto: String) {
-        _uiState.update { it.copy(textoOrigen = texto) }
-    }
-
-    fun onDestinoChange(texto: String) {
-        _uiState.update { it.copy(textoDestino = texto) }
-    }
-
     fun onPrioritySelected(prioridad: RoutePriority) {
-        _uiState.update { it.copy(prioridadSeleccionada = prioridad) }
-    }
-
-    fun onPrioridadSeleccionada(prioridad: RoutePriority) {
         _uiState.update { it.copy(prioridadSeleccionada = prioridad) }
     }
 
@@ -190,6 +178,15 @@ class MapViewModel(
 
     fun marcarZoomInicialHecho() {
         _uiState.update { it.copy(firstLocationZoomDone = true) }
+    }
+
+    fun prepararNuevaSesionMapa() {
+        _uiState.update {
+            it.copy(
+                mapaListo = false,
+                firstLocationZoomDone = false
+            )
+        }
     }
 
     fun calcularRuta(

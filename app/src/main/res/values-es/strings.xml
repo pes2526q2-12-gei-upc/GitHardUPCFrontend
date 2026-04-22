@@ -44,8 +44,8 @@
     <string name="location_permission_required">Se necesita el permiso de ubicaci&#243;n.</string>
     <string name="waiting_gps_location">Esperando ubicaci&#243;n GPS&#8230;</string>
     <string name="searching_gps_signal">Buscando se&#241;al GPS&#8230;</string>
-    <string name="hide_extra_info">Ocultar info extra</string>
-    <string name="show_extra_info">Mostrar info extra</string>
+    <string name="hide_extra_info">Lugares</string>
+    <string name="show_extra_info">Lugares</string>
     <string name="change_map_style">Cambiar estilo del mapa</string>
     <string name="map_style_standard">Est&#225;ndar</string>
     <string name="map_style_satellite">Sat&#233;lite</string>

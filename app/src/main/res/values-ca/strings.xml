@@ -44,8 +44,8 @@
     <string name="location_permission_required">Cal el perm&#237;s d\'ubicaci&#243;.</string>
     <string name="waiting_gps_location">Esperant la ubicaci&#243; del GPS&#8230;</string>
     <string name="searching_gps_signal">Buscant senyal GPS&#8230;</string>
-    <string name="hide_extra_info">Amaga info extra</string>
-    <string name="show_extra_info">Mostra info extra</string>
+    <string name="hide_extra_info">Punts</string>
+    <string name="show_extra_info">Punts</string>
     <string name="change_map_style">Canvia l\'estil del mapa</string>
     <string name="map_style_standard">Est&#224;ndard</string>
     <string name="map_style_satellite">Sat&#232;l&#183;lit</string>

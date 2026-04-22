@@ -51,13 +51,16 @@ fun MapLibreScreen(
     val destinationLabel = appString(R.string.destination_label)
     val hideExtraInfoLabel = appString(R.string.hide_extra_info)
     val showExtraInfoLabel = appString(R.string.show_extra_info)
-    val changeMapStyleLabel = appString(R.string.change_map_style)
     val standardMapStyleLabel = appString(R.string.map_style_standard)
     val satelliteMapStyleLabel = appString(R.string.map_style_satellite)
     val myLocationLabel = appString(R.string.my_location)
     val calculatingBestRouteLabel = appString(R.string.calculating_best_route)
 
     var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
+
+    LaunchedEffect(mapView) {
+        viewModel.prepararNuevaSesionMapa()
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -367,7 +370,6 @@ fun MapLibreScreen(
             bottomPadding = floatingActionsBottomPadding,
             hideExtraInfoLabel = hideExtraInfoLabel,
             showExtraInfoLabel = showExtraInfoLabel,
-            changeMapStyleLabel = changeMapStyleLabel,
             standardMapStyleLabel = standardMapStyleLabel,
             satelliteMapStyleLabel = satelliteMapStyleLabel,
             myLocationLabel = myLocationLabel,

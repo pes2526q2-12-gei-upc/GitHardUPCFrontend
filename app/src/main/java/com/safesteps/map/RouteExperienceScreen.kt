@@ -48,7 +48,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -705,17 +705,18 @@ internal fun BoxScope.RouteExperienceOverlay(
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
 
-    var sheetHeightPx by remember { mutableStateOf(0f) }
-    var sheetOffsetPx by remember { mutableStateOf(0f) }
+    val sheetHeightPxState = remember { mutableFloatStateOf(0f) }
+    var sheetOffsetPx by remember { mutableFloatStateOf(0f) }
+    val routeBottomBarHeightPxState = remember { mutableFloatStateOf(0f) }
 
     val visibleSheetHeightPx = with(density) { 150.dp.toPx() }
-    val collapsedSheetOffset = max(0f, sheetHeightPx - visibleSheetHeightPx)
+    val collapsedSheetOffset = max(0f, sheetHeightPxState.floatValue - visibleSheetHeightPx)
 
     val bottomPadding by animateDpAsState(
         targetValue = when {
-            uiState.modoRuta -> 176.dp
+            uiState.modoRuta -> with(density) { routeBottomBarHeightPxState.floatValue.toDp() } + 18.dp
             uiState.destinoSeleccionado != null -> {
-                val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
+                val currentVisibleHeightPx = sheetHeightPxState.floatValue - sheetOffsetPx
                 val currentVisibleHeightDp = with(density) { currentVisibleHeightPx.toDp() }
                 currentVisibleHeightDp + 16.dp
             }
@@ -769,6 +770,7 @@ internal fun BoxScope.RouteExperienceOverlay(
                 .offset(y = with(density) { sheetOffsetPx.toDp() })
                 .onGloballyPositioned {
                     val newSheetHeightPx = it.size.height.toFloat()
+                    sheetHeightPxState.floatValue = newSheetHeightPx
                     val maxCollapsedOffset = max(0f, newSheetHeightPx - visibleSheetHeightPx)
                     if (sheetOffsetPx > maxCollapsedOffset) {
                         sheetOffsetPx = maxCollapsedOffset
@@ -808,7 +810,11 @@ internal fun BoxScope.RouteExperienceOverlay(
         visible = uiState.modoRuta,
         enter = slideInVertically(initialOffsetY = { it }),
         exit = slideOutVertically(targetOffsetY = { it }),
-        modifier = Modifier.align(Alignment.BottomCenter)
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .onGloballyPositioned {
+                routeBottomBarHeightPxState.floatValue = it.size.height.toFloat()
+            }
     ) {
         RouteActiveBottomBar(
             durationText = uiState.durationText,
