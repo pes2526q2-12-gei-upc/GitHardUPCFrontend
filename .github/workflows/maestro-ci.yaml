@@ -50,9 +50,8 @@ jobs:
             adb install app/build/outputs/apk/debug/app-debug.apk
             
             echo "Executant tests UI..."
-            export PATH="$PATH":"$HOME/.maestro/bin"
             chmod +x $HOME/.maestro/bin/maestro
-            maestro test .maestro/
+            $HOME/.maestro/bin/maestro test .maestro/
 
       - name: Pujar resultats de Maestro si falla
         if: failure()
