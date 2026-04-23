@@ -56,6 +56,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.modifier.modifierLocalConsumer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -77,6 +79,7 @@ private fun SearchBarItem(
     placeholder: String,
     leadingIcon: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    testTag: String? = null,
     borderColor: Color = Color(0xFFE4ECE8),
     textColor: Color = Color(0xFF3D4A45),
     placeholderColor: Color = Color(0xFF9AA7A0),
@@ -127,6 +130,7 @@ private fun SearchBarItem(
                     cursorBrush = SolidColor(Color(0xFF5AC98B)),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
                         .onFocusChanged {
                             if (it.isFocused) {
                                 onFocus?.invoke()
@@ -286,6 +290,7 @@ private fun OriginSearchSection(
             value = origen,
             onValueChange = onOrigenChange,
             placeholder = appString(R.string.my_location),
+            testTag = "input_origen",
             borderColor = actualBorderColor,
             textColor = actualTextColor,
             placeholderColor = actualPlaceholderColor,
@@ -370,6 +375,7 @@ private fun TopSearchPanel(
                 value = destino,
                 onValueChange = onDestinoChange,
                 placeholder = appString(R.string.destination_label),
+                testTag = "input_desti",
                 borderColor = Color(0xFFF2D8D4),
                 leadingIcon = {
                     Icon(
@@ -564,7 +570,9 @@ internal fun BoxScope.MapFloatingActions(
                 icon = Icons.Default.Layers,
                 selected = uiState.estiloSatelite,
                 onClick = onToggleMapStyle,
-                modifier = Modifier.width(132.dp)
+                modifier = Modifier
+                    .width(132.dp)
+                    .testTag("btn_satellit")
             )
 
             MapActionCircleButton(
@@ -572,6 +580,7 @@ internal fun BoxScope.MapFloatingActions(
                 contentDescription = myLocationLabel,
                 iconTint = if (uiState.modoRuta) Color(0xFF1A73E8) else Color(0xFF159957),
                 onClick = onMyLocationClick,
+                modifier = Modifier.testTag("btn_ubicacio_actual")
             )
         }
     }

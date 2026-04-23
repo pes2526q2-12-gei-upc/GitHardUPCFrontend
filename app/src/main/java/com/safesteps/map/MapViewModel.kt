@@ -37,6 +37,7 @@ class MapViewModel(
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
     private var currentLanguage: AppLanguage = AppLanguage.default
+    private var searchJob: kotlinx.coroutines.Job? = null
 
     fun onLanguageChanged(language: AppLanguage) {
         currentLanguage = language
@@ -102,18 +103,38 @@ class MapViewModel(
             )
         }
 
+        searchJob?.cancel()
+
         if (texto.length >= 3) {
-            viewModelScope.launch {
+            searchJob = viewModelScope.launch {
                 kotlinx.coroutines.delay(300)
                 try {
+                    val queryFormatada = texto.replace(Regex("(?<=[a-zA-Z])\\s+(?=\\d+)"), ", ")
+
+                    val idiomaRecuperat = textProvider.photonLanguage(currentLanguage)
+
+                    val latActual = _uiState.value.ultimaUbicacion?.latitude
+                    val lonActual = _uiState.value.ultimaUbicacion?.longitude
+
                     val respuesta = PhotonApi.service.findAddress(
-                        query = texto,
-                        lang = textProvider.photonLanguage(currentLanguage)
+                        query = queryFormatada,
+                        lang = idiomaRecuperat,
+                        lat = latActual,
+                        lon = lonActual
                     )
+
+                    val resultatsNets = respuesta.features
+                        .filter { feature ->
+                            !feature.properties.street.isNullOrBlank() || !feature.properties.name.isNullOrBlank()
+                        }
+                        .distinctBy { it.properties.getAddress().lowercase(Locale.ROOT) }
+                        .take(5)
+
                     _uiState.update { state ->
-                        state.copy(adrecesSuggerides = respuesta.features.distinctBy { it.properties.getAddress() })
+                        state.copy(adrecesSuggerides = resultatsNets)
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Log.e("PhotonAPI", "Error en la petició: ${e.message}")
                     _uiState.update { it.copy(adrecesSuggerides = emptyList()) }
                 }
             }

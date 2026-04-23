@@ -64,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
 import com.safesteps.R
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.appPlural
@@ -174,7 +175,9 @@ private fun RoutePrioritySelector(
                 icon = Icons.Default.Security,
                 activeColor = Color(0xFF1F4A85),
                 onClick = { onPrioritySelected(RoutePriority.SAFETY) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("btn_safety")
             )
 
             RoutePriorityCompactOption(
@@ -183,7 +186,9 @@ private fun RoutePrioritySelector(
                 icon = Icons.AutoMirrored.Filled.Accessible,
                 activeColor = Color(0xFF7FD7AA),
                 onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("btn_accessibility")
             )
 
             RoutePriorityCompactOption(
@@ -192,7 +197,9 @@ private fun RoutePrioritySelector(
                 icon = Icons.Default.WbSunny,
                 activeColor = Color(0xFFFF7B42),
                 onClick = { onPrioritySelected(RoutePriority.HEAT) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("btn_clima")
             )
         }
 
