@@ -24,6 +24,8 @@ name: Sanity Test
     text: "Sagrada Familia.*"
     index: 1
 
+- back
+
 # Modificar Origen
 - extendedWaitUntil:
     visible:
@@ -36,6 +38,8 @@ name: Sanity Test
 - tapOn:
     text: "CosmoCaixa.*"
     index: 1
+
+- back
 
 # 3. CÀLCUL DE RUTA I INFO
 
