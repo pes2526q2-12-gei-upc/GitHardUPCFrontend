@@ -47,6 +47,7 @@ fun hasLocationPermission(context: Context): Boolean {
     return hasFineLocationPermission(context) || hasCoarseLocationPermission(context)
 }
 
+@android.annotation.SuppressLint("MissingPermission")
 fun getBestLastKnownLocation(context: Context): Location? {
     if (!hasLocationPermission(context)) return null
 
