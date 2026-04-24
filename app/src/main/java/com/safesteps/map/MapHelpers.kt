@@ -9,11 +9,16 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.graphics.Color as AndroidColor
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -26,6 +31,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
+import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.location.LocationComponentActivationOptions
@@ -34,9 +40,12 @@ import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+import kotlin.math.abs
 
 private const val NAVIGATION_CAMERA_TRANSITION_DURATION_MS = 900L
 private const val NAVIGATION_CAMERA_ZOOM = 17.0
+private const val NAVIGATION_CAMERA_TILT = 45.0
+private const val NAVIGATION_HEADING_MIN_DELTA_DEGREES = 6f
 
 fun hasFineLocationPermission(context: Context): Boolean {
     return ContextCompat.checkSelfPermission(
@@ -153,7 +162,7 @@ fun activateLocationComponent(
 
         try {
             locationComponent.isLocationComponentEnabled = true
-            locationComponent.renderMode = RenderMode.COMPASS
+            locationComponent.renderMode = resolveLocationRenderMode(context)
             locationComponent.cameraMode = CameraMode.NONE
             resolveInitialLocation(context, initialLocation)?.let(locationComponent::forceLocationUpdate)
         } catch (_: SecurityException) {
@@ -190,6 +199,7 @@ fun centerMapOnLocation(
 fun enableNavigationCameraTracking(
     mapView: MapView,
     currentLocation: Location? = null,
+    headingDegrees: Double? = null,
     applyZoom: Boolean = true
 ) {
     activateLocationComponent(
@@ -207,29 +217,15 @@ fun enableNavigationCameraTracking(
 
         try {
             locationComponent.isLocationComponentEnabled = true
-            locationComponent.renderMode = RenderMode.COMPASS
+            locationComponent.renderMode = resolveLocationRenderMode(mapView.context)
+            locationComponent.cameraMode = CameraMode.NONE
             locationComponent.forceLocationUpdate(focusLocation)
-
-            if (applyZoom) {
-                map.animateCamera(
-                    CameraUpdateFactory.newLatLngZoom(
-                        LatLng(focusLocation.latitude, focusLocation.longitude),
-                        NAVIGATION_CAMERA_ZOOM
-                    ),
-                    NAVIGATION_CAMERA_TRANSITION_DURATION_MS.toInt(),
-                    object : MapLibreMap.CancelableCallback {
-                        override fun onFinish() {
-                            locationComponent.cameraMode = CameraMode.TRACKING_COMPASS
-                        }
-
-                        override fun onCancel() {
-                            locationComponent.cameraMode = CameraMode.TRACKING_COMPASS
-                        }
-                    }
-                )
-            } else {
-                locationComponent.cameraMode = CameraMode.TRACKING_COMPASS
-            }
+            updateNavigationCamera(
+                map = map,
+                location = focusLocation,
+                headingDegrees = headingDegrees,
+                applyZoom = applyZoom
+            )
         } catch (_: IllegalStateException) {
         } catch (_: RuntimeException) {
         } catch (_: SecurityException) {
@@ -319,4 +315,113 @@ private fun resolveInitialLocation(
     preferredLocation: Location?
 ): Location? {
     return preferredLocation ?: getBestLastKnownLocation(context)
+}
+
+private fun resolveLocationRenderMode(context: Context): Int {
+    return if (supportsCompassTracking(context)) {
+        RenderMode.COMPASS
+    } else {
+        RenderMode.NORMAL
+    }
+}
+
+private fun supportsCompassTracking(context: Context): Boolean {
+    if (isProbablyEmulator()) {
+        return false
+    }
+
+    val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return false
+    val hasRotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) != null
+    val hasAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null
+    val hasMagnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) != null
+    return hasRotationVector || (hasAccelerometer && hasMagnetometer)
+}
+
+private fun isProbablyEmulator(): Boolean {
+    return Build.FINGERPRINT.startsWith("generic") ||
+        Build.FINGERPRINT.lowercase().contains("emulator") ||
+        Build.MODEL.contains("Emulator", ignoreCase = true) ||
+        Build.MODEL.contains("Android SDK built for", ignoreCase = true) ||
+        Build.MANUFACTURER.contains("Genymotion", ignoreCase = true) ||
+        Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic") ||
+        Build.PRODUCT.contains("sdk", ignoreCase = true)
+}
+
+private fun updateNavigationCamera(
+    map: MapLibreMap,
+    location: Location,
+    headingDegrees: Double?,
+    applyZoom: Boolean
+) {
+    val currentPosition = map.cameraPosition
+    val targetPosition = CameraPosition.Builder()
+        .target(LatLng(location.latitude, location.longitude))
+        .zoom(if (applyZoom) NAVIGATION_CAMERA_ZOOM else currentPosition.zoom)
+        .bearing(
+            when {
+                headingDegrees != null -> headingDegrees
+                location.hasBearing() -> location.bearing.toDouble()
+                else -> currentPosition.bearing
+            }
+        )
+        .tilt(if (applyZoom) NAVIGATION_CAMERA_TILT else currentPosition.tilt)
+        .build()
+
+    map.animateCamera(
+        CameraUpdateFactory.newCameraPosition(targetPosition),
+        if (applyZoom) NAVIGATION_CAMERA_TRANSITION_DURATION_MS.toInt() else 600
+    )
+}
+
+fun startHeadingUpdates(
+    context: Context,
+    onHeadingChanged: (Float?) -> Unit
+): SensorEventListener? {
+    if (!supportsCompassTracking(context)) {
+        onHeadingChanged(null)
+        return null
+    }
+
+    val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return null
+    val rotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) ?: return null
+    val rotationMatrix = FloatArray(9)
+    val orientationAngles = FloatArray(3)
+    var lastHeading: Float? = null
+
+    val listener = object : SensorEventListener {
+        override fun onSensorChanged(event: SensorEvent) {
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+            SensorManager.getOrientation(rotationMatrix, orientationAngles)
+            val heading = ((Math.toDegrees(orientationAngles[0].toDouble()) + 360.0) % 360.0).toFloat()
+            if (
+                lastHeading == null ||
+                circularHeadingDeltaDegrees(lastHeading!!, heading) >= NAVIGATION_HEADING_MIN_DELTA_DEGREES
+            ) {
+                lastHeading = heading
+                onHeadingChanged(heading)
+            }
+        }
+
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
+
+    sensorManager.registerListener(listener, rotationVectorSensor, SensorManager.SENSOR_DELAY_UI)
+    return listener
+}
+
+fun stopHeadingUpdates(
+    context: Context,
+    listener: SensorEventListener?
+) {
+    if (listener == null) {
+        return
+    }
+
+    val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager ?: return
+    sensorManager.unregisterListener(listener)
+}
+
+private fun circularHeadingDeltaDegrees(previous: Float, current: Float): Float {
+    val delta = abs(previous - current) % 360f
+    return minOf(delta, 360f - delta)
 }

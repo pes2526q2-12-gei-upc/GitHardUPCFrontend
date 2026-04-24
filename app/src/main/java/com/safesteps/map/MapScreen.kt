@@ -64,6 +64,7 @@ fun MapLibreScreen(
     val mapView = rememberMapViewWithLifecycle()
     val uiState by viewModel.uiState.collectAsState()
     val strings = mapScreenStrings()
+    var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
 
     var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
 
@@ -103,6 +104,7 @@ fun MapLibreScreen(
             mapView = mapView,
             context = context,
             requestLocationPermissions = requestLocationPermissions,
+            navigationHeadingDegrees = navigationHeadingDegrees,
             searchingGpsSignalMessage = strings.searchingGpsSignalMessage
         )
     }
@@ -114,6 +116,8 @@ fun MapLibreScreen(
         context = context,
         viewModel = viewModel,
         requestLocationPermissions = requestLocationPermissions,
+        navigationHeadingDegrees = navigationHeadingDegrees,
+        onNavigationHeadingChanged = { navigationHeadingDegrees = it },
         originLabel = strings.originLabel,
         destinationLabel = strings.destinationLabel
     )
@@ -163,6 +167,7 @@ fun MapLibreScreen(
                     enableNavigationCameraTracking(
                         mapView = mapView,
                         currentLocation = location,
+                        headingDegrees = navigationHeadingDegrees?.toDouble(),
                         applyZoom = true
                     )
                 }
@@ -245,6 +250,8 @@ private fun MapScreenEffects(
     context: Context,
     viewModel: MapViewModel,
     requestLocationPermissions: () -> Unit,
+    navigationHeadingDegrees: Float?,
+    onNavigationHeadingChanged: (Float?) -> Unit,
     originLabel: String,
     destinationLabel: String
 ) {
@@ -267,15 +274,20 @@ private fun MapScreenEffects(
         ultimaUbicacion = uiState.ultimaUbicacion,
         mapView = mapView
     )
+    NavigationHeadingSensorEffect(
+        context = context,
+        enabled = uiState.modoRuta && !uiState.routeCompleted && uiState.navigationCameraFollowing,
+        onHeadingChanged = onNavigationHeadingChanged
+    )
     NavigationCameraTrackingEffect(
         locationGranted = uiState.locationGranted,
         mapaListo = uiState.mapaListo,
         modoRuta = uiState.modoRuta,
         routeCompleted = uiState.routeCompleted,
         navigationCameraFollowing = uiState.navigationCameraFollowing,
-        hasCurrentLocation = uiState.ultimaUbicacion != null,
+        currentLocation = uiState.ultimaUbicacion,
+        headingDegrees = navigationHeadingDegrees,
         mapView = mapView,
-        currentLocation = uiState.ultimaUbicacion
     )
     NavigationCameraGestureDismissEffect(
         mapView = mapView,
@@ -298,6 +310,7 @@ private fun MapScreenEffects(
         uiState = uiState,
         context = context,
         viewModel = viewModel,
+        navigationHeadingDegrees = navigationHeadingDegrees,
         originLabel = originLabel,
         destinationLabel = destinationLabel
     )
@@ -373,6 +386,26 @@ private fun LocationComponentActivationEffect(
 }
 
 @Composable
+private fun NavigationHeadingSensorEffect(
+    context: Context,
+    enabled: Boolean,
+    onHeadingChanged: (Float?) -> Unit
+) {
+    DisposableEffect(context, enabled) {
+        if (!enabled) {
+            onHeadingChanged(null)
+            return@DisposableEffect onDispose { }
+        }
+
+        val listener = startHeadingUpdates(context, onHeadingChanged)
+        onDispose {
+            stopHeadingUpdates(context, listener)
+            onHeadingChanged(null)
+        }
+    }
+}
+
+@Composable
 private fun RouteRecalculationEffect(
     destinoSeleccionado: LatLng?,
     origenSeleccionado: LatLng?,
@@ -411,6 +444,7 @@ private fun MapStyleRenderingEffect(
     uiState: MapUiState,
     context: Context,
     viewModel: MapViewModel,
+    navigationHeadingDegrees: Float?,
     originLabel: String,
     destinationLabel: String
 ) {
@@ -431,6 +465,7 @@ private fun MapStyleRenderingEffect(
                     uiState = uiState,
                     context = context,
                     viewModel = viewModel,
+                    navigationHeadingDegrees = navigationHeadingDegrees,
                     originLabel = originLabel,
                     destinationLabel = destinationLabel
                 )
@@ -487,9 +522,9 @@ private fun NavigationCameraTrackingEffect(
     modoRuta: Boolean,
     routeCompleted: Boolean,
     navigationCameraFollowing: Boolean,
-    hasCurrentLocation: Boolean,
-    mapView: MapView,
-    currentLocation: Location?
+    currentLocation: Location?,
+    headingDegrees: Float?,
+    mapView: MapView
 ) {
     LaunchedEffect(
         locationGranted,
@@ -497,7 +532,10 @@ private fun NavigationCameraTrackingEffect(
         modoRuta,
         routeCompleted,
         navigationCameraFollowing,
-        hasCurrentLocation
+        currentLocation?.latitude,
+        currentLocation?.longitude,
+        currentLocation?.bearing,
+        headingDegrees?.toInt()
     ) {
         if (!locationGranted || !mapaListo) {
             return@LaunchedEffect
@@ -508,7 +546,9 @@ private fun NavigationCameraTrackingEffect(
             modoRuta = modoRuta,
             routeCompleted = routeCompleted,
             navigationCameraFollowing = navigationCameraFollowing,
-            currentLocation = currentLocation
+            currentLocation = currentLocation,
+            headingDegrees = headingDegrees?.toDouble(),
+            applyZoom = false
         )
     }
 }
@@ -574,6 +614,7 @@ private fun MapViewSurface(
 }
 
 private fun configureMapUi(map: MapLibreMap) {
+    map.uiSettings.isCompassEnabled = false
     map.uiSettings.isLogoEnabled = false
     map.uiSettings.isAttributionEnabled = false
 }
@@ -710,6 +751,7 @@ private fun recenterOnCurrentLocation(
     mapView: MapView,
     context: Context,
     requestLocationPermissions: () -> Unit,
+    navigationHeadingDegrees: Float?,
     searchingGpsSignalMessage: String
 ) {
     if (!uiState.locationGranted) {
@@ -724,7 +766,9 @@ private fun recenterOnCurrentLocation(
             viewModel.resumeNavigationCameraTracking()
             enableNavigationCameraTracking(
                 mapView = mapView,
-                currentLocation = currentLocation
+                currentLocation = currentLocation,
+                headingDegrees = navigationHeadingDegrees?.toDouble(),
+                applyZoom = true
             )
         } else {
             activateLocationComponent(
@@ -778,6 +822,7 @@ private fun renderMapStateAfterStyleLoaded(
     uiState: MapUiState,
     context: Context,
     viewModel: MapViewModel,
+    navigationHeadingDegrees: Float?,
     originLabel: String,
     destinationLabel: String
 ) {
@@ -792,7 +837,9 @@ private fun renderMapStateAfterStyleLoaded(
         modoRuta = uiState.modoRuta,
         routeCompleted = uiState.routeCompleted,
         navigationCameraFollowing = uiState.navigationCameraFollowing,
-        currentLocation = uiState.ultimaUbicacion
+        currentLocation = uiState.ultimaUbicacion,
+        headingDegrees = navigationHeadingDegrees?.toDouble(),
+        applyZoom = false
     )
 
     if (uiState.rutaCoordenades.isNotEmpty()) {
@@ -840,12 +887,16 @@ private fun syncNavigationCameraTracking(
     modoRuta: Boolean,
     routeCompleted: Boolean,
     navigationCameraFollowing: Boolean,
-    currentLocation: Location?
+    currentLocation: Location?,
+    headingDegrees: Double?,
+    applyZoom: Boolean
 ) {
     if (modoRuta && !routeCompleted && navigationCameraFollowing) {
         enableNavigationCameraTracking(
             mapView = mapView,
-            currentLocation = currentLocation
+            currentLocation = currentLocation,
+            headingDegrees = headingDegrees,
+            applyZoom = applyZoom
         )
     } else {
         disableNavigationCameraTracking(mapView)
