@@ -73,6 +73,7 @@ class MapViewModel(
                 etaText = DEFAULT_ETA_TEXT,
                 rutaCoordenades = emptyList(),
                 modoRuta = false,
+                navigationCameraFollowing = false,
                 routeCompleted = false,
                 routeCompletionSummary = null,
                 activeNavigationInstruction = null,
@@ -92,6 +93,7 @@ class MapViewModel(
         _uiState.update { it.copy(
             rutaCoordenades = emptyList(),
             modoRuta = false,
+            navigationCameraFollowing = false,
             routeCompleted = false,
             routeCompletionSummary = null,
             activeNavigationInstruction = null,
@@ -302,6 +304,7 @@ class MapViewModel(
         _uiState.update {
             it.copy(
                 modoRuta = true,
+                navigationCameraFollowing = true,
                 routeCompleted = false,
                 routeCompletionSummary = null,
                 navigationNotice = null
@@ -315,6 +318,26 @@ class MapViewModel(
 
     fun onMapaListo() {
         _uiState.update { it.copy(mapaListo = true) }
+    }
+
+    fun onNavigationCameraDismissedByGesture() {
+        _uiState.update { state ->
+            if (!state.modoRuta || !state.navigationCameraFollowing) {
+                state
+            } else {
+                state.copy(navigationCameraFollowing = false)
+            }
+        }
+    }
+
+    fun resumeNavigationCameraTracking() {
+        _uiState.update { state ->
+            if (!state.modoRuta || state.routeCompleted) {
+                state
+            } else {
+                state.copy(navigationCameraFollowing = true)
+            }
+        }
     }
 
     fun togglePuntsInteres() {
@@ -556,6 +579,7 @@ class MapViewModel(
 
         _uiState.update {
             it.copy(
+                navigationCameraFollowing = false,
                 routeCompleted = true,
                 routeCompletionSummary = RouteCompletionSummary(
                     distanceText = formatDistance(totalDistanceMeters),

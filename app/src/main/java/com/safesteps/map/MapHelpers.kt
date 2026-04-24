@@ -32,7 +32,11 @@ import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+
+private const val NAVIGATION_CAMERA_TRANSITION_DURATION_MS = 900L
+private const val NAVIGATION_CAMERA_ZOOM = 17.0
 
 fun hasFineLocationPermission(context: Context): Boolean {
     return ContextCompat.checkSelfPermission(
@@ -180,6 +184,67 @@ fun centerMapOnLocation(
             ),
             durationMs
         )
+    }
+}
+
+fun enableNavigationCameraTracking(
+    mapView: MapView,
+    currentLocation: Location? = null,
+    applyZoom: Boolean = true
+) {
+    activateLocationComponent(
+        mapView = mapView,
+        initialLocation = currentLocation
+    )
+
+    mapView.getMapAsync { map ->
+        val locationComponent = map.locationComponent
+        if (!locationComponent.isLocationComponentActivated) {
+            return@getMapAsync
+        }
+
+        val focusLocation = resolveInitialLocation(mapView.context, currentLocation) ?: return@getMapAsync
+
+        try {
+            locationComponent.isLocationComponentEnabled = true
+            locationComponent.renderMode = RenderMode.COMPASS
+            locationComponent.forceLocationUpdate(focusLocation)
+
+            if (applyZoom) {
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        LatLng(focusLocation.latitude, focusLocation.longitude),
+                        NAVIGATION_CAMERA_ZOOM
+                    ),
+                    NAVIGATION_CAMERA_TRANSITION_DURATION_MS.toInt(),
+                    object : MapLibreMap.CancelableCallback {
+                        override fun onFinish() {
+                            locationComponent.cameraMode = CameraMode.TRACKING_COMPASS
+                        }
+
+                        override fun onCancel() {
+                            locationComponent.cameraMode = CameraMode.TRACKING_COMPASS
+                        }
+                    }
+                )
+            } else {
+                locationComponent.cameraMode = CameraMode.TRACKING_COMPASS
+            }
+        } catch (_: IllegalStateException) {
+        } catch (_: RuntimeException) {
+        } catch (_: SecurityException) {
+        }
+    }
+}
+
+fun disableNavigationCameraTracking(mapView: MapView) {
+    mapView.getMapAsync { map ->
+        val locationComponent = map.locationComponent
+        if (!locationComponent.isLocationComponentActivated) {
+            return@getMapAsync
+        }
+
+        locationComponent.cameraMode = CameraMode.NONE
     }
 }
 

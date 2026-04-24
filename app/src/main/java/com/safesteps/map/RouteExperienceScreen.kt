@@ -75,6 +75,14 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.max
 
+private data class RoutePlannerSheetState(
+    val selectedPriority: RoutePriority,
+    val showProfilePreferences: Boolean,
+    val distanceText: String,
+    val durationText: String,
+    val puntsInteres: List<com.safesteps.data.PuntInteres>
+)
+
 @Composable
 private fun RoutePriorityCompactOption(
     title: String,
@@ -305,12 +313,8 @@ private fun RouteDetails(distanceText: String, durationText: String) {
 @Composable
 private fun RoutePlannerSheet(
     modifier: Modifier = Modifier,
-    selectedPriority: RoutePriority,
+    sheetState: RoutePlannerSheetState,
     onPrioritySelected: (RoutePriority) -> Unit,
-    showProfilePreferences: Boolean = false,
-    distanceText: String,
-    durationText: String,
-    puntsInteres: List<com.safesteps.data.PuntInteres>,
     onClose: () -> Unit,
     onStartRoute: () -> Unit
 ) {
@@ -341,16 +345,19 @@ private fun RoutePlannerSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             RoutePrioritySelector(
-                selectedPriority = selectedPriority,
+                selectedPriority = sheetState.selectedPriority,
                 onPrioritySelected = onPrioritySelected,
-                showProfilePreferences = showProfilePreferences
+                showProfilePreferences = sheetState.showProfilePreferences
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            PoiSummary(puntsInteres = puntsInteres)
+            PoiSummary(puntsInteres = sheetState.puntsInteres)
 
-            RouteDetails(distanceText = distanceText, durationText = durationText)
+            RouteDetails(
+                distanceText = sheetState.distanceText,
+                durationText = sheetState.durationText
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -374,37 +381,6 @@ private fun RoutePlannerSheet(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun NavigationStatusChip(
-    icon: ImageVector,
-    text: String,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(999.dp))
-            .background(Color.White.copy(alpha = 0.16f))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color.White,
-            modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = text,
-            color = Color.White,
-            fontWeight = FontWeight.Medium,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }
 
@@ -501,6 +477,160 @@ private fun NavigationTopBanner(
 
                 }
             }
+        }
+    }
+}
+
+private fun routeOverlayBottomPadding(
+    uiState: MapUiState,
+    density: androidx.compose.ui.unit.Density,
+    sheetHeightPx: Float,
+    sheetOffsetPx: Float,
+    routeBottomBarHeightPx: Float,
+    routeCompletedCardHeightPx: Float
+): Dp {
+    return when {
+        uiState.routeCompleted -> with(density) { routeCompletedCardHeightPx.toDp() } + 18.dp
+        uiState.modoRuta -> with(density) { routeBottomBarHeightPx.toDp() } + 18.dp
+        uiState.destinoSeleccionado != null -> {
+            val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
+            with(density) { currentVisibleHeightPx.toDp() } + 16.dp
+        }
+
+        else -> 16.dp
+    }
+}
+
+private fun shouldAllowSheetDrag(uiState: MapUiState): Boolean {
+    return uiState.destinoSeleccionado != null && !uiState.modoRuta
+}
+
+private fun overlayPlannerSheetState(uiState: MapUiState): RoutePlannerSheetState {
+    return RoutePlannerSheetState(
+        selectedPriority = uiState.prioridadSeleccionada,
+        showProfilePreferences = false,
+        distanceText = uiState.distanceText,
+        durationText = uiState.durationText,
+        puntsInteres = uiState.puntsInteres
+    )
+}
+
+@Composable
+private fun BoxScope.NavigationTopBannerOverlay(uiState: MapUiState) {
+    AnimatedVisibility(
+        visible = uiState.modoRuta && !uiState.routeCompleted,
+        enter = slideInVertically(initialOffsetY = { -it / 2 }),
+        exit = slideOutVertically(targetOffsetY = { -it / 2 }),
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .statusBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+    ) {
+        NavigationTopBanner(
+            destinationText = uiState.textoDestino,
+            activeInstruction = uiState.activeNavigationInstruction
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.RoutePlannerSheetOverlay(
+    uiState: MapUiState,
+    density: androidx.compose.ui.unit.Density,
+    sheetOffsetPx: Float,
+    visibleSheetHeightPx: Float,
+    sheetHeightPxState: androidx.compose.runtime.MutableFloatState,
+    sheetDragState: androidx.compose.foundation.gestures.DraggableState,
+    onSheetDragStopped: () -> Unit,
+    onSheetOffsetChange: (Float) -> Unit,
+    onPrioritySelected: (RoutePriority) -> Unit,
+    onClose: () -> Unit,
+    onStartRoute: () -> Unit,
+    showProfilePreferences: Boolean
+) {
+    AnimatedVisibility(
+        visible = uiState.destinoSeleccionado != null && !uiState.modoRuta,
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it }),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(horizontal = 10.dp)
+    ) {
+        RoutePlannerSheet(
+            modifier = Modifier
+                .offset(y = with(density) { sheetOffsetPx.toDp() })
+                .onGloballyPositioned {
+                    val newSheetHeightPx = it.size.height.toFloat()
+                    sheetHeightPxState.floatValue = newSheetHeightPx
+                    val maxCollapsedOffset = max(0f, newSheetHeightPx - visibleSheetHeightPx)
+                    if (sheetOffsetPx > maxCollapsedOffset) {
+                        onSheetOffsetChange(maxCollapsedOffset)
+                    }
+                }
+                .draggable(
+                    orientation = Orientation.Vertical,
+                    state = sheetDragState,
+                    onDragStopped = { onSheetDragStopped() }
+                ),
+            sheetState = overlayPlannerSheetState(uiState).copy(
+                showProfilePreferences = showProfilePreferences
+            ),
+            onPrioritySelected = onPrioritySelected,
+            onClose = {
+                onSheetOffsetChange(0f)
+                onClose()
+            },
+            onStartRoute = onStartRoute
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.RouteActiveBottomBarOverlay(
+    uiState: MapUiState,
+    routeBottomBarHeightPxState: androidx.compose.runtime.MutableFloatState,
+    onClose: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = uiState.modoRuta && !uiState.routeCompleted,
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it }),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .onGloballyPositioned {
+                routeBottomBarHeightPxState.floatValue = it.size.height.toFloat()
+            }
+    ) {
+        RouteActiveBottomBar(
+            durationText = uiState.durationText,
+            distanceText = uiState.distanceText,
+            etaText = uiState.etaText,
+            onClose = onClose
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.RouteCompletedBottomCardOverlay(
+    uiState: MapUiState,
+    routeCompletedCardHeightPxState: androidx.compose.runtime.MutableFloatState,
+    onClose: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = uiState.routeCompleted && uiState.routeCompletionSummary != null,
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it }),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+    ) {
+        uiState.routeCompletionSummary?.let { summary ->
+            RouteCompletedBottomCard(
+                summary = summary,
+                onClose = onClose,
+                modifier = Modifier.onGloballyPositioned {
+                    routeCompletedCardHeightPxState.floatValue = it.size.height.toFloat()
+                }
+            )
         }
     }
 }
@@ -880,21 +1010,19 @@ internal fun BoxScope.RouteExperienceOverlay(
     val collapsedSheetOffset = max(0f, sheetHeightPxState.floatValue - visibleSheetHeightPx)
 
     val bottomPadding by animateDpAsState(
-        targetValue = when {
-            uiState.routeCompleted -> with(density) { routeCompletedCardHeightPxState.floatValue.toDp() } + 18.dp
-            uiState.modoRuta -> with(density) { routeBottomBarHeightPxState.floatValue.toDp() } + 18.dp
-            uiState.destinoSeleccionado != null -> {
-                val currentVisibleHeightPx = sheetHeightPxState.floatValue - sheetOffsetPx
-                val currentVisibleHeightDp = with(density) { currentVisibleHeightPx.toDp() }
-                currentVisibleHeightDp + 16.dp
-            }
-            else -> 16.dp
-        },
+        targetValue = routeOverlayBottomPadding(
+            uiState = uiState,
+            density = density,
+            sheetHeightPx = sheetHeightPxState.floatValue,
+            sheetOffsetPx = sheetOffsetPx,
+            routeBottomBarHeightPx = routeBottomBarHeightPxState.floatValue,
+            routeCompletedCardHeightPx = routeCompletedCardHeightPxState.floatValue
+        ),
         label = "routeOverlayBottomPadding"
     )
 
     val sheetDragState = rememberDraggableState { delta ->
-        if (uiState.destinoSeleccionado != null && !uiState.modoRuta) {
+        if (shouldAllowSheetDrag(uiState)) {
             sheetOffsetPx = (sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset)
         }
     }
@@ -909,103 +1037,40 @@ internal fun BoxScope.RouteExperienceOverlay(
         }
     }
 
-    AnimatedVisibility(
-        visible = uiState.modoRuta && !uiState.routeCompleted,
-        enter = slideInVertically(initialOffsetY = { -it / 2 }),
-        exit = slideOutVertically(targetOffsetY = { -it / 2 }),
-        modifier = Modifier
-            .align(Alignment.TopCenter)
-            .statusBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 12.dp)
-    ) {
-        NavigationTopBanner(
-            destinationText = uiState.textoDestino,
-            activeInstruction = uiState.activeNavigationInstruction
-        )
-    }
-
-    AnimatedVisibility(
-        visible = uiState.destinoSeleccionado != null && !uiState.modoRuta,
-        enter = slideInVertically(initialOffsetY = { it }),
-        exit = slideOutVertically(targetOffsetY = { it }),
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(horizontal = 10.dp)
-    ) {
-        RoutePlannerSheet(
-            modifier = Modifier
-                .offset(y = with(density) { sheetOffsetPx.toDp() })
-                .onGloballyPositioned {
-                    val newSheetHeightPx = it.size.height.toFloat()
-                    sheetHeightPxState.floatValue = newSheetHeightPx
-                    val maxCollapsedOffset = max(0f, newSheetHeightPx - visibleSheetHeightPx)
-                    if (sheetOffsetPx > maxCollapsedOffset) {
-                        sheetOffsetPx = maxCollapsedOffset
-                    }
-                }
-                .draggable(
-                    orientation = Orientation.Vertical,
-                    state = sheetDragState,
-                    onDragStopped = {
-                        val target = if (sheetOffsetPx > collapsedSheetOffset / 2f) {
-                            collapsedSheetOffset
-                        } else {
-                            0f
-                        }
-                        coroutineScope.launch {
-                            animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ ->
-                                sheetOffsetPx = value
-                            }
-                        }
-                    }
-                ),
-            selectedPriority = uiState.prioridadSeleccionada,
-            onPrioritySelected = onPrioritySelected,
-            showProfilePreferences = showProfilePreferences,
-            distanceText = uiState.distanceText,
-            durationText = uiState.durationText,
-            onClose = {
-                sheetOffsetPx = 0f
-                onClose()
-            },
-            puntsInteres = uiState.puntsInteres,
-            onStartRoute = onStartRoute
-        )
-    }
-
-    AnimatedVisibility(
-        visible = uiState.modoRuta && !uiState.routeCompleted,
-        enter = slideInVertically(initialOffsetY = { it }),
-        exit = slideOutVertically(targetOffsetY = { it }),
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .onGloballyPositioned {
-                routeBottomBarHeightPxState.floatValue = it.size.height.toFloat()
+    NavigationTopBannerOverlay(uiState = uiState)
+    RoutePlannerSheetOverlay(
+        uiState = uiState,
+        density = density,
+        sheetOffsetPx = sheetOffsetPx,
+        visibleSheetHeightPx = visibleSheetHeightPx,
+        sheetHeightPxState = sheetHeightPxState,
+        sheetDragState = sheetDragState,
+        onSheetDragStopped = {
+            val target = if (sheetOffsetPx > collapsedSheetOffset / 2f) {
+                collapsedSheetOffset
+            } else {
+                0f
             }
-    ) {
-        RouteActiveBottomBar(
-            durationText = uiState.durationText,
-            distanceText = uiState.distanceText,
-            etaText = uiState.etaText,
-            onClose = onClose
-        )
-    }
-
-    AnimatedVisibility(
-        visible = uiState.routeCompleted && uiState.routeCompletionSummary != null,
-        enter = slideInVertically(initialOffsetY = { it }),
-        exit = slideOutVertically(targetOffsetY = { it }),
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-    ) {
-        uiState.routeCompletionSummary?.let { summary ->
-            RouteCompletedBottomCard(
-                summary = summary,
-                onClose = onClose,
-                modifier = Modifier.onGloballyPositioned {
-                    routeCompletedCardHeightPxState.floatValue = it.size.height.toFloat()
+            coroutineScope.launch {
+                animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ ->
+                    sheetOffsetPx = value
                 }
-            )
-        }
-    }
+            }
+        },
+        onSheetOffsetChange = { sheetOffsetPx = it },
+        onPrioritySelected = onPrioritySelected,
+        onClose = onClose,
+        onStartRoute = onStartRoute,
+        showProfilePreferences = showProfilePreferences
+    )
+    RouteActiveBottomBarOverlay(
+        uiState = uiState,
+        routeBottomBarHeightPxState = routeBottomBarHeightPxState,
+        onClose = onClose
+    )
+    RouteCompletedBottomCardOverlay(
+        uiState = uiState,
+        routeCompletedCardHeightPxState = routeCompletedCardHeightPxState,
+        onClose = onClose
+    )
 }

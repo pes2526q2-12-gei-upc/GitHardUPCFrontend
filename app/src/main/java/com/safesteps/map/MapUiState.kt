@@ -38,6 +38,7 @@ data class MapUiState(
     val campActiu: textField = textField.NONE,
     val rutaCoordenades: List<Coordenada> = emptyList(),
     val modoRuta: Boolean = false,
+    val navigationCameraFollowing: Boolean = false,
     val routeCompleted: Boolean = false,
     val routeCompletionSummary: RouteCompletionSummary? = null,
     val activeNavigationInstruction: ActiveNavigationInstruction? = null,

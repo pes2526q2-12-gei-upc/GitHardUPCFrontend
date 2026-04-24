@@ -157,7 +157,16 @@ fun MapLibreScreen(
             uiState = uiState,
             showProfilePreferences = currentUser != null,
             onPrioritySelected = onPrioritySelected,
-            onStartRoute = { viewModel.iniciarNavegacio() },
+            onStartRoute = {
+                viewModel.iniciarNavegacio()
+                uiState.ultimaUbicacion?.let { location ->
+                    enableNavigationCameraTracking(
+                        mapView = mapView,
+                        currentLocation = location,
+                        applyZoom = true
+                    )
+                }
+            },
             onClose = resetToMainMenu,
             onBottomPaddingChange = { padding ->
                 floatingActionsBottomPadding = padding
@@ -257,6 +266,21 @@ private fun MapScreenEffects(
         mapaListo = uiState.mapaListo,
         ultimaUbicacion = uiState.ultimaUbicacion,
         mapView = mapView
+    )
+    NavigationCameraTrackingEffect(
+        locationGranted = uiState.locationGranted,
+        mapaListo = uiState.mapaListo,
+        modoRuta = uiState.modoRuta,
+        routeCompleted = uiState.routeCompleted,
+        navigationCameraFollowing = uiState.navigationCameraFollowing,
+        hasCurrentLocation = uiState.ultimaUbicacion != null,
+        mapView = mapView,
+        currentLocation = uiState.ultimaUbicacion
+    )
+    NavigationCameraGestureDismissEffect(
+        mapView = mapView,
+        uiState = uiState,
+        viewModel = viewModel
     )
     RouteRecalculationEffect(
         destinoSeleccionado = uiState.destinoSeleccionado,
@@ -457,6 +481,77 @@ private fun InitialZoomEffect(
 }
 
 @Composable
+private fun NavigationCameraTrackingEffect(
+    locationGranted: Boolean,
+    mapaListo: Boolean,
+    modoRuta: Boolean,
+    routeCompleted: Boolean,
+    navigationCameraFollowing: Boolean,
+    hasCurrentLocation: Boolean,
+    mapView: MapView,
+    currentLocation: Location?
+) {
+    LaunchedEffect(
+        locationGranted,
+        mapaListo,
+        modoRuta,
+        routeCompleted,
+        navigationCameraFollowing,
+        hasCurrentLocation
+    ) {
+        if (!locationGranted || !mapaListo) {
+            return@LaunchedEffect
+        }
+
+        syncNavigationCameraTracking(
+            mapView = mapView,
+            modoRuta = modoRuta,
+            routeCompleted = routeCompleted,
+            navigationCameraFollowing = navigationCameraFollowing,
+            currentLocation = currentLocation
+        )
+    }
+}
+
+@Composable
+private fun NavigationCameraGestureDismissEffect(
+    mapView: MapView,
+    uiState: MapUiState,
+    viewModel: MapViewModel
+) {
+    val latestUiState = rememberUpdatedState(uiState)
+
+    DisposableEffect(mapView, viewModel) {
+        var attachedMap: MapLibreMap? = null
+        var disposed = false
+        val listener = MapLibreMap.OnCameraMoveStartedListener { reason ->
+            val state = latestUiState.value
+            if (
+                reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE &&
+                state.modoRuta &&
+                !state.routeCompleted &&
+                state.navigationCameraFollowing
+            ) {
+                viewModel.onNavigationCameraDismissedByGesture()
+            }
+        }
+
+        mapView.getMapAsync { map ->
+            if (disposed) {
+                return@getMapAsync
+            }
+            attachedMap = map
+            map.addOnCameraMoveStartedListener(listener)
+        }
+
+        onDispose {
+            disposed = true
+            attachedMap?.removeOnCameraMoveStartedListener(listener)
+        }
+    }
+}
+
+@Composable
 private fun MapViewSurface(
     mapView: MapView,
     uiState: MapUiState,
@@ -557,6 +652,7 @@ private fun resetMapToMainMenu(
 ) {
     viewModel.clearRuta()
     viewModel.limpiarOrigen()
+    disableNavigationCameraTracking(mapView)
     mapView.getMapAsync { map ->
         clearLegacyAnnotations(map)
     }
@@ -621,8 +717,31 @@ private fun recenterOnCurrentLocation(
         return
     }
 
-    viewModel.limpiarOrigen()
     val currentLocation = uiState.ultimaUbicacion
+
+    if (uiState.modoRuta) {
+        if (!uiState.routeCompleted) {
+            viewModel.resumeNavigationCameraTracking()
+            enableNavigationCameraTracking(
+                mapView = mapView,
+                currentLocation = currentLocation
+            )
+        } else {
+            activateLocationComponent(
+                mapView = mapView,
+                initialLocation = currentLocation
+            )
+        }
+
+        if (currentLocation == null) {
+            Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
+        } else if (uiState.routeCompleted) {
+            centerMapOnLocation(mapView, currentLocation)
+        }
+        return
+    }
+
+    viewModel.limpiarOrigen()
     activateLocationComponent(
         mapView = mapView,
         initialLocation = currentLocation
@@ -668,6 +787,13 @@ private fun renderMapStateAfterStyleLoaded(
         mapView = mapView,
         currentLocation = uiState.ultimaUbicacion
     )
+    syncNavigationCameraTracking(
+        mapView = mapView,
+        modoRuta = uiState.modoRuta,
+        routeCompleted = uiState.routeCompleted,
+        navigationCameraFollowing = uiState.navigationCameraFollowing,
+        currentLocation = uiState.ultimaUbicacion
+    )
 
     if (uiState.rutaCoordenades.isNotEmpty()) {
         drawCurrentRoute(
@@ -706,6 +832,23 @@ private fun enableLocationOnMapIfNeeded(
             mapView = mapView,
             initialLocation = currentLocation
         )
+    }
+}
+
+private fun syncNavigationCameraTracking(
+    mapView: MapView,
+    modoRuta: Boolean,
+    routeCompleted: Boolean,
+    navigationCameraFollowing: Boolean,
+    currentLocation: Location?
+) {
+    if (modoRuta && !routeCompleted && navigationCameraFollowing) {
+        enableNavigationCameraTracking(
+            mapView = mapView,
+            currentLocation = currentLocation
+        )
+    } else {
+        disableNavigationCameraTracking(mapView)
     }
 }
 
