@@ -108,7 +108,10 @@ fun rememberMapViewWithLifecycle(): MapView {
     return mapView
 }
 
-fun activateLocationComponent(mapView: MapView) {
+fun activateLocationComponent(
+    mapView: MapView,
+    initialLocation: Location? = null
+) {
     mapView.getMapAsync { map ->
         val context = mapView.context
         val fineGranted = ContextCompat.checkSelfPermission(
@@ -146,8 +149,9 @@ fun activateLocationComponent(mapView: MapView) {
 
         try {
             locationComponent.isLocationComponentEnabled = true
-            locationComponent.renderMode = RenderMode.NORMAL
+            locationComponent.renderMode = RenderMode.COMPASS
             locationComponent.cameraMode = CameraMode.NONE
+            resolveInitialLocation(context, initialLocation)?.let(locationComponent::forceLocationUpdate)
         } catch (_: SecurityException) {
         }
     }
@@ -199,11 +203,18 @@ fun startAndroidLocationUpdates(
     val providers = buildList {
         if (fineGranted) add(LocationManager.GPS_PROVIDER)
         if (fineGranted || coarseGranted) add(LocationManager.NETWORK_PROVIDER)
+        if (fineGranted || coarseGranted) add(LocationManager.PASSIVE_PROVIDER)
+    }
+
+    getBestLastKnownLocation(context)?.let { location ->
+        pushLocationToMap(mapView, location)
+        onLocationUpdated(location)
     }
 
     for (provider in providers) {
         try {
-            if (locationManager.isProviderEnabled(provider)) {
+            val providerAvailable = provider == LocationManager.PASSIVE_PROVIDER || locationManager.isProviderEnabled(provider)
+            if (providerAvailable) {
                 locationManager.requestLocationUpdates(provider, 1000L, 1f, listener)
                 locationManager.getLastKnownLocation(provider)?.let {
                     pushLocationToMap(mapView, it)
@@ -236,4 +247,11 @@ fun crearIconaGrisa(context: Context): Icon {
     canvas.drawCircle(20f, 20f, 20f, paint)
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
+}
+
+private fun resolveInitialLocation(
+    context: Context,
+    preferredLocation: Location?
+): Location? {
+    return preferredLocation ?: getBestLastKnownLocation(context)
 }

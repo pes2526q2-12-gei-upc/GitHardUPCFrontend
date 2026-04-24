@@ -72,6 +72,7 @@ import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.appPlural
 import com.safesteps.i18n.appString
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.max
 
 @Composable
@@ -410,15 +411,26 @@ private fun NavigationStatusChip(
 @Composable
 private fun NavigationTopBanner(
     destinationText: String,
-    distanceText: String,
-    etaText: String,
+    activeInstruction: ActiveNavigationInstruction?,
     modifier: Modifier = Modifier
 ) {
     val navigationActiveLabel = appString(R.string.navigation_active)
     val followRouteLabel = appString(R.string.navigation_follow_route)
-    val walkingModeLabel = appString(R.string.navigation_walk_mode)
     val destinationFallback = appString(R.string.destination_label)
     val resolvedDestination = destinationText.ifBlank { destinationFallback }
+    val actionLabel = navigationInstructionActionLabel(
+        maneuver = activeInstruction?.maneuver,
+        fallbackText = followRouteLabel
+    )
+    val instructionTitle = navigationInstructionHeadline(
+        instruction = activeInstruction,
+        actionLabel = actionLabel,
+        fallbackText = followRouteLabel
+    )
+    val instructionSubtitle = navigationInstructionSubtitle(
+        instruction = activeInstruction,
+        destinationText = resolvedDestination
+    )
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -469,53 +481,24 @@ private fun NavigationTopBanner(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = followRouteLabel,
+                            text = instructionTitle,
                             color = Color.White,
+                            modifier = Modifier.testTag("active_route_instruction"),
                             fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleLarge
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = resolvedDestination,
+                            text = instructionSubtitle,
                             color = Color.White.copy(alpha = 0.92f),
                             style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = Color.White.copy(alpha = 0.16f)
-                    ) {
-                        Text(
-                            text = etaText,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    NavigationStatusChip(
-                        icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                        text = walkingModeLabel,
-                        modifier = Modifier.weight(1f)
-                    )
-                    NavigationStatusChip(
-                        icon = Icons.Default.LocationOn,
-                        text = distanceText,
-                        modifier = Modifier.weight(1f)
-                    )
                 }
             }
         }
@@ -523,9 +506,125 @@ private fun NavigationTopBanner(
 }
 
 @Composable
-private fun NavigationInfoTile(
+private fun navigationInstructionActionLabel(
+    maneuver: NavigationManeuver?,
+    fallbackText: String
+): String {
+    return when (maneuver) {
+        NavigationManeuver.CONTINUE -> appString(R.string.navigation_instruction_continue)
+        NavigationManeuver.SLIGHT_LEFT -> appString(R.string.navigation_instruction_slight_left)
+        NavigationManeuver.LEFT -> appString(R.string.navigation_instruction_left)
+        NavigationManeuver.SHARP_LEFT -> appString(R.string.navigation_instruction_sharp_left)
+        NavigationManeuver.SLIGHT_RIGHT -> appString(R.string.navigation_instruction_slight_right)
+        NavigationManeuver.RIGHT -> appString(R.string.navigation_instruction_right)
+        NavigationManeuver.SHARP_RIGHT -> appString(R.string.navigation_instruction_sharp_right)
+        NavigationManeuver.U_TURN -> appString(R.string.navigation_instruction_uturn)
+        NavigationManeuver.ARRIVE -> appString(R.string.navigation_instruction_arrive)
+        null -> fallbackText
+    }
+}
+
+@Composable
+private fun navigationInstructionHeadline(
+    instruction: ActiveNavigationInstruction?,
+    actionLabel: String,
+    fallbackText: String
+): String {
+    if (instruction == null) {
+        return fallbackText
+    }
+
+    if (instruction.maneuver == NavigationManeuver.ARRIVE) {
+        return actionLabel
+    }
+
+    if (instruction.isCorrective && instruction.maneuver == NavigationManeuver.U_TURN) {
+        return appString(R.string.navigation_instruction_now_action, actionLabel)
+    }
+
+    val distanceLabel = formatDistanceLabel(instruction.distanceMeters)
+    return when {
+        instruction.maneuver == NavigationManeuver.CONTINUE && instruction.distanceMeters > 20.0 -> {
+            appString(R.string.navigation_instruction_continue_for_distance, distanceLabel)
+        }
+
+        instruction.distanceMeters <= 20.0 -> {
+            appString(R.string.navigation_instruction_now_action, actionLabel)
+        }
+
+        else -> {
+            appString(
+                R.string.navigation_instruction_in_distance_action,
+                distanceLabel,
+                actionLabel.replaceFirstChar { char ->
+                    char.lowercase(Locale.getDefault())
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun navigationInstructionSubtitle(
+    instruction: ActiveNavigationInstruction?,
+    destinationText: String
+): String {
+    if (instruction == null) {
+        return appString(
+            R.string.navigation_instruction_towards_destination,
+            compactDestinationText(destinationText)
+        )
+    }
+
+    val destinationHint = compactDestinationText(destinationText)
+    if (instruction.isCorrective) {
+        val followUpAction = navigationInstructionActionLabel(
+            maneuver = instruction.followUpManeuver,
+            fallbackText = appString(R.string.navigation_instruction_continue)
+        )
+        val followUpDistance = instruction.followUpDistanceMeters?.let(::formatDistanceLabel)
+        return if (followUpDistance != null) {
+            appString(
+                R.string.navigation_instruction_after_uturn_action,
+                followUpDistance,
+                followUpAction.replaceFirstChar { char ->
+                    char.lowercase(Locale.getDefault())
+                }
+            )
+        } else {
+            appString(
+                R.string.navigation_instruction_towards_destination,
+                destinationHint
+            )
+        }
+    }
+
+    return when (instruction.maneuver) {
+        NavigationManeuver.ARRIVE -> destinationHint
+        else -> appString(
+            R.string.navigation_instruction_towards_destination,
+            destinationHint
+        )
+    }
+}
+
+private fun compactDestinationText(destinationText: String): String {
+    val parts = destinationText
+        .split(",")
+        .map(String::trim)
+        .filter(String::isNotBlank)
+
+    return when {
+        parts.isEmpty() -> destinationText
+        parts.first().length >= 8 -> parts.first()
+        parts.size >= 2 -> "${parts[0]}, ${parts[1]}"
+        else -> parts.first()
+    }
+}
+
+@Composable
+private fun NavigationCompactMetric(
     icon: ImageVector,
-    label: String,
     value: String,
     accentColor: Color,
     modifier: Modifier = Modifier,
@@ -533,14 +632,14 @@ private fun NavigationInfoTile(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(999.dp))
             .background(Color(0xFFF6F8FB))
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
-            modifier = Modifier.size(38.dp),
-            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier.size(28.dp),
+            shape = RoundedCornerShape(10.dp),
             color = accentColor.copy(alpha = 0.12f)
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -548,30 +647,22 @@ private fun NavigationInfoTile(
                     imageVector = icon,
                     contentDescription = null,
                     tint = accentColor,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(14.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(8.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = label,
-                color = Color(0xFF70757A),
-                style = MaterialTheme.typography.labelMedium
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = value,
-                color = Color(0xFF202124),
-                modifier = if (valueTestTag != null) Modifier.testTag(valueTestTag) else Modifier,
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+        Text(
+            text = value,
+            color = Color(0xFF202124),
+            modifier = if (valueTestTag != null) Modifier.testTag(valueTestTag) else Modifier,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -580,142 +671,189 @@ private fun RouteActiveBottomBar(
     durationText: String,
     distanceText: String,
     etaText: String,
-    destinationText: String,
     onClose: () -> Unit
 ) {
     val closeLabel = appString(R.string.close)
     val remainingLabel = appString(R.string.navigation_remaining)
-    val distanceLabel = appString(R.string.navigation_distance)
-    val arrivalShortLabel = appString(R.string.navigation_arrival_short)
-    val destinationLabel = appString(R.string.destination_label)
-    val resolvedDestination = destinationText.ifBlank { destinationLabel }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 18.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 14.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = durationText,
+                    modifier = Modifier
+                        .semantics { testTag = "active_route_duration" }
+                        .testTag("active_route_duration"),
+                    color = Color(0xFF202124),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(modifier = Modifier.height(1.dp))
+                Text(
+                    text = remainingLabel,
+                    color = Color(0xFF5F6368),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            NavigationCompactMetric(
+                icon = Icons.Default.LocationOn,
+                value = distanceText,
+                accentColor = Color(0xFF1A73E8),
+                valueTestTag = "active_route_distance"
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            NavigationCompactMetric(
+                icon = Icons.Default.AccessTime,
+                value = etaText,
+                accentColor = Color(0xFF34A853),
+                valueTestTag = "active_route_eta"
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = Color(0xFFF1F3F4)
+            ) {
+                IconButton(
+                    onClick = onClose,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .semantics { testTag = "btn_close_route" }
+                        .testTag("btn_close_route")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = closeLabel,
+                        tint = Color(0xFF3D4A45)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteCompletionMetric(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFFF6F8FB))
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = label,
+            color = Color(0xFF5F6368),
+            style = MaterialTheme.typography.labelMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            color = Color(0xFF202124),
+            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun RouteCompletedBottomCard(
+    summary: RouteCompletionSummary,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp, vertical = 18.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = durationText,
-                        modifier = Modifier
-                            .semantics { testTag = "active_route_duration" }
-                            .testTag("active_route_duration"),
-                        color = Color(0xFF202124),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.headlineLarge
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = remainingLabel,
-                        color = Color(0xFF5F6368),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
+            Text(
+                text = appString(R.string.navigation_route_completed_title),
+                color = Color(0xFF202124),
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineSmall
+            )
 
-                Surface(
-                    modifier = Modifier.size(46.dp),
-                    shape = CircleShape,
-                    color = Color(0xFFF1F3F4)
-                ) {
-                    IconButton(
-                        onClick = onClose,
-                        modifier = Modifier
-                            .size(46.dp)
-                            .semantics { testTag = "btn_close_route" }
-                            .testTag("btn_close_route")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = closeLabel,
-                            tint = Color(0xFF3D4A45)
-                        )
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(6.dp))
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = appString(R.string.navigation_route_completed_message),
+                color = Color(0xFF5F6368),
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                NavigationInfoTile(
-                    icon = Icons.Default.LocationOn,
-                    label = distanceLabel,
-                    value = distanceText,
-                    accentColor = Color(0xFF1A73E8),
-                    modifier = Modifier
-                        .weight(1f),
-                    valueTestTag = "active_route_distance"
+                RouteCompletionMetric(
+                    label = appString(R.string.navigation_route_summary_distance),
+                    value = summary.distanceText,
+                    modifier = Modifier.weight(1f)
                 )
-                NavigationInfoTile(
-                    icon = Icons.Default.AccessTime,
-                    label = arrivalShortLabel,
-                    value = etaText,
-                    accentColor = Color(0xFF34A853),
-                    modifier = Modifier
-                        .weight(1f),
-                    valueTestTag = "active_route_eta"
+                RouteCompletionMetric(
+                    label = appString(R.string.navigation_route_summary_duration),
+                    value = summary.durationText,
+                    modifier = Modifier.weight(1f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
-            Row(
+            Button(
+                onClick = onClose,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0xFFF8FAFD))
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(52.dp)
+                    .semantics { testTag = "btn_exit_route" }
+                    .testTag("btn_exit_route"),
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1A73E8),
+                    contentColor = Color.White
+                )
             ) {
-                Surface(
-                    modifier = Modifier.size(42.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFFE8F0FE)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = Color(0xFF1A73E8),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = destinationLabel,
-                        color = Color(0xFF70757A),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = resolvedDestination,
-                        color = Color(0xFF202124),
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Text(
+                    text = appString(R.string.exit_route),
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
         }
     }
@@ -736,12 +874,14 @@ internal fun BoxScope.RouteExperienceOverlay(
     val sheetHeightPxState = remember { mutableFloatStateOf(0f) }
     var sheetOffsetPx by remember { mutableFloatStateOf(0f) }
     val routeBottomBarHeightPxState = remember { mutableFloatStateOf(0f) }
+    val routeCompletedCardHeightPxState = remember { mutableFloatStateOf(0f) }
 
     val visibleSheetHeightPx = with(density) { 150.dp.toPx() }
     val collapsedSheetOffset = max(0f, sheetHeightPxState.floatValue - visibleSheetHeightPx)
 
     val bottomPadding by animateDpAsState(
         targetValue = when {
+            uiState.routeCompleted -> with(density) { routeCompletedCardHeightPxState.floatValue.toDp() } + 18.dp
             uiState.modoRuta -> with(density) { routeBottomBarHeightPxState.floatValue.toDp() } + 18.dp
             uiState.destinoSeleccionado != null -> {
                 val currentVisibleHeightPx = sheetHeightPxState.floatValue - sheetOffsetPx
@@ -770,7 +910,7 @@ internal fun BoxScope.RouteExperienceOverlay(
     }
 
     AnimatedVisibility(
-        visible = uiState.modoRuta,
+        visible = uiState.modoRuta && !uiState.routeCompleted,
         enter = slideInVertically(initialOffsetY = { -it / 2 }),
         exit = slideOutVertically(targetOffsetY = { -it / 2 }),
         modifier = Modifier
@@ -780,8 +920,7 @@ internal fun BoxScope.RouteExperienceOverlay(
     ) {
         NavigationTopBanner(
             destinationText = uiState.textoDestino,
-            distanceText = uiState.distanceText,
-            etaText = uiState.etaText
+            activeInstruction = uiState.activeNavigationInstruction
         )
     }
 
@@ -835,7 +974,7 @@ internal fun BoxScope.RouteExperienceOverlay(
     }
 
     AnimatedVisibility(
-        visible = uiState.modoRuta,
+        visible = uiState.modoRuta && !uiState.routeCompleted,
         enter = slideInVertically(initialOffsetY = { it }),
         exit = slideOutVertically(targetOffsetY = { it }),
         modifier = Modifier
@@ -848,8 +987,25 @@ internal fun BoxScope.RouteExperienceOverlay(
             durationText = uiState.durationText,
             distanceText = uiState.distanceText,
             etaText = uiState.etaText,
-            destinationText = uiState.textoDestino,
             onClose = onClose
         )
+    }
+
+    AnimatedVisibility(
+        visible = uiState.routeCompleted && uiState.routeCompletionSummary != null,
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it }),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+    ) {
+        uiState.routeCompletionSummary?.let { summary ->
+            RouteCompletedBottomCard(
+                summary = summary,
+                onClose = onClose,
+                modifier = Modifier.onGloballyPositioned {
+                    routeCompletedCardHeightPxState.floatValue = it.size.height.toFloat()
+                }
+            )
+        }
     }
 }

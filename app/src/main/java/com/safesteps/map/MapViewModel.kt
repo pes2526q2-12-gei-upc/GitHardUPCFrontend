@@ -32,12 +32,19 @@ class MapViewModel(
         const val DEFAULT_DISTANCE_TEXT = "-- km"
         const val DEFAULT_DURATION_TEXT = "-- min"
         const val DEFAULT_ETA_TEXT = "--:--"
+        const val OFF_ROUTE_RECALCULATION_THRESHOLD_METERS = 200.0
+        const val OFF_ROUTE_RECALCULATION_COOLDOWN_MS = 15_000L
+        const val MIN_DISTANCE_FOR_ACTIVE_NAVIGATION_METERS = 30.0
     }
 
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
     private var currentLanguage: AppLanguage = AppLanguage.default
     private var searchJob: kotlinx.coroutines.Job? = null
+    private var navigationRoute: NavigationRouteModel? = null
+    private var currentRouteSummary: RouteSummary? = null
+    private var lastNavigationProgressMeters: Double = 0.0
+    private var lastAutomaticRecalculationAtMs: Long = 0L
 
     fun onLanguageChanged(language: AppLanguage) {
         currentLanguage = language
@@ -56,6 +63,7 @@ class MapViewModel(
     }
 
     fun clearRuta() {
+        resetNavigationState()
         _uiState.update {
             it.copy(
                 destinoSeleccionado = null,
@@ -65,6 +73,10 @@ class MapViewModel(
                 etaText = DEFAULT_ETA_TEXT,
                 rutaCoordenades = emptyList(),
                 modoRuta = false,
+                routeCompleted = false,
+                routeCompletionSummary = null,
+                activeNavigationInstruction = null,
+                navigationNotice = null,
                 adrecesSuggerides = emptyList(),
                 campActiu = textField.NONE,
                 isTyping = false,
@@ -76,9 +88,14 @@ class MapViewModel(
     }
 
     fun cancelarRutaVisual() {
+        resetNavigationState()
         _uiState.update { it.copy(
             rutaCoordenades = emptyList(),
             modoRuta = false,
+            routeCompleted = false,
+            routeCompletionSummary = null,
+            activeNavigationInstruction = null,
+            navigationNotice = null,
             distanceText = DEFAULT_DISTANCE_TEXT,
             durationText = DEFAULT_DURATION_TEXT,
             etaText = DEFAULT_ETA_TEXT,
@@ -90,6 +107,11 @@ class MapViewModel(
 
     fun updateLocation(location: Location) {
         _uiState.update { it.copy(ultimaUbicacion = location) }
+        refreshNavigationProgress(location.toCoordenada())
+    }
+
+    fun onNavigationNoticeConsumed() {
+        _uiState.update { it.copy(navigationNotice = null) }
     }
 
     fun onTextoBuscadorModificado(texto: String, campo: textField) {
@@ -225,12 +247,14 @@ class MapViewModel(
         destiLong: Double,
         destiLat: Double
     ) {
+        if (_uiState.value.calculantRuta) return
+
         val prioridad = _uiState.value.prioridadSeleccionada
         val routeWeights = routeWeightsFor(prioridad)
         Log.d("PRUEBA_RUTA", "Llamando a calcularRuta. Prioridad actual: $prioridad")
 
+        _uiState.update { it.copy(calculantRuta = true) }
         viewModelScope.launch {
-            _uiState.update { it.copy(calculantRuta = true) }
             try {
                 val infoRuta = obtenirCoordenadesRuta(
                     RouteCoordinatesRequest(
@@ -274,7 +298,19 @@ class MapViewModel(
     }
 
     fun iniciarNavegacio() {
-        _uiState.update { it.copy(modoRuta = true) }
+        lastNavigationProgressMeters = 0.0
+        _uiState.update {
+            it.copy(
+                modoRuta = true,
+                routeCompleted = false,
+                routeCompletionSummary = null,
+                navigationNotice = null
+            )
+        }
+        refreshNavigationProgress(
+            currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate(),
+            force = true
+        )
     }
 
     fun onMapaListo() {
@@ -359,9 +395,27 @@ class MapViewModel(
         routeDurationMinutes: Int,
         puntosInteres: List<PuntInteres>
     ) {
+        val currentState = _uiState.value
+        val totalDistanceMeters = tiempoDistancia.second
+            .takeIf { distance -> distance > 0.0 }
+            ?: estimateTotalDistanceMeters(coordenadas)
+
+        navigationRoute = buildNavigationRouteModel(
+            coordinates = coordenadas,
+            origin = routeOriginForState(currentState),
+            destination = currentState.destinoSeleccionado?.toCoordenada()
+        )
+        currentRouteSummary = RouteSummary(
+            totalDurationMinutes = routeDurationMinutes,
+            totalDistanceMeters = totalDistanceMeters
+        )
+        lastNavigationProgressMeters = 0.0
+
         _uiState.update {
             it.copy(
                 rutaCoordenades = coordenadas,
+                routeCompleted = false,
+                routeCompletionSummary = null,
                 distanceText = tiempoDistancia.second
                     .takeIf { distance -> distance > 0.0 }
                     ?.let(::formatDistance)
@@ -374,13 +428,193 @@ class MapViewModel(
                     .takeIf { duration -> duration > 0 }
                     ?.let(::formatEta)
                     ?: it.etaText,
+                activeNavigationInstruction = if (it.modoRuta) it.activeNavigationInstruction else null,
                 adrecesSuggerides = emptyList(),
                 campActiu = textField.NONE,
                 isTyping = false,
                 puntsInteres = puntosInteres
             )
         }
+
+        if (_uiState.value.modoRuta) {
+            refreshNavigationProgress(
+                currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate(),
+                force = true
+            )
+        }
     }
+
+    private fun resetNavigationState() {
+        navigationRoute = null
+        currentRouteSummary = null
+        lastNavigationProgressMeters = 0.0
+        lastAutomaticRecalculationAtMs = 0L
+    }
+
+    private fun refreshNavigationProgress(
+        currentLocation: Coordenada?,
+        force: Boolean = false
+    ) {
+        val route = navigationRoute ?: return
+        val location = currentLocation ?: return
+        val state = _uiState.value
+
+        if (!force && !state.modoRuta) {
+            return
+        }
+
+        if (state.routeCompleted) {
+            return
+        }
+
+        val progress = resolveNavigationProgress(
+            route = route,
+            currentLocation = location,
+            minimumProgressMeters = lastNavigationProgressMeters
+        )
+
+        if (shouldCompleteRoute(progress)) {
+            completeRoute(progress)
+            return
+        }
+
+        if (shouldAutomaticallyRecalculateRoute(state, progress)) {
+            triggerAutomaticRouteRecalculation(location)
+            return
+        }
+
+        lastNavigationProgressMeters = progress.progressMeters
+
+        val remainingDurationMinutes = remainingDurationMinutes(progress.instruction.remainingDistanceMeters)
+
+        _uiState.update {
+            it.copy(
+                activeNavigationInstruction = progress.instruction,
+                distanceText = formatDistance(progress.instruction.remainingDistanceMeters),
+                durationText = formatDuration(remainingDurationMinutes),
+                etaText = formatEta(remainingDurationMinutes)
+            )
+        }
+    }
+
+    private fun shouldAutomaticallyRecalculateRoute(
+        state: MapUiState,
+        progress: NavigationProgressResult
+    ): Boolean {
+        if (!state.modoRuta || state.calculantRuta || state.routeCompleted) {
+            return false
+        }
+
+        if (state.destinoSeleccionado == null) {
+            return false
+        }
+
+        if (progress.distanceToRouteMeters <= OFF_ROUTE_RECALCULATION_THRESHOLD_METERS) {
+            return false
+        }
+
+        if (progress.instruction.remainingDistanceMeters <= MIN_DISTANCE_FOR_ACTIVE_NAVIGATION_METERS) {
+            return false
+        }
+
+        val now = System.currentTimeMillis()
+        return now - lastAutomaticRecalculationAtMs >= OFF_ROUTE_RECALCULATION_COOLDOWN_MS
+    }
+
+    private fun triggerAutomaticRouteRecalculation(currentLocation: Coordenada) {
+        val destination = _uiState.value.destinoSeleccionado ?: return
+        lastAutomaticRecalculationAtMs = System.currentTimeMillis()
+        _uiState.update {
+            it.copy(
+                navigationNotice = textProvider.routeRecalculated(
+                    language = currentLanguage,
+                    distanceText = formatDistance(OFF_ROUTE_RECALCULATION_THRESHOLD_METERS)
+                )
+            )
+        }
+        calcularRuta(
+            origenLong = currentLocation.lon,
+            origenLat = currentLocation.lat,
+            destiLong = destination.longitude,
+            destiLat = destination.latitude
+        )
+    }
+
+    private fun shouldCompleteRoute(progress: NavigationProgressResult): Boolean {
+        return progress.instruction.maneuver == NavigationManeuver.ARRIVE &&
+            progress.instruction.remainingDistanceMeters <= ARRIVAL_DISTANCE_METERS
+    }
+
+    private fun completeRoute(progress: NavigationProgressResult) {
+        val routeSummary = currentRouteSummary
+        val totalDistanceMeters = routeSummary?.totalDistanceMeters
+            ?.takeIf { it > 0.0 }
+            ?: navigationRoute?.totalDistanceMeters
+            ?: progress.progressMeters
+        val totalDurationMinutes = routeSummary?.totalDurationMinutes ?: 0
+        lastNavigationProgressMeters = navigationRoute?.totalDistanceMeters ?: progress.progressMeters
+
+        _uiState.update {
+            it.copy(
+                routeCompleted = true,
+                routeCompletionSummary = RouteCompletionSummary(
+                    distanceText = formatDistance(totalDistanceMeters),
+                    durationText = totalDurationMinutes
+                        .takeIf { duration -> duration > 0 }
+                        ?.let(::formatDuration)
+                        ?: it.durationText
+                ),
+                activeNavigationInstruction = progress.instruction,
+                distanceText = formatDistance(progress.instruction.remainingDistanceMeters),
+                durationText = formatDuration(0),
+                etaText = DEFAULT_ETA_TEXT
+            )
+        }
+    }
+
+    private fun remainingDurationMinutes(remainingDistanceMeters: Double): Int {
+        if (remainingDistanceMeters <= 0.0) {
+            return 0
+        }
+
+        val routeSummary = currentRouteSummary
+        return when {
+            routeSummary != null &&
+                routeSummary.totalDurationMinutes > 0 &&
+                routeSummary.totalDistanceMeters > 0.0 -> {
+                max(
+                    1,
+                    (
+                        routeSummary.totalDurationMinutes.toDouble() *
+                            remainingDistanceMeters /
+                            routeSummary.totalDistanceMeters
+                        ).roundToInt()
+                )
+            }
+
+            else -> estimateMinutesFromDistanceMeters(remainingDistanceMeters)
+        }
+    }
+
+    private fun estimateTotalDistanceMeters(coordenadas: List<Coordenada>): Double {
+        return buildNavigationRouteModel(coordenadas)?.totalDistanceMeters ?: 0.0
+    }
+
+    private fun routeOriginForState(state: MapUiState): Coordenada? {
+        return if (state.modoRuta) {
+            state.ultimaUbicacion?.toCoordenada() ?: state.origenSeleccionado?.toCoordenada()
+        } else {
+            state.origenSeleccionado?.toCoordenada() ?: state.ultimaUbicacion?.toCoordenada()
+        }
+    }
+
+    private fun routeStartCoordinate(): Coordenada? {
+        return navigationRoute?.points?.firstOrNull()
+    }
+
+    private fun LatLng.toCoordenada(): Coordenada = Coordenada(lat = latitude, lon = longitude)
+
+    private fun Location.toCoordenada(): Coordenada = Coordenada(lat = latitude, lon = longitude)
 
     private data class RouteWeights(
         val seguretat: Float = 0f,
@@ -388,5 +622,10 @@ class MapViewModel(
         val ombra: Float = 0f,
         val eMecaniques: Float = 0f,
         val bancs: Float = 0f
+    )
+
+    private data class RouteSummary(
+        val totalDurationMinutes: Int,
+        val totalDistanceMeters: Double
     )
 }

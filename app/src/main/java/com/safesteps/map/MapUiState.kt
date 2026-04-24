@@ -13,6 +13,11 @@ enum class textField {
     DESTINY
 }
 
+data class RouteCompletionSummary(
+    val distanceText: String,
+    val durationText: String
+)
+
 data class MapUiState(
     val destinoSeleccionado: LatLng? = null,
     val textoOrigen: String = "",
@@ -33,6 +38,10 @@ data class MapUiState(
     val campActiu: textField = textField.NONE,
     val rutaCoordenades: List<Coordenada> = emptyList(),
     val modoRuta: Boolean = false,
+    val routeCompleted: Boolean = false,
+    val routeCompletionSummary: RouteCompletionSummary? = null,
+    val activeNavigationInstruction: ActiveNavigationInstruction? = null,
+    val navigationNotice: String? = null,
     val calculantRuta: Boolean = false,
     val puntsInteres: List<PuntInteres> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,

@@ -17,6 +17,13 @@ class MapTextProvider(
         return context.localizedContext(language).getString(R.string.selected_map_location)
     }
 
+    fun routeRecalculated(language: AppLanguage, distanceText: String): String {
+        return context.localizedContext(language).getString(
+            R.string.navigation_route_recalculated_notice,
+            distanceText
+        )
+    }
+
     fun photonLanguage(language: AppLanguage): String {
         return when (language.languageTag.substring(0, 2).lowercase(Locale.ROOT)) {
             "de" -> "de"

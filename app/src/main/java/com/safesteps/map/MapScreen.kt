@@ -255,12 +255,18 @@ private fun MapScreenEffects(
     LocationComponentActivationEffect(
         locationGranted = uiState.locationGranted,
         mapaListo = uiState.mapaListo,
+        ultimaUbicacion = uiState.ultimaUbicacion,
         mapView = mapView
     )
     RouteRecalculationEffect(
         destinoSeleccionado = uiState.destinoSeleccionado,
         origenSeleccionado = uiState.origenSeleccionado,
         ultimaUbicacion = uiState.ultimaUbicacion,
+        viewModel = viewModel
+    )
+    NavigationNoticeEffect(
+        navigationNotice = uiState.navigationNotice,
+        context = context,
         viewModel = viewModel
     )
     MapStyleRenderingEffect(
@@ -329,11 +335,15 @@ private fun InitialLocationPermissionEffect(
 private fun LocationComponentActivationEffect(
     locationGranted: Boolean,
     mapaListo: Boolean,
+    ultimaUbicacion: Location?,
     mapView: MapView
 ) {
-    LaunchedEffect(locationGranted, mapaListo) {
+    LaunchedEffect(locationGranted, mapaListo, ultimaUbicacion != null) {
         if (locationGranted && mapaListo) {
-            activateLocationComponent(mapView)
+            activateLocationComponent(
+                mapView = mapView,
+                initialLocation = ultimaUbicacion
+            )
         }
     }
 }
@@ -352,6 +362,22 @@ private fun RouteRecalculationEffect(
             selectedOrigin = origenSeleccionado,
             currentLocation = ultimaUbicacion
         )
+    }
+}
+
+@Composable
+private fun NavigationNoticeEffect(
+    navigationNotice: String?,
+    context: Context,
+    viewModel: MapViewModel
+) {
+    LaunchedEffect(navigationNotice) {
+        if (navigationNotice.isNullOrBlank()) {
+            return@LaunchedEffect
+        }
+
+        Toast.makeText(context, navigationNotice, Toast.LENGTH_SHORT).show()
+        viewModel.onNavigationNoticeConsumed()
     }
 }
 
@@ -596,9 +622,12 @@ private fun recenterOnCurrentLocation(
     }
 
     viewModel.limpiarOrigen()
-    activateLocationComponent(mapView)
-
     val currentLocation = uiState.ultimaUbicacion
+    activateLocationComponent(
+        mapView = mapView,
+        initialLocation = currentLocation
+    )
+
     if (currentLocation == null) {
         Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
         return
@@ -636,7 +665,8 @@ private fun renderMapStateAfterStyleLoaded(
     viewModel.onMapaListo()
     enableLocationOnMapIfNeeded(
         locationGranted = uiState.locationGranted,
-        mapView = mapView
+        mapView = mapView,
+        currentLocation = uiState.ultimaUbicacion
     )
 
     if (uiState.rutaCoordenades.isNotEmpty()) {
@@ -668,10 +698,14 @@ private fun renderMapStateAfterStyleLoaded(
 
 private fun enableLocationOnMapIfNeeded(
     locationGranted: Boolean,
-    mapView: MapView
+    mapView: MapView,
+    currentLocation: Location?
 ) {
     if (locationGranted) {
-        activateLocationComponent(mapView)
+        activateLocationComponent(
+            mapView = mapView,
+            initialLocation = currentLocation
+        )
     }
 }
 
@@ -682,10 +716,16 @@ private fun drawCurrentRoute(
     originLabel: String,
     destinationLabel: String
 ) {
+    val routeOrigin = if (uiState.modoRuta) {
+        uiState.ultimaUbicacion?.toLatLng() ?: uiState.origenSeleccionado
+    } else {
+        uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.toLatLng()
+    }
+
     drawRoute(
         mapView = mapView,
         coordenades = uiState.rutaCoordenades,
-        origen = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.toLatLng(),
+        origen = routeOrigin,
         desti = uiState.destinoSeleccionado,
         context = context,
         originTitle = originLabel,
