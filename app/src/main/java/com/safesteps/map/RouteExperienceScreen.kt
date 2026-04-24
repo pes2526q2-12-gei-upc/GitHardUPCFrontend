@@ -169,8 +169,7 @@ private fun RoutePlannerHeader(onClose: () -> Unit) {
 private fun RoutePrioritySelector(
     selectedPriority: RoutePriority,
     onPrioritySelected: (RoutePriority) -> Unit,
-    showProfilePreferences: Boolean = false,
-    onProfilePreferencesClick: () -> Unit = {}
+    showProfilePreferences: Boolean = false
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -217,11 +216,13 @@ private fun RoutePrioritySelector(
         if (showProfilePreferences) {
             RoutePriorityCompactOption(
                 title = appString(R.string.filter_preferences),
-                selected = false,
+                selected = selectedPriority == RoutePriority.PERSONALIZED,
                 icon = Icons.Default.Person,
                 activeColor = Color(0xFF6A768F),
-                onClick = onProfilePreferencesClick,
-                modifier = Modifier.fillMaxWidth()
+                onClick = { onPrioritySelected(RoutePriority.PERSONALIZED) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("btn_preferences")
             )
         }
     }

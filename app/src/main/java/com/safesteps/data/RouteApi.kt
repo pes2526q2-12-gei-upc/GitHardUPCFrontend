@@ -10,21 +10,21 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.POST
 
-data class RouteFilterWeights(
-    val seguretat: Float,
-    val fontsAigua: Float,
-    val ombra: Float,
-    val eMecaniques: Float,
-    val bancs: Float
-)
+enum class RouteType {
+    SEGURETAT,
+    CLIMA,
+    CONFORT,
+    PERSONALITZAT
+}
 
 data class RouteCoordinatesRequest(
+    val googleId: String? = null,
     val origenLong: Double,
     val origenLat: Double,
     val destiLong: Double,
     val destiLat: Double,
     val nRoutes: Int = 1,
-    val filters: RouteFilterWeights
+    val routeType: RouteType
 )
 
 private data class RoutePointRequest(
@@ -33,18 +33,11 @@ private data class RoutePointRequest(
 )
 
 private data class RouteRequestWithNRoutes(
+    val googleId: String? = null,
     val origin: RoutePointRequest,
     val destination: RoutePointRequest,
     val nRoutes: Int = 1,
-    val filtre: RouteFilterRequest
-)
-
-private data class RouteFilterRequest(
-    val seguretat: Float,
-    val fontsAigua: Float,
-    val ombra: Float,
-    val escalesMecaniques: Float,
-    val bancs: Float
+    val filtre: RouteType
 )
 
 private fun interface RouteCoordinatesApi {
@@ -75,12 +68,14 @@ suspend fun obtenirCoordenadesRuta(
     Log.d("ROUTE_API", "Enviando peticion al servidor")
     Log.d(
         "ROUTE_API",
-        "origin=(${request.origenLat}, ${request.origenLong}), " +
-            "destination=(${request.destiLat}, ${request.destiLong}), nRoutes=${request.nRoutes}"
+        "googleId=${request.googleId}, origin=(${request.origenLat}, ${request.origenLong}), " +
+            "destination=(${request.destiLat}, ${request.destiLong}), " +
+            "nRoutes=${request.nRoutes}, routeType=${request.routeType}"
     )
 
     val response = RouteCoordinatesBackend.service.calcularRuta(
         RouteRequestWithNRoutes(
+            googleId = request.googleId,
             origin = RoutePointRequest(
                 lat = request.origenLat,
                 lon = request.origenLong
@@ -90,13 +85,7 @@ suspend fun obtenirCoordenadesRuta(
                 lon = request.destiLong
             ),
             nRoutes = request.nRoutes,
-            filtre = RouteFilterRequest(
-                seguretat = request.filters.seguretat,
-                fontsAigua = request.filters.fontsAigua,
-                ombra = request.filters.ombra,
-                escalesMecaniques = request.filters.eMecaniques,
-                bancs = request.filters.bancs
-            )
+            filtre = request.routeType
         )
     )
 

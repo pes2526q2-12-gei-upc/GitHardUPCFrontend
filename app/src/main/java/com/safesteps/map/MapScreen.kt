@@ -109,6 +109,10 @@ fun MapLibreScreen(
         )
     }
 
+    LaunchedEffect(currentUser?.googleId) {
+        viewModel.onCurrentUserChanged(currentUser)
+    }
+
     MapScreenEffects(
         mapView = mapView,
         currentLanguage = currentLanguage,
@@ -159,7 +163,7 @@ fun MapLibreScreen(
 
         RouteExperienceOverlay(
             uiState = uiState,
-            showProfilePreferences = currentUser != null,
+            showProfilePreferences = !currentUser?.googleId.isNullOrBlank(),
             onPrioritySelected = onPrioritySelected,
             onStartRoute = {
                 viewModel.iniciarNavegacio()

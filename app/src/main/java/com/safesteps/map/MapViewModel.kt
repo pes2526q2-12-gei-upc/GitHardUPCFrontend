@@ -4,12 +4,13 @@ import android.location.Location
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.safesteps.auth.UserInfo
 import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
 import com.safesteps.data.PhotonApi
 import com.safesteps.data.PuntInteres
 import com.safesteps.data.RouteCoordinatesRequest
-import com.safesteps.data.RouteFilterWeights
+import com.safesteps.data.RouteType
 import com.safesteps.data.obtenirCoordenadesRuta
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
@@ -45,6 +46,7 @@ class MapViewModel(
     private var currentRouteSummary: RouteSummary? = null
     private var lastNavigationProgressMeters: Double = 0.0
     private var lastAutomaticRecalculationAtMs: Long = 0L
+    private var currentGoogleId: String? = null
 
     fun onLanguageChanged(language: AppLanguage) {
         currentLanguage = language
@@ -52,6 +54,10 @@ class MapViewModel(
 
     fun onPrioritySelected(prioridad: RoutePriority) {
         _uiState.update { it.copy(prioridadSeleccionada = prioridad) }
+    }
+
+    fun onCurrentUserChanged(user: UserInfo?) {
+        currentGoogleId = user?.googleId?.takeIf { it.isNotBlank() }
     }
 
     fun toggleEstiloSatelite() {
@@ -252,7 +258,7 @@ class MapViewModel(
         if (_uiState.value.calculantRuta) return
 
         val prioridad = _uiState.value.prioridadSeleccionada
-        val routeWeights = routeWeightsFor(prioridad)
+        val routeType = routeTypeFor(prioridad)
         Log.d("PRUEBA_RUTA", "Llamando a calcularRuta. Prioridad actual: $prioridad")
 
         _uiState.update { it.copy(calculantRuta = true) }
@@ -260,18 +266,13 @@ class MapViewModel(
             try {
                 val infoRuta = obtenirCoordenadesRuta(
                     RouteCoordinatesRequest(
+                        googleId = currentGoogleId,
                         origenLong = origenLong,
                         origenLat = origenLat,
                         destiLong = destiLong,
                         destiLat = destiLat,
                         nRoutes = 1,
-                        filters = RouteFilterWeights(
-                            seguretat = routeWeights.seguretat,
-                            fontsAigua = routeWeights.fontsAigua,
-                            ombra = routeWeights.ombra,
-                            eMecaniques = routeWeights.eMecaniques,
-                            bancs = routeWeights.bancs
-                        )
+                        routeType = routeType
                     )
                 )
 
@@ -376,7 +377,17 @@ class MapViewModel(
     }
 
     private fun formatDuration(durationMinutes: Int): String {
-        return if (durationMinutes > 0) "$durationMinutes min" else DEFAULT_DURATION_TEXT
+        if (durationMinutes <= 0) {
+            return DEFAULT_DURATION_TEXT
+        }
+
+        if (durationMinutes <= 60) {
+            return "$durationMinutes min"
+        }
+
+        val hours = durationMinutes / 60
+        val minutes = durationMinutes % 60
+        return "${hours}h y ${minutes}min"
     }
 
     private fun formatEta(durationMinutes: Int): String {
@@ -396,11 +407,12 @@ class MapViewModel(
         return Locale.forLanguageTag(currentLanguage.languageTag)
     }
 
-    private fun routeWeightsFor(priority: RoutePriority): RouteWeights {
+    private fun routeTypeFor(priority: RoutePriority): RouteType {
         return when (priority) {
-            RoutePriority.SAFETY -> RouteWeights(seguretat = 1f)
-            RoutePriority.ACCESSIBILITY -> RouteWeights(eMecaniques = 1f, bancs = 1f)
-            RoutePriority.HEAT -> RouteWeights(ombra = 1f, fontsAigua = 1f)
+            RoutePriority.SAFETY -> RouteType.SEGURETAT
+            RoutePriority.ACCESSIBILITY -> RouteType.CONFORT
+            RoutePriority.HEAT -> RouteType.CLIMA
+            RoutePriority.PERSONALIZED -> RouteType.PERSONALITZAT
         }
     }
 
@@ -639,14 +651,6 @@ class MapViewModel(
     private fun LatLng.toCoordenada(): Coordenada = Coordenada(lat = latitude, lon = longitude)
 
     private fun Location.toCoordenada(): Coordenada = Coordenada(lat = latitude, lon = longitude)
-
-    private data class RouteWeights(
-        val seguretat: Float = 0f,
-        val fontsAigua: Float = 0f,
-        val ombra: Float = 0f,
-        val eMecaniques: Float = 0f,
-        val bancs: Float = 0f
-    )
 
     private data class RouteSummary(
         val totalDurationMinutes: Int,
