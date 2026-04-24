@@ -18,11 +18,13 @@ class MapTextProvider(
     }
 
     fun photonLanguage(language: AppLanguage): String {
-        return when (language.languageTag.lowercase(Locale.ROOT)) {
-            "en" -> "en"
+        return when (language.languageTag.substring(0, 2).lowercase(Locale.ROOT)) {
             "de" -> "de"
             "fr" -> "fr"
-            else -> "default"
+            "it" -> "it"
+            "ca" -> "en"
+            "es" -> "en"
+            else -> "en"
         }
     }
 }

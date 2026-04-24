@@ -50,12 +50,11 @@ android {
 }
 
 jacoco {
-    toolVersion = "0.8.12" // Usamos exactamente la misma versión que el backend
+    toolVersion = "0.8.12"
 }
 
-// Creamos la tarea que ejecutará los tests y generará el XML
 tasks.register<JacocoReport>("jacocoTestReport") {
-    dependsOn("testDebugUnitTest") // Primero corren los tests
+    dependsOn("testDebugUnitTest")
 
     reports {
         xml.required.set(true)

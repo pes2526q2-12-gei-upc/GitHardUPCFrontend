@@ -64,6 +64,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import com.safesteps.R
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.appPlural
@@ -174,7 +177,9 @@ private fun RoutePrioritySelector(
                 icon = Icons.Default.Security,
                 activeColor = Color(0xFF1F4A85),
                 onClick = { onPrioritySelected(RoutePriority.SAFETY) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("btn_safety")
             )
 
             RoutePriorityCompactOption(
@@ -183,7 +188,9 @@ private fun RoutePrioritySelector(
                 icon = Icons.AutoMirrored.Filled.Accessible,
                 activeColor = Color(0xFF7FD7AA),
                 onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("btn_accessibility")
             )
 
             RoutePriorityCompactOption(
@@ -192,7 +199,9 @@ private fun RoutePrioritySelector(
                 icon = Icons.Default.WbSunny,
                 activeColor = Color(0xFFFF7B42),
                 onClick = { onPrioritySelected(RoutePriority.HEAT) },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("btn_clima")
             )
         }
 
@@ -221,7 +230,9 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
-            .padding(12.dp),
+            .padding(12.dp)
+            .semantics{ testTag = "btn_places" }
+            .testTag("btn_places"),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         if (fonts > 0) {
@@ -346,6 +357,8 @@ private fun RoutePlannerSheet(
                 onClick = onStartRoute,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .semantics { testTag = "btn_start_route" }
+                    .testTag("btn_start_route")
                     .height(56.dp),
                 shape = RoundedCornerShape(22.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -515,7 +528,8 @@ private fun NavigationInfoTile(
     label: String,
     value: String,
     accentColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    valueTestTag: String? = null
 ) {
     Row(
         modifier = modifier
@@ -551,6 +565,7 @@ private fun NavigationInfoTile(
             Text(
                 text = value,
                 color = Color(0xFF202124),
+                modifier = if (valueTestTag != null) Modifier.testTag(valueTestTag) else Modifier,
                 fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
@@ -596,6 +611,9 @@ private fun RouteActiveBottomBar(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = durationText,
+                        modifier = Modifier
+                            .semantics { testTag = "active_route_duration" }
+                            .testTag("active_route_duration"),
                         color = Color(0xFF202124),
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.headlineLarge
@@ -613,7 +631,13 @@ private fun RouteActiveBottomBar(
                     shape = CircleShape,
                     color = Color(0xFFF1F3F4)
                 ) {
-                    IconButton(onClick = onClose, modifier = Modifier.size(46.dp)) {
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier
+                            .size(46.dp)
+                            .semantics { testTag = "btn_close_route" }
+                            .testTag("btn_close_route")
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = closeLabel,
@@ -634,14 +658,18 @@ private fun RouteActiveBottomBar(
                     label = distanceLabel,
                     value = distanceText,
                     accentColor = Color(0xFF1A73E8),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f),
+                    valueTestTag = "active_route_distance"
                 )
                 NavigationInfoTile(
                     icon = Icons.Default.AccessTime,
                     label = arrivalShortLabel,
                     value = etaText,
                     accentColor = Color(0xFF34A853),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f),
+                    valueTestTag = "active_route_eta"
                 )
             }
 
