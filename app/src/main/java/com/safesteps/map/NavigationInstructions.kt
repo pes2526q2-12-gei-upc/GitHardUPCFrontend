@@ -238,6 +238,51 @@ internal fun resolveNavigationProgress(
     )
 }
 
+internal fun remainingRouteCoordinates(
+    route: NavigationRouteModel,
+    progressMeters: Double
+): List<Coordenada> {
+    if (route.points.isEmpty()) {
+        return emptyList()
+    }
+
+    val normalizedProgressMeters = progressMeters.coerceIn(0.0, route.totalDistanceMeters)
+    if (normalizedProgressMeters <= 0.0) {
+        return route.points
+    }
+
+    if (normalizedProgressMeters >= route.totalDistanceMeters) {
+        return emptyList()
+    }
+
+    for (index in 1 until route.cumulativeDistancesMeters.size) {
+        val segmentStartMeters = route.cumulativeDistancesMeters[index - 1]
+        val segmentEndMeters = route.cumulativeDistancesMeters[index]
+        if (normalizedProgressMeters > segmentEndMeters) {
+            continue
+        }
+
+        val segmentLengthMeters = segmentEndMeters - segmentStartMeters
+        val interpolatedPoint = if (segmentLengthMeters <= 0.0) {
+            route.points[index]
+        } else {
+            interpolateCoordinate(
+                start = route.points[index - 1],
+                end = route.points[index],
+                ratio = ((normalizedProgressMeters - segmentStartMeters) / segmentLengthMeters)
+                    .coerceIn(0.0, 1.0)
+            )
+        }
+
+        return buildList {
+            add(interpolatedPoint)
+            addAll(route.points.subList(index, route.points.size))
+        }.removeConsecutiveDuplicates()
+    }
+
+    return emptyList()
+}
+
 private fun List<Coordenada>.removeConsecutiveDuplicates(): List<Coordenada> {
     if (isEmpty()) {
         return emptyList()
@@ -251,6 +296,17 @@ private fun List<Coordenada>.removeConsecutiveDuplicates(): List<Coordenada> {
         }
     }
     return deduplicated
+}
+
+private fun interpolateCoordinate(
+    start: Coordenada,
+    end: Coordenada,
+    ratio: Double
+): Coordenada {
+    return Coordenada(
+        lat = start.lat + (end.lat - start.lat) * ratio,
+        lon = start.lon + (end.lon - start.lon) * ratio
+    )
 }
 
 private fun findAnchorIndexBackward(

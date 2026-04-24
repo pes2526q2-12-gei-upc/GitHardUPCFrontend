@@ -26,18 +26,56 @@ fun drawRoute(
     desti: LatLng?,
     context: Context,
     originTitle: String,
-    destinationTitle: String
+    destinationTitle: String,
+    clearAnnotations: Boolean = true,
+    disableLocationCameraBeforeDraw: Boolean = true,
+    fitCameraToRoute: Boolean = true
 ) {
     if (coordenades.isEmpty()) return
 
     mapView.getMapAsync { map ->
         if (map.style?.isFullyLoaded != true) return@getMapAsync
+        drawRouteOnMap(
+            map = map,
+            coordenades = coordenades,
+            origen = origen,
+            desti = desti,
+            context = context,
+            originTitle = originTitle,
+            destinationTitle = destinationTitle,
+            clearAnnotations = clearAnnotations,
+            disableLocationCameraBeforeDraw = disableLocationCameraBeforeDraw,
+            fitCameraToRoute = fitCameraToRoute
+        )
+    }
+}
 
+internal fun drawRouteOnMap(
+    map: org.maplibre.android.maps.MapLibreMap,
+    coordenades: List<Coordenada>,
+    origen: LatLng?,
+    desti: LatLng?,
+    context: Context,
+    originTitle: String,
+    destinationTitle: String,
+    clearAnnotations: Boolean = true,
+    disableLocationCameraBeforeDraw: Boolean = true,
+    fitCameraToRoute: Boolean = true
+) {
+    if (coordenades.isEmpty()) {
+        return
+    }
+
+    if (disableLocationCameraBeforeDraw) {
         disableLocationCamera(map)
+    }
+    if (clearAnnotations) {
         clearLegacyAnnotations(map)
-        val puntsRuta = buildRoutePoints(coordenades, origen, desti)
-        drawRoutePolyline(map, puntsRuta)
-        addRouteMarkers(map, origen, desti, context, originTitle, destinationTitle)
+    }
+    val puntsRuta = buildRoutePoints(coordenades, origen, desti)
+    drawRoutePolyline(map, puntsRuta)
+    addRouteMarkers(map, origen, desti, context, originTitle, destinationTitle)
+    if (fitCameraToRoute) {
         animateCameraToRoute(map, puntsRuta)
     }
 }

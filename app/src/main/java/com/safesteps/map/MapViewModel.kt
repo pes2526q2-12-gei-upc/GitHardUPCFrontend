@@ -36,6 +36,7 @@ class MapViewModel(
         const val OFF_ROUTE_RECALCULATION_THRESHOLD_METERS = 200.0
         const val OFF_ROUTE_RECALCULATION_COOLDOWN_MS = 15_000L
         const val MIN_DISTANCE_FOR_ACTIVE_NAVIGATION_METERS = 30.0
+        const val ROUTE_CONSUMPTION_MAX_DISTANCE_METERS = 30.0
     }
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -78,6 +79,7 @@ class MapViewModel(
                 durationText = DEFAULT_DURATION_TEXT,
                 etaText = DEFAULT_ETA_TEXT,
                 rutaCoordenades = emptyList(),
+                rutaVisibleCoordenades = emptyList(),
                 modoRuta = false,
                 navigationCameraFollowing = false,
                 routeCompleted = false,
@@ -98,6 +100,7 @@ class MapViewModel(
         resetNavigationState()
         _uiState.update { it.copy(
             rutaCoordenades = emptyList(),
+            rutaVisibleCoordenades = emptyList(),
             modoRuta = false,
             navigationCameraFollowing = false,
             routeCompleted = false,
@@ -449,6 +452,7 @@ class MapViewModel(
         _uiState.update {
             it.copy(
                 rutaCoordenades = coordenadas,
+                rutaVisibleCoordenades = coordenadas,
                 routeCompleted = false,
                 routeCompletionSummary = null,
                 distanceText = tiempoDistancia.second
@@ -527,7 +531,15 @@ class MapViewModel(
                 activeNavigationInstruction = progress.instruction,
                 distanceText = formatDistance(progress.instruction.remainingDistanceMeters),
                 durationText = formatDuration(remainingDurationMinutes),
-                etaText = formatEta(remainingDurationMinutes)
+                etaText = formatEta(remainingDurationMinutes),
+                rutaVisibleCoordenades = if (shouldConsumeRouteProgress(progress)) {
+                    remainingRouteCoordinates(
+                        route = route,
+                        progressMeters = progress.currentProgressMeters
+                    )
+                } else {
+                    it.rutaVisibleCoordenades
+                }
             )
         }
     }
@@ -603,9 +615,15 @@ class MapViewModel(
                 activeNavigationInstruction = progress.instruction,
                 distanceText = formatDistance(progress.instruction.remainingDistanceMeters),
                 durationText = formatDuration(0),
-                etaText = DEFAULT_ETA_TEXT
+                etaText = DEFAULT_ETA_TEXT,
+                rutaVisibleCoordenades = emptyList()
             )
         }
+    }
+
+    private fun shouldConsumeRouteProgress(progress: NavigationProgressResult): Boolean {
+        return !progress.instruction.isCorrective &&
+            progress.distanceToRouteMeters <= ROUTE_CONSUMPTION_MAX_DISTANCE_METERS
     }
 
     private fun remainingDurationMinutes(remainingDistanceMeters: Double): Int {

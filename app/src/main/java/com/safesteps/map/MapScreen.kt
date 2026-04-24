@@ -318,6 +318,13 @@ private fun MapScreenEffects(
         originLabel = originLabel,
         destinationLabel = destinationLabel
     )
+    RouteNavigationOverlayEffect(
+        mapView = mapView,
+        uiState = uiState,
+        context = context,
+        originLabel = originLabel,
+        destinationLabel = destinationLabel
+    )
     LocationUpdatesEffect(
         locationGranted = uiState.locationGranted,
         context = context,
@@ -474,6 +481,47 @@ private fun MapStyleRenderingEffect(
                     destinationLabel = destinationLabel
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun RouteNavigationOverlayEffect(
+    mapView: MapView,
+    uiState: MapUiState,
+    context: Context,
+    originLabel: String,
+    destinationLabel: String
+) {
+    LaunchedEffect(
+        uiState.modoRuta,
+        uiState.routeCompleted,
+        uiState.rutaVisibleCoordenades,
+        uiState.mostrarPuntsInteres,
+        uiState.puntsInteres,
+        uiState.origenSeleccionado,
+        uiState.destinoSeleccionado,
+        uiState.ultimaUbicacion?.latitude,
+        uiState.ultimaUbicacion?.longitude
+    ) {
+        if (!uiState.modoRuta && !uiState.routeCompleted) {
+            return@LaunchedEffect
+        }
+
+        mapView.getMapAsync { map ->
+            if (map.style?.isFullyLoaded != true) {
+                return@getMapAsync
+            }
+
+            renderMapAnnotations(
+                map = map,
+                uiState = uiState,
+                context = context,
+                originLabel = originLabel,
+                destinationLabel = destinationLabel,
+                fitCameraToRoute = false,
+                disableLocationCameraBeforeDraw = false
+            )
         }
     }
 }
@@ -845,31 +893,14 @@ private fun renderMapStateAfterStyleLoaded(
         headingDegrees = navigationHeadingDegrees?.toDouble(),
         applyZoom = false
     )
-
-    if (uiState.rutaCoordenades.isNotEmpty()) {
-        drawCurrentRoute(
-            mapView = mapView,
-            uiState = uiState,
-            context = context,
-            originLabel = originLabel,
-            destinationLabel = destinationLabel
-        )
-        addPoiMarkersIfVisible(
-            map = map,
-            mostrarPuntsInteres = uiState.mostrarPuntsInteres,
-            puntsInteres = uiState.puntsInteres,
-            context = context
-        )
-        return
-    }
-
-    addSelectionMarkers(
+    renderMapAnnotations(
         map = map,
+        uiState = uiState,
         context = context,
-        origin = uiState.origenSeleccionado,
-        destination = uiState.destinoSeleccionado,
         originLabel = originLabel,
-        destinationLabel = destinationLabel
+        destinationLabel = destinationLabel,
+        fitCameraToRoute = !uiState.modoRuta,
+        disableLocationCameraBeforeDraw = !uiState.modoRuta
     )
 }
 
@@ -908,11 +939,13 @@ private fun syncNavigationCameraTracking(
 }
 
 private fun drawCurrentRoute(
-    mapView: MapView,
+    map: MapLibreMap,
     uiState: MapUiState,
     context: Context,
     originLabel: String,
-    destinationLabel: String
+    destinationLabel: String,
+    fitCameraToRoute: Boolean,
+    disableLocationCameraBeforeDraw: Boolean
 ) {
     val routeOrigin = if (uiState.modoRuta) {
         uiState.ultimaUbicacion?.toLatLng() ?: uiState.origenSeleccionado
@@ -920,14 +953,56 @@ private fun drawCurrentRoute(
         uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.toLatLng()
     }
 
-    drawRoute(
-        mapView = mapView,
-        coordenades = uiState.rutaCoordenades,
+    drawRouteOnMap(
+        map = map,
+        coordenades = uiState.rutaVisibleCoordenades,
         origen = routeOrigin,
         desti = uiState.destinoSeleccionado,
         context = context,
         originTitle = originLabel,
-        destinationTitle = destinationLabel
+        destinationTitle = destinationLabel,
+        clearAnnotations = true,
+        disableLocationCameraBeforeDraw = disableLocationCameraBeforeDraw,
+        fitCameraToRoute = fitCameraToRoute
+    )
+}
+
+private fun renderMapAnnotations(
+    map: MapLibreMap,
+    uiState: MapUiState,
+    context: Context,
+    originLabel: String,
+    destinationLabel: String,
+    fitCameraToRoute: Boolean,
+    disableLocationCameraBeforeDraw: Boolean
+) {
+    if (uiState.rutaVisibleCoordenades.isNotEmpty()) {
+        drawCurrentRoute(
+            map = map,
+            uiState = uiState,
+            context = context,
+            originLabel = originLabel,
+            destinationLabel = destinationLabel,
+            fitCameraToRoute = fitCameraToRoute,
+            disableLocationCameraBeforeDraw = disableLocationCameraBeforeDraw
+        )
+        addPoiMarkersIfVisible(
+            map = map,
+            mostrarPuntsInteres = uiState.mostrarPuntsInteres,
+            puntsInteres = uiState.puntsInteres,
+            context = context
+        )
+        return
+    }
+
+    clearLegacyAnnotations(map)
+    addSelectionMarkers(
+        map = map,
+        context = context,
+        origin = uiState.origenSeleccionado,
+        destination = uiState.destinoSeleccionado,
+        originLabel = originLabel,
+        destinationLabel = destinationLabel
     )
 }
 
