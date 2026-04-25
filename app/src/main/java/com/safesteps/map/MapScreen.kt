@@ -1,4 +1,4 @@
-package com.safesteps.map
+﻿package com.safesteps.map
 
 import android.Manifest
 import android.content.Context
@@ -109,7 +109,7 @@ fun MapLibreScreen(
         )
     }
 
-    LaunchedEffect(currentUser?.googleId) {
+    LaunchedEffect(currentUser) {
         viewModel.onCurrentUserChanged(currentUser)
     }
 
@@ -927,7 +927,8 @@ private fun drawCurrentRoute(
         desti = uiState.destinoSeleccionado,
         context = context,
         originTitle = originLabel,
-        destinationTitle = destinationLabel
+        destinationTitle = destinationLabel,
+        routeColor = uiState.routeColor
     )
 }
 
@@ -1036,3 +1037,5 @@ private fun resolveMapStyleUrl(estiloSatelite: Boolean): String {
 }
 
 private fun Location.toLatLng(): LatLng = LatLng(latitude, longitude)
+
+

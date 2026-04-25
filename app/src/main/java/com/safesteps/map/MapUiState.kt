@@ -1,4 +1,4 @@
-package com.safesteps.map
+﻿package com.safesteps.map
 
 import android.location.Location
 import com.safesteps.data.Coordenada
@@ -41,9 +41,10 @@ data class MapUiState(
     val navigationCameraFollowing: Boolean = false,
     val routeCompleted: Boolean = false,
     val routeCompletionSummary: RouteCompletionSummary? = null,
-    val activeNavigationInstruction: ActiveNavigationInstruction? = null,
+    val activeNavigationInstruction: ActiveNavigationInstruction? = null,       
     val navigationNotice: String? = null,
     val calculantRuta: Boolean = false,
+    val routeColor: String? = null,
     val puntsInteres: List<PuntInteres> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
     val puntInteresSeleccionat: PuntInteres? = null

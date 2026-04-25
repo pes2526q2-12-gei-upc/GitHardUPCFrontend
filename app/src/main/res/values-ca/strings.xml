@@ -83,6 +83,14 @@
     <string name="delete_account_banner_message">Tota la teva informaci&#243;, incloses les incid&#232;ncies reportades i l\'historial de rutes, s\'esborrar&#224; de forma definitiva. Vols continuar?</string>
     <string name="cancel_action">Cancel&#183;la</string>
     <string name="confirm_action">Confirma</string>
+    <string name="profile_level">Nivell %1$d</string>
+    <string name="profile_points">%1$d / %2$d pts</string>
+    <string name="profile_customize">Personalitza</string>
+    <string name="customize_title">Personalitzar Perfil</string>
+    <string name="customize_photo">Foto de perfil</string>
+    <string name="customize_route_color">Color de ruta</string>
+    <string name="customize_name_style">Estil d\'usuari</string>
+    <string name="customize_change">Canviar</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d font</item>

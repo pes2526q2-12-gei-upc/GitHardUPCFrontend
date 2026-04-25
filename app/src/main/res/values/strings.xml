@@ -84,6 +84,14 @@
     <string name="delete_account_banner_message">All your information, including reported incidents and route history, will be permanently deleted. Do you want to continue?</string>
     <string name="cancel_action">Cancel</string>
     <string name="confirm_action">Confirm</string>
+    <string name="profile_level">Level %1$d</string>
+    <string name="profile_points">%1$d / %2$d pts</string>
+    <string name="profile_customize">Customize</string>
+    <string name="customize_title">Customize Profile</string>
+    <string name="customize_photo">Profile Photo</string>
+    <string name="customize_route_color">Route Color</string>
+    <string name="customize_name_style">Username Style</string>
+    <string name="customize_change">Change</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d fountain</item>

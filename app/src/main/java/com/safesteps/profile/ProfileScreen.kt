@@ -33,6 +33,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -109,6 +110,7 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit,
+    onCustomizeClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val totalFilterCount = profileFilterGroups.sumOf { it.filterResIds.size }
@@ -192,6 +194,25 @@ fun ProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 ProfileHeader(user = user)
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedButton(
+                    onClick = onCustomizeClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, Color(0xFFE5ECE7)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFFF9FBFA),
+                        contentColor = Color(0xFF23333A)
+                    )
+                ) {
+                    Text(
+                        text = appString(R.string.profile_customize),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(28.dp))
 
@@ -298,48 +319,118 @@ fun ProfileScreen(
 
 @Composable
 private fun ProfileHeader(user: UserInfo) {
-    if (!user.photoUrl.isNullOrBlank()) {
-        AsyncImage(
-            model = user.photoUrl,
-            contentDescription = appString(R.string.profile_photo),
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(96.dp)
-                .clip(CircleShape)
-        )
-    } else {
+    // Hardcoded points for testing/presentation
+    val points = 1045
+    val pointsPerLevel = 100
+    val maxLevel = 20
+
+    val currentLevel = (points / pointsPerLevel + 1).coerceAtMost(maxLevel)
+    val pointsInCurrentLevel = points % pointsPerLevel
+    val progress = if (currentLevel == maxLevel) 1f else pointsInCurrentLevel.toFloat() / pointsPerLevel
+
+    // The style changes every 5 levels
+    val tier = ((currentLevel - 1) / 5).coerceIn(0, 3)
+    val tierColor = when (tier) {
+        0 -> Color(0xFFB0BEC5) // Bronze/Silver
+        1 -> Color(0xFFFFD700) // Gold
+        2 -> Color(0xFF00E676) // Emerald
+        else -> Color(0xFFE040FB) // Diamond
+    }
+    val borderStroke = BorderStroke(if (tier == 0) 2.dp else (tier + 2).dp, tierColor)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Surface(
-            modifier = Modifier.size(96.dp),
             shape = CircleShape,
-            color = Color(0xFF6DD29A)
+            border = borderStroke,
+            modifier = Modifier.size(80.dp),
+            color = Color.Transparent
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(42.dp)
+            if (!user.photoUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = user.photoUrl,
+                    contentDescription = appString(R.string.profile_photo),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(borderStroke.width)
+                        .clip(CircleShape)
                 )
+            } else {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(borderStroke.width),
+                    shape = CircleShape,
+                    color = Color(0xFF6DD29A)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
             }
         }
+
+        Spacer(modifier = Modifier.width(20.dp))
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = user.username,
+                color = Color(0xFF23333A),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = user.email,
+                color = Color(0xFF77837D),
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = appString(R.string.profile_level, currentLevel),
+                    color = tierColor,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = appString(R.string.profile_points, pointsInCurrentLevel, pointsPerLevel),
+                    color = Color(0xFF77837D),
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = tierColor,
+                trackColor = Color(0xFFE5ECE7)
+            )
+        }
     }
-
-    Spacer(modifier = Modifier.height(18.dp))
-
-    Text(
-        text = user.username,
-        color = Color(0xFF23333A),
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.SemiBold
-    )
-
-    Spacer(modifier = Modifier.height(6.dp))
-
-    Text(
-        text = user.email,
-        color = Color(0xFF77837D),
-        style = MaterialTheme.typography.bodyLarge
-    )
 }
 
 @Composable

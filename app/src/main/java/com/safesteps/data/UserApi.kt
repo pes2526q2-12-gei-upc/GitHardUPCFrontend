@@ -1,4 +1,4 @@
-package com.safesteps.data
+﻿package com.safesteps.data
 
 import android.util.Log
 import com.safesteps.auth.UserInfo
@@ -25,7 +25,9 @@ enum class UserSyncResult {
 
 data class UserSyncOutcome(
     val result: UserSyncResult,
-    val languageTag: String
+    val languageTag: String,
+    // val routeColor: String? = null,
+    // val nameStyle: String? = "Normal"
 )
 
 private data class UserRequest(
@@ -34,7 +36,9 @@ private data class UserRequest(
     val googleId: String,
     val pictureUrl: String? = null,
     val language: String? = null,
-    val isAnonymous: Boolean
+    val isAnonymous: Boolean,
+    // val routeColor: String? = null,
+    // val nameStyle: String? = null
 )
 
 private data class UserResponse(
@@ -44,7 +48,9 @@ private data class UserResponse(
     val googleId: String? = null,
     val pictureUrl: String? = null,
     val language: String? = null,
-    val isAnonymous: Boolean? = null
+    val isAnonymous: Boolean? = null,
+    // val routeColor: String? = null,
+    // val nameStyle: String? = null
 )
 
 private interface UserApiService {
@@ -108,7 +114,9 @@ suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncOutcome {
             ensureSuccess(updateResponse, "actualizando el usuario")
             return UserSyncOutcome(
                 result = UserSyncResult.EXISTING_USER_UPDATED,
-                languageTag = resolvedLanguageTag
+                languageTag = resolvedLanguageTag,
+                // routeColor = existingUser.routeColor,
+                // nameStyle = existingUser.nameStyle
             )
         }
 
@@ -123,9 +131,12 @@ suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncOutcome {
             )
             val createResponse = UserBackend.service.createUser(createRequest)
             ensureSuccess(createResponse, "creando el usuario")
+            val createdUser = createResponse.body()
             return UserSyncOutcome(
                 result = UserSyncResult.NEW_USER_CREATED,
-                languageTag = resolvedLanguageTag
+                languageTag = resolvedLanguageTag,
+                // routeColor = createdUser?.routeColor,
+                // nameStyle = createdUser?.nameStyle
             )
         }
 
@@ -137,6 +148,7 @@ suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncOutcome {
     }
 }
 
+// suspend fun sincronizarPersonalizacionUsuario(user: UserInfo) { ... } (Commented out for now)
 suspend fun eliminarUsuarioDelBackend(googleId: String) {
     if (googleId.isBlank()) {
         throw IOException("Falta el googleId para eliminar el usuario del backend")
@@ -175,7 +187,9 @@ private fun buildUserRequest(
         googleId = user.googleId,
         pictureUrl = user.photoUrl,
         language = language,
-        isAnonymous = isAnonymous
+        isAnonymous = isAnonymous,
+        // routeColor = user.routeColor,
+        // nameStyle = user.nameStyle
     )
 }
 
@@ -197,3 +211,4 @@ private fun <T> ensureSuccess(
         throw IOException("Error $action: ${response.code()} ${response.message()}")
     }
 }
+

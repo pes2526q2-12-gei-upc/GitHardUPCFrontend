@@ -26,7 +26,8 @@ fun drawRoute(
     desti: LatLng?,
     context: Context,
     originTitle: String,
-    destinationTitle: String
+    destinationTitle: String,
+    routeColor: String? = null
 ) {
     if (coordenades.isEmpty()) return
 
@@ -36,7 +37,7 @@ fun drawRoute(
         disableLocationCamera(map)
         clearLegacyAnnotations(map)
         val puntsRuta = buildRoutePoints(coordenades, origen, desti)
-        drawRoutePolyline(map, puntsRuta)
+        drawRoutePolyline(map, puntsRuta, routeColor)
         addRouteMarkers(map, origen, desti, context, originTitle, destinationTitle)
         animateCameraToRoute(map, puntsRuta)
     }
@@ -78,11 +79,11 @@ private fun hasSameCoordinates(first: LatLng, second: LatLng): Boolean {
     return first.latitude == second.latitude && first.longitude == second.longitude
 }
 
-private fun drawRoutePolyline(map: org.maplibre.android.maps.MapLibreMap, puntsRuta: List<LatLng>) {
+private fun drawRoutePolyline(map: org.maplibre.android.maps.MapLibreMap, puntsRuta: List<LatLng>, routeColor: String? = null) {
     map.addPolyline(
         PolylineOptions()
             .addAll(puntsRuta)
-            .color("#1E88E5".toColorInt())
+            .color((routeColor ?: "#1E88E5").toColorInt())
             .width(6f)
     )
 }

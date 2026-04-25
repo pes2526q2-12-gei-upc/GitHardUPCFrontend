@@ -1,4 +1,4 @@
-package com.safesteps
+﻿package com.safesteps
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -32,7 +32,8 @@ import com.safesteps.profile.ProfileScreen
 
 private enum class SafeStepsDestination {
     MAP,
-    PROFILE
+    PROFILE,
+    CUSTOMIZE
 }
 
 private data class AuthNoticeTexts(
@@ -73,8 +74,12 @@ fun SafeStepsApp(
         onUserChanged = languageViewModel::onUserChanged
     )
 
-    BackHandler(enabled = isProfileDestination(currentDestination)) {
-        currentDestination = SafeStepsDestination.MAP
+    BackHandler(enabled = isProfileDestination(currentDestination) || currentDestination == SafeStepsDestination.CUSTOMIZE) {
+        if (currentDestination == SafeStepsDestination.CUSTOMIZE) {
+            currentDestination = SafeStepsDestination.PROFILE
+        } else {
+            currentDestination = SafeStepsDestination.MAP
+        }
     }
 
     SafeStepsLocalizedContent(
@@ -86,7 +91,8 @@ fun SafeStepsApp(
         onLanguageSelected = languageViewModel::onLanguageSelected,
         onLoginClick = onLoginClick,
         onNavigateToMap = { currentDestination = SafeStepsDestination.MAP },
-        onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE }
+        onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE },
+        onNavigateToCustomize = { currentDestination = SafeStepsDestination.CUSTOMIZE }
     )
 }
 
@@ -97,7 +103,7 @@ private fun HandleProfileRedirectEffect(
     onNavigateToMap: () -> Unit
 ) {
     LaunchedEffect(currentUser, currentDestination) {
-        if (currentUser == null && isProfileDestination(currentDestination)) {
+        if (currentUser == null && (isProfileDestination(currentDestination) || currentDestination == SafeStepsDestination.CUSTOMIZE)) {
             onNavigateToMap()
         }
     }
@@ -123,7 +129,8 @@ private fun SafeStepsLocalizedContent(
     onLanguageSelected: (AppLanguage) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
-    onNavigateToProfile: () -> Unit
+    onNavigateToProfile: () -> Unit,
+    onNavigateToCustomize: () -> Unit
 ) {
     ProvideLocalizedStrings(currentLanguage) {
         HandleAuthNoticeEffect(
@@ -151,11 +158,13 @@ private fun SafeStepsLocalizedContent(
             onLoginClick = onLoginClick,
             onNavigateToMap = onNavigateToMap,
             onNavigateToProfile = onNavigateToProfile,
+            onNavigateToCustomize = onNavigateToCustomize,
             onLogout = rememberLogoutToMapAction(
                 authViewModel = authViewModel,
                 onNavigateToMap = onNavigateToMap
             ),
-            onDeleteAccount = authViewModel::onDeleteAccountRequested
+            onDeleteAccount = authViewModel::onDeleteAccountRequested,
+            onUpdateUserProfile = authViewModel::onUpdateUserProfile
         )
     }
 }
@@ -196,22 +205,49 @@ private fun SafeStepsBody(
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit,
+    onNavigateToCustomize: () -> Unit,
     onLogout: () -> Unit,
-    onDeleteAccount: (UserInfo) -> Unit
+    onDeleteAccount: (UserInfo) -> Unit,
+    onUpdateUserProfile: (UserInfo) -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         val currentUser = authUiState.currentUser
 
-        if (isProfileDestination(currentDestination) && currentUser != null) {
-            ProfileScreen(
-                modifier = Modifier.fillMaxSize(),
-                user = currentUser,
-                currentLanguage = currentLanguage,
-                onLanguageSelected = onLanguageSelected,
-                onBack = onNavigateToMap,
-                onLogout = onLogout,
-                onDeleteAccount = { onDeleteAccount(currentUser) }
-            )
+        if (currentUser != null) {
+            when (currentDestination) {
+                SafeStepsDestination.PROFILE -> {
+                    ProfileScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        user = currentUser,
+                        currentLanguage = currentLanguage,
+                        onLanguageSelected = onLanguageSelected,
+                        onBack = onNavigateToMap,
+                        onLogout = onLogout,
+                        onDeleteAccount = { onDeleteAccount(currentUser) },
+                        onCustomizeClick = onNavigateToCustomize
+                    )
+                }
+                SafeStepsDestination.CUSTOMIZE -> {
+                    com.safesteps.profile.ProfileCustomizationScreen(
+                        user = currentUser,
+                        onSave = { updatedUser ->
+                            onUpdateUserProfile(updatedUser)
+                            onNavigateToProfile()
+                        },
+                        onCancel = onNavigateToProfile,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                else -> {
+                    MapLibreScreen(
+                        modifier = Modifier.fillMaxSize(),
+                        currentUser = currentUser,
+                        currentLanguage = currentLanguage,
+                        onLoginClick = onLoginClick,
+                        onProfileClick = onNavigateToProfile
+                    )
+                }
+            }
         } else {
             MapLibreScreen(
                 modifier = Modifier.fillMaxSize(),
@@ -255,3 +291,4 @@ private fun resolveAuthNoticeMessage(
 private fun isProfileDestination(destination: SafeStepsDestination): Boolean {
     return destination == SafeStepsDestination.PROFILE
 }
+

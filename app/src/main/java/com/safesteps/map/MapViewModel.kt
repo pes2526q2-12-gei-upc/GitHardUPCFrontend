@@ -1,4 +1,4 @@
-package com.safesteps.map
+﻿package com.safesteps.map
 
 import android.location.Location
 import android.util.Log
@@ -58,6 +58,8 @@ class MapViewModel(
 
     fun onCurrentUserChanged(user: UserInfo?) {
         currentGoogleId = user?.googleId?.takeIf { it.isNotBlank() }
+        _uiState.update { it.copy(routeColor = user?.routeColor) }
+
     }
 
     fun toggleEstiloSatelite() {
@@ -164,7 +166,7 @@ class MapViewModel(
                         state.copy(adrecesSuggerides = resultatsNets)
                     }
                 } catch (e: Exception) {
-                    Log.e("PhotonAPI", "Error en la petició: ${e.message}")
+                    Log.e("PhotonAPI", "Error en la peticiÃ³: ${e.message}")
                     _uiState.update { it.copy(adrecesSuggerides = emptyList()) }
                 }
             }
@@ -657,3 +659,6 @@ class MapViewModel(
         val totalDistanceMeters: Double
     )
 }
+
+
+
