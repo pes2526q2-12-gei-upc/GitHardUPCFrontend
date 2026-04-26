@@ -190,50 +190,49 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
+                Button(
+                    onClick = {
+                        showDeleteBanner = false
+                        onLogout()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFC86A37),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = appString(R.string.log_out),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Button(
-                        onClick = {
-                            showDeleteBanner = false
-                            onLogout()
-                        },
-                        modifier = Modifier
-                            .weight(1.35f)
-                            .height(54.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFC86A37),
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            text = appString(R.string.log_out),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    Button(
+                    OutlinedButton(
                         onClick = { showDeleteBanner = true },
-                        modifier = Modifier
-                            .weight(0.95f)
-                            .height(54.dp),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFF8E2D8),
-                            contentColor = Color(0xFF8F3D1B)
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, Color(0xFFD58A63)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color(0xFFB76435)
                         ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = appString(R.string.delete_account_short),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2
+                            color = Color(0xFFB76435),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.End
                         )
                     }
                 }
