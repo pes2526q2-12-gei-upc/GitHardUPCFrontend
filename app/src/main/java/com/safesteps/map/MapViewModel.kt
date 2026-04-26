@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.max
@@ -381,13 +381,7 @@ class MapViewModel(
             return DEFAULT_DURATION_TEXT
         }
 
-        if (durationMinutes <= 60) {
-            return "$durationMinutes min"
-        }
-
-        val hours = durationMinutes / 60
-        val minutes = durationMinutes % 60
-        return "${hours}h y ${minutes}min"
+        return formatReadableDuration(durationMinutes)
     }
 
     private fun formatEta(durationMinutes: Int): String {
@@ -395,7 +389,8 @@ class MapViewModel(
         val calendar = Calendar.getInstance().apply {
             add(Calendar.MINUTE, durationMinutes)
         }
-        return SimpleDateFormat("h:mm a", localeForCurrentLanguage()).format(calendar.time)
+        return DateFormat.getTimeInstance(DateFormat.SHORT, localeForCurrentLanguage())
+            .format(calendar.time)
     }
 
     private fun estimateMinutesFromDistanceMeters(distanceMeters: Double): Int {
@@ -656,4 +651,19 @@ class MapViewModel(
         val totalDurationMinutes: Int,
         val totalDistanceMeters: Double
     )
+}
+
+internal fun formatReadableDuration(durationMinutes: Int): String {
+    require(durationMinutes > 0) {
+        "durationMinutes must be greater than 0"
+    }
+
+    val hours = durationMinutes / 60
+    val minutes = durationMinutes % 60
+
+    return when {
+        hours == 0 -> "$durationMinutes min"
+        minutes == 0 -> "$hours h"
+        else -> "$hours h $minutes min"
+    }
 }
