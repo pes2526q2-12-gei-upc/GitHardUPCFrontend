@@ -590,12 +590,14 @@ private fun routeOverlayBottomPadding(
     routeBottomBarHeightPx: Float,
     routeCompletedCardHeightPx: Float
 ): Dp {
+    val plannerFloatingActionsClearance = 40.dp
+
     return when {
         uiState.routeCompleted -> with(density) { routeCompletedCardHeightPx.toDp() } + 18.dp
         uiState.modoRuta -> with(density) { routeBottomBarHeightPx.toDp() } + 18.dp
         uiState.destinoSeleccionado != null -> {
             val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
-            with(density) { currentVisibleHeightPx.toDp() } + 16.dp
+            with(density) { currentVisibleHeightPx.toDp() } + plannerFloatingActionsClearance
         }
 
         else -> 16.dp
