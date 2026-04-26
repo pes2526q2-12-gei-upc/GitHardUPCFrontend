@@ -7,30 +7,48 @@ import org.junit.Test
 class ProfileFiltersTest {
 
     @Test
-    fun `backend default weights map to medium slider values`() {
-        val uiModel = UserFilters().toProfileFiltersUiModel()
-
-        assertEquals(List(PROFILE_FILTER_COUNT) { 1 }, uiModel.values)
+    fun `filter catalog matches the backend contract`() {
+        assertEquals(
+            listOf(
+                "cameresSeguretat",
+                "comissaries",
+                "fetsPenals",
+                "infraccions",
+                "bancs",
+                "contaminacioAcustica",
+                "escalesMecaniques",
+                "fontsAigua",
+                "arbres",
+                "qualitatAire",
+                "refugisClimatics"
+            ),
+            profileFilterKeys.map(ProfileFilterKey::backendName)
+        )
+        assertEquals(11, PROFILE_FILTER_COUNT)
     }
 
     @Test
-    fun `slider values map back to expected backend weights`() {
-        val uiModel = ProfileFiltersUiModel(
-            values = listOf(0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2)
+    fun `user filters round trip through the profile ui model`() {
+        val filters = UserFilters(
+            comissaries = 0.25,
+            fetsPenals = 0.5,
+            cameresSeguretat = 0.75,
+            infraccions = 1.0,
+            fontsAigua = 0.25,
+            bancs = 0.5,
+            contaminacioAcustica = 0.75,
+            escalesMecaniques = 1.0,
+            arbres = 0.25,
+            refugisClimatics = 0.5,
+            qualitatAire = 0.75
         )
 
-        val filters = uiModel.toUserFilters()
+        val uiModel = filters.toProfileFiltersUiModel()
 
-        assertEquals(0.25, filters.cameresSeguretat, 0.0)
-        assertEquals(0.5, filters.comissaries, 0.0)
-        assertEquals(0.75, filters.fetsPenals, 0.0)
-        assertEquals(1.0, filters.infraccions, 0.0)
-        assertEquals(0.25, filters.bancs, 0.0)
-        assertEquals(0.5, filters.contaminacioAcustica, 0.0)
-        assertEquals(0.75, filters.escalesMecaniques, 0.0)
-        assertEquals(1.0, filters.fontsAigua, 0.0)
-        assertEquals(0.25, filters.arbres, 0.0)
-        assertEquals(0.5, filters.qualitatAire, 0.0)
-        assertEquals(0.75, filters.refugisClimatics, 0.0)
+        assertEquals(
+            listOf(2, 0, 1, 3, 1, 2, 3, 0, 0, 2, 1),
+            uiModel.values
+        )
+        assertEquals(filters, uiModel.toUserFilters())
     }
 }

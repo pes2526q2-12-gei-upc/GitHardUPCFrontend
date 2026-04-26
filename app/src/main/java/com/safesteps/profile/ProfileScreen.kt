@@ -1,5 +1,6 @@
 package com.safesteps.profile
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,12 +25,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -79,52 +77,6 @@ private val filterLevelDescriptionResIds = listOf(
     R.string.filter_level_required_description
 )
 
-private data class ProfileFilterGroup(
-    val titleResId: Int,
-    val descriptionResId: Int,
-    val icon: ImageVector,
-    val accentColor: Color,
-    val filterResIds: List<Int>
-)
-
-private val profileFilterGroups = listOf(
-    ProfileFilterGroup(
-        titleResId = R.string.filter_safety,
-        descriptionResId = R.string.profile_filter_group_safety_description,
-        icon = Icons.Default.Security,
-        accentColor = Color(0xFF2A5F8A),
-        filterResIds = listOf(
-            R.string.profile_filter_security_cameras,
-            R.string.profile_filter_police_stations,
-            R.string.profile_filter_criminal_incidents,
-            R.string.profile_filter_user_reported_incidents
-        )
-    ),
-    ProfileFilterGroup(
-        titleResId = R.string.filter_comfort,
-        descriptionResId = R.string.profile_filter_group_comfort_description,
-        icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-        accentColor = Color(0xFF388E6C),
-        filterResIds = listOf(
-            R.string.profile_filter_benches,
-            R.string.profile_filter_noise_pollution,
-            R.string.profile_filter_escalators,
-            R.string.profile_filter_drinking_fountains
-        )
-    ),
-    ProfileFilterGroup(
-        titleResId = R.string.filter_climate,
-        descriptionResId = R.string.profile_filter_group_climate_description,
-        icon = Icons.Default.WbSunny,
-        accentColor = Color(0xFFD97832),
-        filterResIds = listOf(
-            R.string.profile_filter_trees,
-            R.string.profile_filter_air_quality,
-            R.string.profile_filter_climate_shelters
-        )
-    )
-)
-
 @Composable
 fun ProfileScreen(
     user: UserInfo,
@@ -142,6 +94,7 @@ fun ProfileScreen(
     var expandedGroups by rememberSaveable {
         mutableStateOf(List(profileFilterGroups.size) { false })
     }
+    var isFiltersSectionExpanded by rememberSaveable { mutableStateOf(false) }
     var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
 
     Column(
@@ -220,9 +173,13 @@ fun ProfileScreen(
 
                 ProfileFiltersSection(
                     filterValues = filterValues,
+                    expanded = isFiltersSectionExpanded,
                     expandedGroups = expandedGroups,
                     isLoadingFilters = isLoadingFilters,
                     areFiltersEnabled = areFiltersEnabled,
+                    onExpandedChange = {
+                        isFiltersSectionExpanded = !isFiltersSectionExpanded
+                    },
                     onExpandedGroupToggle = { groupIndex ->
                         expandedGroups = expandedGroups.toMutableList().also { groups ->
                             groups[groupIndex] = !groups[groupIndex]
@@ -300,15 +257,18 @@ fun ProfileScreen(
 @Composable
 private fun ProfileFiltersSection(
     filterValues: List<Int>,
+    expanded: Boolean,
     expandedGroups: List<Boolean>,
     isLoadingFilters: Boolean,
     areFiltersEnabled: Boolean,
+    onExpandedChange: () -> Unit,
     onExpandedGroupToggle: (Int) -> Unit,
     onFilterValueChange: (Int, Int) -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize()
             .border(1.dp, Color(0xFFD7E5DC), RoundedCornerShape(26.dp)),
         shape = RoundedCornerShape(26.dp),
         color = Color(0xFFF2F7F3)
@@ -326,12 +286,34 @@ private fun ProfileFiltersSection(
                     .fillMaxWidth()
                     .padding(horizontal = 18.dp, vertical = 18.dp)
             ) {
-                Text(
-                    text = appString(R.string.profile_filters_intro_title),
-                    color = Color(0xFF23333A),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(18.dp))
+                        .clickable(onClick = onExpandedChange)
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        modifier = Modifier.weight(1f),
+                        text = appString(R.string.profile_filters_intro_title),
+                        color = Color(0xFF23333A),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Icon(
+                        imageVector = if (expanded) {
+                            Icons.Default.ExpandLess
+                        } else {
+                            Icons.Default.ExpandMore
+                        },
+                        contentDescription = null,
+                        tint = Color(0xFF5C6A64)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(6.dp))
 
@@ -349,38 +331,40 @@ private fun ProfileFiltersSection(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                if (expanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                var filterOffset = 0
-                profileFilterGroups.forEachIndexed { groupIndex, group ->
-                    val groupStartIndex = filterOffset
+                    var filterOffset = 0
+                    profileFilterGroups.forEachIndexed { groupIndex, group ->
+                        val groupStartIndex = filterOffset
 
-                    FilterAccordion(
-                        title = appString(group.titleResId),
-                        description = appString(group.descriptionResId),
-                        accentColor = group.accentColor,
-                        icon = group.icon,
-                        filterCountText = appPlural(
-                            R.plurals.profile_filter_count,
-                            group.filterResIds.size,
-                            group.filterResIds.size
-                        ),
-                        expanded = expandedGroups[groupIndex],
-                        filterLabels = group.filterResIds.map { appString(it) },
-                        filterValues = group.filterResIds.indices.map { localIndex ->
-                            filterValues.getOrElse(groupStartIndex + localIndex) { 1 }
-                        },
-                        enabled = areFiltersEnabled,
-                        onExpandedChange = { onExpandedGroupToggle(groupIndex) },
-                        onValueChange = { localIndex, newValue ->
-                            onFilterValueChange(groupStartIndex + localIndex, newValue)
+                        FilterAccordion(
+                            title = appString(group.titleResId),
+                            description = appString(group.descriptionResId),
+                            accentColor = group.accentColor,
+                            icon = group.icon,
+                            filterCountText = appPlural(
+                                R.plurals.profile_filter_count,
+                                group.filters.size,
+                                group.filters.size
+                            ),
+                            expanded = expandedGroups[groupIndex],
+                            filterLabels = group.filters.map { appString(it.labelResId) },
+                            filterValues = group.filters.indices.map { localIndex ->
+                                filterValues.getOrElse(groupStartIndex + localIndex) { 1 }
+                            },
+                            enabled = areFiltersEnabled,
+                            onExpandedChange = { onExpandedGroupToggle(groupIndex) },
+                            onValueChange = { localIndex, newValue ->
+                                onFilterValueChange(groupStartIndex + localIndex, newValue)
+                            }
+                        )
+
+                        filterOffset += group.filters.size
+
+                        if (groupIndex < profileFilterGroups.lastIndex) {
+                            Spacer(modifier = Modifier.height(12.dp))
                         }
-                    )
-
-                    filterOffset += group.filterResIds.size
-
-                    if (groupIndex < profileFilterGroups.lastIndex) {
-                        Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
             }

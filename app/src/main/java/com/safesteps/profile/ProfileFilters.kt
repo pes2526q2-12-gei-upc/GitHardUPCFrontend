@@ -2,9 +2,10 @@ package com.safesteps.profile
 
 import com.safesteps.data.UserFilters
 
-internal const val PROFILE_FILTER_COUNT = 11
-
 private val FILTER_LEVEL_WEIGHTS = listOf(0.25, 0.5, 0.75, 1.0)
+private val profileFilterIndexes = profileFilterKeys.withIndex().associate { (index, key) ->
+    key to index
+}
 
 internal data class ProfileFiltersUiModel(
     val values: List<Int> = List(PROFILE_FILTER_COUNT) { 1 }
@@ -35,36 +36,46 @@ internal data class ProfileFiltersUiModel(
 
 internal fun ProfileFiltersUiModel.toUserFilters(): UserFilters {
     return UserFilters(
-        cameresSeguretat = values[0].toFilterWeight(),
-        comissaries = values[1].toFilterWeight(),
-        fetsPenals = values[2].toFilterWeight(),
-        infraccions = values[3].toFilterWeight(),
-        bancs = values[4].toFilterWeight(),
-        contaminacioAcustica = values[5].toFilterWeight(),
-        escalesMecaniques = values[6].toFilterWeight(),
-        fontsAigua = values[7].toFilterWeight(),
-        arbres = values[8].toFilterWeight(),
-        qualitatAire = values[9].toFilterWeight(),
-        refugisClimatics = values[10].toFilterWeight()
+        comissaries = filterWeight(ProfileFilterKey.COMISSARIES),
+        fetsPenals = filterWeight(ProfileFilterKey.FETS_PENALS),
+        cameresSeguretat = filterWeight(ProfileFilterKey.CAMERES_SEGURETAT),
+        infraccions = filterWeight(ProfileFilterKey.INFRACCIONS),
+        fontsAigua = filterWeight(ProfileFilterKey.FONTS_AIGUA),
+        bancs = filterWeight(ProfileFilterKey.BANCS),
+        contaminacioAcustica = filterWeight(ProfileFilterKey.CONTAMINACIO_ACUSTICA),
+        escalesMecaniques = filterWeight(ProfileFilterKey.ESCALES_MECANIQUES),
+        arbres = filterWeight(ProfileFilterKey.ARBRES),
+        refugisClimatics = filterWeight(ProfileFilterKey.REFUGIS_CLIMATICS),
+        qualitatAire = filterWeight(ProfileFilterKey.QUALITAT_AIRE)
     )
 }
 
 internal fun UserFilters.toProfileFiltersUiModel(): ProfileFiltersUiModel {
     return ProfileFiltersUiModel(
-        values = listOf(
-            cameresSeguretat.toSliderValue(),
-            comissaries.toSliderValue(),
-            fetsPenals.toSliderValue(),
-            infraccions.toSliderValue(),
-            bancs.toSliderValue(),
-            contaminacioAcustica.toSliderValue(),
-            escalesMecaniques.toSliderValue(),
-            fontsAigua.toSliderValue(),
-            arbres.toSliderValue(),
-            qualitatAire.toSliderValue(),
-            refugisClimatics.toSliderValue()
-        )
+        values = profileFilterKeys.map { filterKey ->
+            valueFor(filterKey).toSliderValue()
+        }
     )
+}
+
+private fun ProfileFiltersUiModel.filterWeight(filterKey: ProfileFilterKey): Double {
+    return values[profileFilterIndexes.getValue(filterKey)].toFilterWeight()
+}
+
+private fun UserFilters.valueFor(filterKey: ProfileFilterKey): Double {
+    return when (filterKey) {
+        ProfileFilterKey.CAMERES_SEGURETAT -> cameresSeguretat
+        ProfileFilterKey.COMISSARIES -> comissaries
+        ProfileFilterKey.FETS_PENALS -> fetsPenals
+        ProfileFilterKey.INFRACCIONS -> infraccions
+        ProfileFilterKey.BANCS -> bancs
+        ProfileFilterKey.CONTAMINACIO_ACUSTICA -> contaminacioAcustica
+        ProfileFilterKey.ESCALES_MECANIQUES -> escalesMecaniques
+        ProfileFilterKey.FONTS_AIGUA -> fontsAigua
+        ProfileFilterKey.ARBRES -> arbres
+        ProfileFilterKey.QUALITAT_AIRE -> qualitatAire
+        ProfileFilterKey.REFUGIS_CLIMATICS -> refugisClimatics
+    }
 }
 
 private fun Int.toFilterWeight(): Double {

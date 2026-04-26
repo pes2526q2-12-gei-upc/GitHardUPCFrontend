@@ -52,7 +52,7 @@
     <string name="profile_filter_security_cameras">Security cameras</string>
     <string name="profile_filter_police_stations">Police stations</string>
     <string name="profile_filter_criminal_incidents">Criminal incidents</string>
-    <string name="profile_filter_user_reported_incidents">Incidents reported by other users</string>
+    <string name="profile_filter_infractions">Infractions</string>
     <string name="profile_filter_benches">Benches</string>
     <string name="profile_filter_noise_pollution">Noise pollution</string>
     <string name="profile_filter_escalators">Escalators</string>
@@ -60,11 +60,11 @@
     <string name="profile_filter_trees">Trees</string>
     <string name="profile_filter_air_quality">Air quality</string>
     <string name="profile_filter_climate_shelters">Climate shelters</string>
-    <string name="profile_filter_group_safety_description">Cameras, police stations and reported incidents</string>
+    <string name="profile_filter_group_safety_description">Cameras, police stations, criminal activity and infractions</string>
     <string name="profile_filter_group_comfort_description">Benches, fountains and walking support</string>
     <string name="profile_filter_group_climate_description">Shade, air quality and heat shelters</string>
-    <string name="profile_filters_intro_title">Route preferences</string>
-    <string name="profile_filters_intro_message">They adjust the route to your preferences.</string>
+    <string name="profile_filters_intro_title">Customize your route filters</string>
+    <string name="profile_filters_intro_message">Open this section to choose how much each factor should influence your route.</string>
     <string name="profile_filters_section_hint">Move each slider to indicate how much weight that factor should have.</string>
     <string name="profile_filters_sync_loading">Refreshing from API</string>
     <string name="profile_filters_sync_saving">Saving changes</string>

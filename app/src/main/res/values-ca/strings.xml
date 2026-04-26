@@ -51,7 +51,7 @@
     <string name="profile_filter_security_cameras">C&#224;meres de seguretat</string>
     <string name="profile_filter_police_stations">Comissaries</string>
     <string name="profile_filter_criminal_incidents">Fets penals</string>
-    <string name="profile_filter_user_reported_incidents">Incid&#232;ncies reportades per altres usuaris</string>
+    <string name="profile_filter_infractions">Infraccions</string>
     <string name="profile_filter_benches">Bancs</string>
     <string name="profile_filter_noise_pollution">Contaminaci&#243; ac&#250;stica</string>
     <string name="profile_filter_escalators">Escales mec&#224;niques</string>
@@ -59,11 +59,11 @@
     <string name="profile_filter_trees">Arbres</string>
     <string name="profile_filter_air_quality">Qualitat de l\'aire</string>
     <string name="profile_filter_climate_shelters">Refugis clim&#224;tics</string>
-    <string name="profile_filter_group_safety_description">C&#224;meres, comissaries i incid&#232;ncies reportades</string>
+    <string name="profile_filter_group_safety_description">C&#224;meres, comissaries, fets penals i infraccions</string>
     <string name="profile_filter_group_comfort_description">Bancs, fonts i suport per caminar amb m&#233;s comoditat</string>
     <string name="profile_filter_group_climate_description">Ombra, qualitat de l\'aire i refugis davant la calor</string>
-    <string name="profile_filters_intro_title">Preferències de ruta</string>
-    <string name="profile_filters_intro_message">Ajusten la ruta segons les teves prefer&#232;ncies.</string>
+    <string name="profile_filters_intro_title">Personalitza els teus filtres de ruta</string>
+    <string name="profile_filters_intro_message">Obre aquesta secci&#243; per decidir quant ha d\'influir cada factor en la teva ruta.</string>
     <string name="profile_filters_section_hint">Mou cada slider per indicar quant pes ha de tenir aquest factor.</string>
     <string name="profile_filters_sync_loading">Actualitzant des de l\'API</string>
     <string name="profile_filters_sync_saving">Guardant canvis</string>
