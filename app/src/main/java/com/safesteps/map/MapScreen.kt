@@ -461,8 +461,24 @@ private fun MapStyleRenderingEffect(
         uiState.origenSeleccionado,
         uiState.destinoSeleccionado
     ) {
+        val targetStyleUrl = resolveMapStyleUrl(uiState.estiloSatelite)
         mapView.getMapAsync { map ->
-            map.setStyle(resolveMapStyleUrl(uiState.estiloSatelite)) {
+            val currentStyle = map.style
+            if (currentStyle?.isFullyLoaded == true && currentStyle.uri == targetStyleUrl) {
+                renderMapStateAfterStyleLoaded(
+                    map = map,
+                    mapView = mapView,
+                    uiState = uiState,
+                    context = context,
+                    viewModel = viewModel,
+                    navigationHeadingDegrees = navigationHeadingDegrees,
+                    originLabel = originLabel,
+                    destinationLabel = destinationLabel
+                )
+                return@getMapAsync
+            }
+
+            map.setStyle(targetStyleUrl) {
                 renderMapStateAfterStyleLoaded(
                     map = map,
                     mapView = mapView,

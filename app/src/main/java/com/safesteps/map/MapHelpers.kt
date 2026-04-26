@@ -45,6 +45,8 @@ import kotlin.math.abs
 private const val NAVIGATION_CAMERA_TRANSITION_DURATION_MS = 900L
 private const val NAVIGATION_CAMERA_ZOOM = 17.0
 private const val NAVIGATION_CAMERA_TILT = 45.0
+private const val EMULATOR_NAVIGATION_CAMERA_BEARING = 0.0
+private const val EMULATOR_NAVIGATION_CAMERA_TILT = 0.0
 private const val NAVIGATION_HEADING_MIN_DELTA_DEGREES = 6f
 
 fun hasFineLocationPermission(context: Context): Boolean {
@@ -354,17 +356,28 @@ private fun updateNavigationCamera(
     applyZoom: Boolean
 ) {
     val currentPosition = map.cameraPosition
+    val useStaticNavigationCamera = isProbablyEmulator()
+    val targetBearing = if (useStaticNavigationCamera) {
+        EMULATOR_NAVIGATION_CAMERA_BEARING
+    } else {
+        when {
+            headingDegrees != null -> headingDegrees
+            location.hasBearing() -> location.bearing.toDouble()
+            else -> currentPosition.bearing
+        }
+    }
+    val targetTilt = if (useStaticNavigationCamera) {
+        EMULATOR_NAVIGATION_CAMERA_TILT
+    } else if (applyZoom) {
+        NAVIGATION_CAMERA_TILT
+    } else {
+        currentPosition.tilt
+    }
     val targetPosition = CameraPosition.Builder()
         .target(LatLng(location.latitude, location.longitude))
         .zoom(if (applyZoom) NAVIGATION_CAMERA_ZOOM else currentPosition.zoom)
-        .bearing(
-            when {
-                headingDegrees != null -> headingDegrees
-                location.hasBearing() -> location.bearing.toDouble()
-                else -> currentPosition.bearing
-            }
-        )
-        .tilt(if (applyZoom) NAVIGATION_CAMERA_TILT else currentPosition.tilt)
+        .bearing(targetBearing)
+        .tilt(targetTilt)
         .build()
 
     map.animateCamera(
