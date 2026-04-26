@@ -46,5 +46,6 @@ data class MapUiState(
     val calculantRuta: Boolean = false,
     val puntsInteres: List<PuntInteres> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
-    val puntInteresSeleccionat: PuntInteres? = null
+    val puntInteresSeleccionat: PuntInteres? = null,
+    val mostrarIncidencies: Boolean = true
 )

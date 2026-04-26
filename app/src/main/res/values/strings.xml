@@ -84,6 +84,7 @@
     <string name="delete_account_banner_message">All your information, including reported incidents and route history, will be permanently deleted. Do you want to continue?</string>
     <string name="cancel_action">Cancel</string>
     <string name="confirm_action">Confirm</string>
+    <string name="report_issue">Issue</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d fountain</item>

@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -56,7 +57,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.modifier.modifierLocalConsumer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -530,9 +530,11 @@ internal fun BoxScope.MapFloatingActions(
     standardMapStyleLabel: String,
     satelliteMapStyleLabel: String,
     myLocationLabel: String,
+    reportIssueLabel: String,
     onTogglePuntsInteres: () -> Unit,
     onToggleMapStyle: () -> Unit,
-    onMyLocationClick: () -> Unit
+    onMyLocationClick: () -> Unit,
+    onReportIssueClick: () -> Unit
 ) {
     AnimatedVisibility(
         visible = true,
@@ -573,6 +575,14 @@ internal fun BoxScope.MapFloatingActions(
                 modifier = Modifier
                     .width(132.dp)
                     .testTag("btn_satellit")
+            )
+
+            MapActionCircleButton(
+                icon = Icons.Default.ReportProblem,
+                contentDescription = reportIssueLabel,
+                iconTint = Color(0xFFE53935),
+                onClick = onReportIssueClick,
+                modifier = Modifier.testTag("btn_incidencies")
             )
 
             MapActionCircleButton(

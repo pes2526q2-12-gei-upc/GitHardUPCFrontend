@@ -116,3 +116,8 @@ name: Sanity Test
 
 - tapOn:
     id: "btn_ubicacio_actual"
+
+- extendedWaitUntil:
+     visible:
+         id: "btn_incidencies"
+     timeout: 10000

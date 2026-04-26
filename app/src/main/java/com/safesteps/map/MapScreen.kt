@@ -46,7 +46,8 @@ private data class MapScreenStrings(
     val standardMapStyleLabel: String,
     val satelliteMapStyleLabel: String,
     val myLocationLabel: String,
-    val calculatingBestRouteLabel: String
+    val calculatingBestRouteLabel: String,
+    val reportIssueLabel: String
 )
 
 @Composable
@@ -192,7 +193,9 @@ fun MapLibreScreen(
             myLocationLabel = strings.myLocationLabel,
             onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
             onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
-            onMyLocationClick = onCenterCurrentLocation
+            onMyLocationClick = onCenterCurrentLocation,
+            reportIssueLabel = strings.reportIssueLabel,
+            onReportIssueClick = { viewModel.toggleMenuIncidencies(true) }
         )
 
         CalculatingRouteOverlay(
@@ -215,7 +218,8 @@ private fun mapScreenStrings(): MapScreenStrings {
         standardMapStyleLabel = appString(R.string.map_style_standard),
         satelliteMapStyleLabel = appString(R.string.map_style_satellite),
         myLocationLabel = appString(R.string.my_location),
-        calculatingBestRouteLabel = appString(R.string.calculating_best_route)
+        calculatingBestRouteLabel = appString(R.string.calculating_best_route),
+        reportIssueLabel = appString(R.string.report_issue)
     )
 }
 

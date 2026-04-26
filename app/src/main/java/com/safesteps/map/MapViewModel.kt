@@ -656,4 +656,8 @@ class MapViewModel(
         val totalDurationMinutes: Int,
         val totalDistanceMeters: Double
     )
+
+    fun toggleMenuIncidencies(show: Boolean){
+        _uiState.update { it.copy(mostrarIncidencies = show) }
+    }
 }

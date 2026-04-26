@@ -83,6 +83,8 @@
     <string name="delete_account_banner_message">Tota la teva informaci&#243;, incloses les incid&#232;ncies reportades i l\'historial de rutes, s\'esborrar&#224; de forma definitiva. Vols continuar?</string>
     <string name="cancel_action">Cancel&#183;la</string>
     <string name="confirm_action">Confirma</string>
+    <string name="report_issue">Incidencia</string>
+
 
     <plurals name="poi_fountains">
         <item quantity="one">%d font</item>
