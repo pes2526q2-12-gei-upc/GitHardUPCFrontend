@@ -1,6 +1,8 @@
 package com.safesteps.map
 
 import android.location.Location
+import androidx.annotation.StringRes
+import com.safesteps.R
 import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
 import com.safesteps.data.PuntInteres
@@ -11,6 +13,11 @@ enum class textField {
     NONE,
     ORIGIN,
     DESTINY
+}
+
+enum class IssueType(@StringRes val labelRes: Int) {
+    WORKSITE(R.string.issue_type_worksite),
+    OTHERS(R.string.issue_type_others)
 }
 
 data class RouteCompletionSummary(
@@ -47,5 +54,5 @@ data class MapUiState(
     val puntsInteres: List<PuntInteres> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
     val puntInteresSeleccionat: PuntInteres? = null,
-    val mostrarIncidencies: Boolean = true
+    val mostrarIncidencies: Boolean = false
 )

@@ -9,6 +9,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
@@ -201,6 +204,25 @@ fun MapLibreScreen(
         CalculatingRouteOverlay(
             visible = uiState.calculantRuta,
             calculatingBestRouteLabel = strings.calculatingBestRouteLabel
+        )
+
+        ReportIssueDialog(
+            visible = uiState.mostrarIncidencies,
+            isLoggedIn = currentUser != null,
+            defaultLocationText = appString(R.string.my_location),
+            onDismiss = { viewModel.toggleMenuIncidencies(false) },
+            onConfirm = {
+                viewModel.toggleMenuIncidencies(false)
+                val missatge = context.getString(R.string.report_registered)
+                Toast.makeText(context, missatge, Toast.LENGTH_SHORT).show()
+            },
+            onNavigateToLogin = onLoginClick,
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false
+            ),
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .padding(horizontal = 16.dp)
         )
     }
 }
@@ -1015,7 +1037,7 @@ private fun findSelectedPoi(
 ): PuntInteres? {
     return puntsInteres.find { punt ->
         punt.latitud == markerPosition.latitude &&
-            punt.longitud == markerPosition.longitude
+                punt.longitud == markerPosition.longitude
     }
 }
 

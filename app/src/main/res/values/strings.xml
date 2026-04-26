@@ -85,6 +85,18 @@
     <string name="cancel_action">Cancel</string>
     <string name="confirm_action">Confirm</string>
     <string name="report_issue">Issue</string>
+    <string name="issue_type_worksite">Worksite</string>
+    <string name="issue_type_others">Others</string>
+    <string name="report_issue_failed_label">Restricted action</string>
+    <string name="report_issue_failed_text">Only users can report issue for security reasons</string>
+    <string name="report_issue_title">Report Issue</string>
+    <string name="report_location_placeholder">Ex: Carrer d\'arago, 20</string>
+    <string name="report_type_label">Issue Type:</string>
+    <string name="report_description_label">Description:</string>
+    <string name="report_description_placeholder">Describe the reason and/or details of the issue</string>
+    <string name="report_error_msg_text">Select an ubication and fill the description of the issue</string>
+    <string name="report_location_label">Location:</string>
+    <string name="report_registered">Issue registered correctly</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d fountain</item>

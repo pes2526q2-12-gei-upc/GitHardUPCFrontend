@@ -84,6 +84,19 @@
     <string name="cancel_action">Cancel&#183;la</string>
     <string name="confirm_action">Confirma</string>
     <string name="report_issue">Incidencia</string>
+    <string name="issue_type_worksite">Obres</string>
+    <string name="issue_type_others">Altres</string>
+    <string name="report_issue_failed_label">Acció restringida</string>
+    <string name="report_issue_failed_text">Unicament els usuaris registrats poden reportar incidències per motius de seguretat</string>
+    <string name="report_issue_title">Informar incidencia</string>
+    <string name="report_location_placeholder">Ex: Carrer d\'arago, 20</string>
+    <string name="report_type_label">Tipus d\'incidència:</string>
+    <string name="report_description_label">Descripció:</string>
+    <string name="report_description_placeholder">Descriu el motiu i detalls de la incidència</string>
+    <string name="report_error_msg_text">Selecciona una ubicació i omple la descripció de la incidència</string>
+    <string name="report_location_label">Ubicació:</string>
+    <string name="report_registered">Incidència registrada correctament</string>
+
 
 
     <plurals name="poi_fountains">
