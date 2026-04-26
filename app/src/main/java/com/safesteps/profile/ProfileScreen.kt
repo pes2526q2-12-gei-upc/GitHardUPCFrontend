@@ -106,6 +106,9 @@ fun ProfileScreen(
     user: UserInfo,
     currentLanguage: AppLanguage,
     onLanguageSelected: (AppLanguage) -> Unit,
+    filterValues: List<Int>,
+    onFilterValueChange: (Int, Int) -> Unit,
+    areFiltersEnabled: Boolean,
     onBack: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit,
@@ -117,9 +120,6 @@ fun ProfileScreen(
         mutableStateOf(List(profileFilterGroups.size) { false })
     }
     var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
-    var filterValues by rememberSaveable {
-        mutableStateOf(List(totalFilterCount) { 1 })
-    }
 
     Column(
         modifier = modifier
@@ -209,17 +209,16 @@ fun ProfileScreen(
                         expanded = expandedGroups[groupIndex],
                         filterLabels = group.filterResIds.map { appString(it) },
                         filterValues = group.filterResIds.indices.map { localIndex ->
-                            filterValues[groupStartIndex + localIndex]
+                            filterValues.getOrElse(groupStartIndex + localIndex) { 1 }
                         },
+                        enabled = areFiltersEnabled,
                         onExpandedChange = {
                             expandedGroups = expandedGroups.toMutableList().also { groups ->
                                 groups[groupIndex] = !groups[groupIndex]
                             }
                         },
                         onValueChange = { localIndex, newValue ->
-                            filterValues = filterValues.toMutableList().also { values ->
-                                values[groupStartIndex + localIndex] = newValue
-                            }
+                            onFilterValueChange(groupStartIndex + localIndex, newValue)
                         }
                     )
 
@@ -349,6 +348,7 @@ private fun FilterAccordion(
     expanded: Boolean,
     filterLabels: List<String>,
     filterValues: List<Int>,
+    enabled: Boolean,
     onExpandedChange: () -> Unit,
     onValueChange: (Int, Int) -> Unit
 ) {
@@ -398,7 +398,8 @@ private fun FilterAccordion(
                 filterLabels.forEachIndexed { index, label ->
                     FilterPreferenceControl(
                         title = label,
-                        value = filterValues[index],
+                        value = filterValues.getOrElse(index) { 1 },
+                        enabled = enabled,
                         onValueChange = { onValueChange(index, it) }
                     )
 
@@ -415,9 +416,11 @@ private fun FilterAccordion(
 private fun FilterPreferenceControl(
     title: String,
     value: Int,
+    enabled: Boolean,
     onValueChange: (Int) -> Unit
 ) {
-    val selectedLabel = appString(filterLevelResIds[value])
+    val safeValue = value.coerceIn(0, filterLevelResIds.lastIndex)
+    val selectedLabel = appString(filterLevelResIds[safeValue])
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -444,10 +447,11 @@ private fun FilterPreferenceControl(
     Spacer(modifier = Modifier.height(6.dp))
 
     Slider(
-        value = value.toFloat(),
+        value = safeValue.toFloat(),
         onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 3)) },
         valueRange = 0f..3f,
         steps = 2,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth()
     )
 
@@ -458,9 +462,9 @@ private fun FilterPreferenceControl(
             Text(
                 modifier = Modifier.weight(1f),
                 text = appString(labelResId),
-                color = if (index == value) Color(0xFF23333A) else Color(0xFF8A948F),
+                color = if (index == safeValue) Color(0xFF23333A) else Color(0xFF8A948F),
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = if (index == value) FontWeight.SemiBold else FontWeight.Normal,
+                fontWeight = if (index == safeValue) FontWeight.SemiBold else FontWeight.Normal,
                 textAlign = when (index) {
                     0 -> TextAlign.Start
                     filterLevelResIds.lastIndex -> TextAlign.End

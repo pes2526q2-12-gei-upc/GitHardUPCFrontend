@@ -17,7 +17,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40381/"
+private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40384/"
 private const val USERS_PATH = "api/v1/users"
 
 enum class UserSyncResult {
@@ -28,6 +28,20 @@ enum class UserSyncResult {
 data class UserSyncOutcome(
     val result: UserSyncResult,
     val languageTag: String
+)
+
+data class UserFilters(
+    val comissaries: Double = 0.5,
+    val fetsPenals: Double = 0.5,
+    val cameresSeguretat: Double = 0.5,
+    val infraccions: Double = 0.5,
+    val fontsAigua: Double = 0.5,
+    val bancs: Double = 0.5,
+    val contaminacioAcustica: Double = 0.5,
+    val escalesMecaniques: Double = 0.5,
+    val arbres: Double = 0.5,
+    val refugisClimatics: Double = 0.5,
+    val qualitatAire: Double = 0.5
 )
 
 private data class UserRequest(
@@ -47,6 +61,35 @@ private data class UserResponse(
     val pictureUrl: String? = null,
     val language: String? = null,
     val isAnonymous: Boolean? = null
+)
+
+private data class FilterRequest(
+    val comissaries: Double? = null,
+    val fetsPenals: Double? = null,
+    val cameresSeguretat: Double? = null,
+    val infraccions: Double? = null,
+    val fontsAigua: Double? = null,
+    val bancs: Double? = null,
+    val contaminacioAcustica: Double? = null,
+    val escalesMecaniques: Double? = null,
+    val arbres: Double? = null,
+    val refugisClimatics: Double? = null,
+    val qualitatAire: Double? = null
+)
+
+private data class UserFiltersResponse(
+    val googleId: String? = null,
+    val comissaries: Double? = null,
+    val fetsPenals: Double? = null,
+    val cameresSeguretat: Double? = null,
+    val infraccions: Double? = null,
+    val fontsAigua: Double? = null,
+    val bancs: Double? = null,
+    val contaminacioAcustica: Double? = null,
+    val escalesMecaniques: Double? = null,
+    val arbres: Double? = null,
+    val refugisClimatics: Double? = null,
+    val qualitatAire: Double? = null
 )
 
 private interface UserApiService {
@@ -71,6 +114,12 @@ private interface UserApiService {
         @Path("googleId") googleId: String,
         @Query("lang") language: String
     ): Response<UserResponse>
+
+    @PUT("$USERS_PATH/{googleId}/filters")
+    suspend fun updateFilters(
+        @Path("googleId") googleId: String,
+        @Body request: FilterRequest
+    ): Response<UserFiltersResponse>
 
     @DELETE("$USERS_PATH/{googleId}")
     suspend fun deleteUser(
@@ -217,6 +266,59 @@ suspend fun updateLenguage(
         ?: language.languageTag
 }
 
+suspend fun cargarFiltrosUsuario(googleId: String): UserFilters {
+    if (googleId.isBlank()) {
+        throw IOException("Falta el googleId para cargar los filtros del usuario")
+    }
+
+    Log.d("USER_API", "Cargando filtros del usuario: googleId=$googleId")
+
+    // El backend actual solo expone PUT /filters. Enviando un body vacio
+    // se obtienen los valores persistidos sin modificar ninguno.
+    val response = UserBackend.service.updateFilters(googleId, FilterRequest())
+    if (response.isSuccessful) {
+        return response.body()?.toUserFilters() ?: UserFilters()
+    }
+
+    if (response.code() == 404) {
+        Log.w(
+            "USER_API",
+            "El endpoint de filtros no esta desplegado en este backend. Se usan filtros por defecto."
+        )
+        return UserFilters()
+    }
+
+    throw IOException("Error cargando los filtros del usuario: ${response.code()} ${response.message()}")
+}
+
+suspend fun actualizarFiltrosUsuario(
+    googleId: String,
+    filters: UserFilters
+): UserFilters {
+    if (googleId.isBlank()) {
+        throw IOException("Falta el googleId para actualizar los filtros del usuario")
+    }
+
+    Log.d("USER_API", "Actualizando filtros del usuario: googleId=$googleId")
+
+    val response = UserBackend.service.updateFilters(googleId, filters.toFilterRequest())
+    if (response.isSuccessful) {
+        return response.body()?.toUserFilters() ?: filters
+    }
+
+    if (response.code() == 404) {
+        Log.w(
+            "USER_API",
+            "El endpoint de filtros no esta desplegado en este backend. Se mantiene el estado local."
+        )
+        return filters
+    }
+
+    throw IOException(
+        "Error actualizando los filtros del usuario: ${response.code()} ${response.message()}"
+    )
+}
+
 private fun validarDatosUsuario(user: UserInfo) {
     if (user.email.isBlank() || user.username.isBlank() || user.googleId.isBlank()) {
         throw IOException("Faltan datos de Google para sincronizar el usuario con el backend")
@@ -241,6 +343,38 @@ private fun buildUserRequest(
 private fun defaultLanguage(): String {
     val languageTag = Locale.getDefault().language.takeIf { it.isNotBlank() }
     return AppLanguage.fromLanguageTag(languageTag).languageTag
+}
+
+private fun UserFilters.toFilterRequest(): FilterRequest {
+    return FilterRequest(
+        comissaries = comissaries,
+        fetsPenals = fetsPenals,
+        cameresSeguretat = cameresSeguretat,
+        infraccions = infraccions,
+        fontsAigua = fontsAigua,
+        bancs = bancs,
+        contaminacioAcustica = contaminacioAcustica,
+        escalesMecaniques = escalesMecaniques,
+        arbres = arbres,
+        refugisClimatics = refugisClimatics,
+        qualitatAire = qualitatAire
+    )
+}
+
+private fun UserFiltersResponse.toUserFilters(): UserFilters {
+    return UserFilters(
+        comissaries = comissaries ?: 0.5,
+        fetsPenals = fetsPenals ?: 0.5,
+        cameresSeguretat = cameresSeguretat ?: 0.5,
+        infraccions = infraccions ?: 0.5,
+        fontsAigua = fontsAigua ?: 0.5,
+        bancs = bancs ?: 0.5,
+        contaminacioAcustica = contaminacioAcustica ?: 0.5,
+        escalesMecaniques = escalesMecaniques ?: 0.5,
+        arbres = arbres ?: 0.5,
+        refugisClimatics = refugisClimatics ?: 0.5,
+        qualitatAire = qualitatAire ?: 0.5
+    )
 }
 
 private fun <T> ensureSuccess(

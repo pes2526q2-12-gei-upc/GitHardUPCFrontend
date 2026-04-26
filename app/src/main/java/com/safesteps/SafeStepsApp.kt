@@ -29,6 +29,7 @@ import com.safesteps.i18n.ProvideLocalizedStrings
 import com.safesteps.i18n.appString
 import com.safesteps.map.MapLibreScreen
 import com.safesteps.profile.ProfileScreen
+import com.safesteps.profile.ProfileViewModel
 
 private enum class SafeStepsDestination {
     MAP,
@@ -53,8 +54,10 @@ fun SafeStepsApp(
     val languageViewModel: LanguageViewModel = viewModel(
         factory = LanguageViewModelFactory(languageRepository)
     )
+    val profileViewModel: ProfileViewModel = viewModel()
     val authUiState by authViewModel.uiState.collectAsState()
     val languageUiState by languageViewModel.uiState.collectAsState()
+    val profileUiState by profileViewModel.uiState.collectAsState()
     var currentDestination by rememberSaveable {
         mutableStateOf(SafeStepsDestination.MAP)
     }
@@ -71,6 +74,10 @@ fun SafeStepsApp(
     HandleLanguageSyncEffect(
         currentUser = authUiState.currentUser,
         onUserChanged = languageViewModel::onUserChanged
+    )
+    HandleProfileFiltersSyncEffect(
+        currentUser = authUiState.currentUser,
+        onUserChanged = profileViewModel::onCurrentUserChanged
     )
     val onLanguageSelected: (AppLanguage) -> Unit = remember(languageViewModel, authViewModel) {
         { language ->
@@ -91,7 +98,9 @@ fun SafeStepsApp(
         currentLanguage = languageUiState.currentLanguage,
         authViewModel = authViewModel,
         currentDestination = currentDestination,
+        profileUiState = profileUiState,
         onLanguageSelected = onLanguageSelected,
+        onFilterValueChange = profileViewModel::onFilterValueChanged,
         onLoginClick = onLoginClick,
         onNavigateToMap = { currentDestination = SafeStepsDestination.MAP },
         onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE }
@@ -122,13 +131,25 @@ private fun HandleLanguageSyncEffect(
 }
 
 @Composable
+private fun HandleProfileFiltersSyncEffect(
+    currentUser: UserInfo?,
+    onUserChanged: (UserInfo?) -> Unit
+) {
+    LaunchedEffect(currentUser?.googleId) {
+        onUserChanged(currentUser)
+    }
+}
+
+@Composable
 private fun SafeStepsLocalizedContent(
     modifier: Modifier,
     authUiState: AuthUiState,
     currentLanguage: AppLanguage,
     authViewModel: AuthViewModel,
     currentDestination: SafeStepsDestination,
+    profileUiState: com.safesteps.profile.ProfileUiState,
     onLanguageSelected: (AppLanguage) -> Unit,
+    onFilterValueChange: (Int, Int) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit
@@ -155,7 +176,9 @@ private fun SafeStepsLocalizedContent(
             authUiState = authUiState,
             currentLanguage = currentLanguage,
             currentDestination = currentDestination,
+            profileUiState = profileUiState,
             onLanguageSelected = onLanguageSelected,
+            onFilterValueChange = onFilterValueChange,
             onLoginClick = onLoginClick,
             onNavigateToMap = onNavigateToMap,
             onNavigateToProfile = onNavigateToProfile,
@@ -200,7 +223,9 @@ private fun SafeStepsBody(
     authUiState: AuthUiState,
     currentLanguage: AppLanguage,
     currentDestination: SafeStepsDestination,
+    profileUiState: com.safesteps.profile.ProfileUiState,
     onLanguageSelected: (AppLanguage) -> Unit,
+    onFilterValueChange: (Int, Int) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit,
@@ -216,6 +241,9 @@ private fun SafeStepsBody(
                 user = currentUser,
                 currentLanguage = currentLanguage,
                 onLanguageSelected = onLanguageSelected,
+                filterValues = profileUiState.filterValues,
+                onFilterValueChange = onFilterValueChange,
+                areFiltersEnabled = !profileUiState.isLoadingFilters,
                 onBack = onNavigateToMap,
                 onLogout = onLogout,
                 onDeleteAccount = { onDeleteAccount(currentUser) }
