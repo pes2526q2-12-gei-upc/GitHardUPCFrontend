@@ -11,9 +11,11 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40381/"
 private const val USERS_PATH = "api/v1/users"
@@ -62,6 +64,12 @@ private interface UserApiService {
     suspend fun updateUser(
         @Path("googleId") googleId: String,
         @Body request: UserRequest
+    ): Response<UserResponse>
+
+    @PATCH("$USERS_PATH/{googleId}/language")
+    suspend fun updateLanguage(
+        @Path("googleId") googleId: String,
+        @Query("lang") language: String
     ): Response<UserResponse>
 
     @DELETE("$USERS_PATH/{googleId}")
@@ -156,6 +164,57 @@ suspend fun eliminarUsuarioDelBackend(googleId: String) {
     }
 
     throw IOException("Error eliminando el usuario: ${response.code()} ${response.message()}")
+}
+
+suspend fun updateLenguage(
+    user: UserInfo,
+    language: AppLanguage
+): String {
+    if (user.googleId.isBlank()) {
+        throw IOException("Falta el googleId para actualizar el idioma del usuario")
+    }
+
+    Log.d(
+        "USER_API",
+        "Actualizando idioma del usuario en backend: googleId=${user.googleId} lang=${language.languageTag}"
+    )
+
+    val response = UserBackend.service.updateLanguage(user.googleId, language.languageTag)
+    if (response.isSuccessful) {
+        return response.body()
+            ?.language
+            ?.takeIf { it.isNotBlank() }
+            ?: language.languageTag
+    }
+
+    if (response.code() == 404) {
+        Log.w(
+            "USER_API",
+            "El endpoint PATCH de idioma no existe en este backend. Se usa fallback con PUT."
+        )
+
+        val updateResponse = UserBackend.service.updateUser(
+            user.googleId,
+            buildUserRequest(
+                user = user,
+                language = language.languageTag,
+                isAnonymous = false
+            )
+        )
+        ensureSuccess(updateResponse, "actualizando el idioma del usuario con PUT")
+
+        return updateResponse.body()
+            ?.language
+            ?.takeIf { it.isNotBlank() }
+            ?: language.languageTag
+    }
+
+    ensureSuccess(response, "actualizando el idioma del usuario")
+
+    return response.body()
+        ?.language
+        ?.takeIf { it.isNotBlank() }
+        ?: language.languageTag
 }
 
 private fun validarDatosUsuario(user: UserInfo) {

@@ -1,7 +1,15 @@
 package com.safesteps.i18n
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.safesteps.auth.UserInfo
+import com.safesteps.data.updateLenguage
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,20 +21,29 @@ data class LanguageUiState(
 )
 
 class LanguageViewModel(
-    private val repository: LanguagePreferencesRepository
+    private val repository: LanguagePreferencesRepository,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LanguageUiState())
     val uiState: StateFlow<LanguageUiState> = _uiState.asStateFlow()
 
-    private var currentUserEmail: String? = null
+    private var currentUser: UserInfo? = null
     private var currentBackendLanguageTag: String? = null
 
-    fun onUserChanged(email: String?, backendLanguageTag: String?) {
-        if (email == currentUserEmail && backendLanguageTag == currentBackendLanguageTag) {
+    fun onUserChanged(user: UserInfo?) {
+        val googleId = user?.googleId
+        val email = user?.email
+        val backendLanguageTag = user?.backendLanguageTag
+
+        if (
+            googleId == currentUser?.googleId &&
+            email == currentUser?.email &&
+            backendLanguageTag == currentBackendLanguageTag
+        ) {
             return
         }
 
-        currentUserEmail = email
+        currentUser = user
         currentBackendLanguageTag = backendLanguageTag
 
         val resolvedLanguage = when {
@@ -47,12 +64,43 @@ class LanguageViewModel(
         }
     }
 
-    fun onLanguageSelected(language: AppLanguage) {
-        val email = currentUserEmail ?: return
+    fun onLanguageSelected(
+        language: AppLanguage,
+        onLanguageUpdated: (String, String) -> Unit = { _, _ -> }
+    ) {
+        val user = currentUser ?: return
+        val email = user.email
 
         repository.saveLanguageForUser(email, language)
         currentBackendLanguageTag = language.languageTag
         _uiState.update { it.copy(currentLanguage = language) }
+        if (user.googleId.isNotBlank()) {
+            onLanguageUpdated(user.googleId, language.languageTag)
+        }
+
+        if (user.googleId.isBlank()) {
+            return
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                withContext(ioDispatcher) {
+                    updateLenguage(user, language)
+                }
+            }.onSuccess { updatedLanguageTag ->
+                val resolvedLanguage = AppLanguage.fromLanguageTag(updatedLanguageTag)
+                repository.saveLanguageForUser(email, resolvedLanguage)
+                currentBackendLanguageTag = resolvedLanguage.languageTag
+                _uiState.update { it.copy(currentLanguage = resolvedLanguage) }
+                onLanguageUpdated(user.googleId, resolvedLanguage.languageTag)
+            }.onFailure { error ->
+                Log.e(
+                    "LANGUAGE_VIEW_MODEL",
+                    "No se pudo sincronizar el idioma del usuario con el backend",
+                    error
+                )
+            }
+        }
     }
 }
 

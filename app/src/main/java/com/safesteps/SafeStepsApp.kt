@@ -72,6 +72,14 @@ fun SafeStepsApp(
         currentUser = authUiState.currentUser,
         onUserChanged = languageViewModel::onUserChanged
     )
+    val onLanguageSelected: (AppLanguage) -> Unit = remember(languageViewModel, authViewModel) {
+        { language ->
+            languageViewModel.onLanguageSelected(
+                language = language,
+                onLanguageUpdated = authViewModel::onCurrentUserLanguageChanged
+            )
+        }
+    }
 
     BackHandler(enabled = isProfileDestination(currentDestination)) {
         currentDestination = SafeStepsDestination.MAP
@@ -83,7 +91,7 @@ fun SafeStepsApp(
         currentLanguage = languageUiState.currentLanguage,
         authViewModel = authViewModel,
         currentDestination = currentDestination,
-        onLanguageSelected = languageViewModel::onLanguageSelected,
+        onLanguageSelected = onLanguageSelected,
         onLoginClick = onLoginClick,
         onNavigateToMap = { currentDestination = SafeStepsDestination.MAP },
         onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE }
@@ -106,10 +114,10 @@ private fun HandleProfileRedirectEffect(
 @Composable
 private fun HandleLanguageSyncEffect(
     currentUser: UserInfo?,
-    onUserChanged: (String?, String?) -> Unit
+    onUserChanged: (UserInfo?) -> Unit
 ) {
-    LaunchedEffect(currentUser?.email, currentUser?.backendLanguageTag) {
-        onUserChanged(currentUser?.email, currentUser?.backendLanguageTag)
+    LaunchedEffect(currentUser?.googleId, currentUser?.email, currentUser?.backendLanguageTag) {
+        onUserChanged(currentUser)
     }
 }
 

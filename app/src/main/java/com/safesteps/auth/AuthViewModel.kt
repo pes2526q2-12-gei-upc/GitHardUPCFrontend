@@ -73,6 +73,23 @@ class AuthViewModel(
         }
     }
 
+    fun onCurrentUserLanguageChanged(googleId: String, languageTag: String) {
+        if (googleId.isBlank() || languageTag.isBlank()) {
+            return
+        }
+
+        _uiState.update { state ->
+            val currentUser = state.currentUser
+            if (currentUser == null || currentUser.googleId != googleId) {
+                state
+            } else {
+                state.copy(
+                    currentUser = currentUser.copy(backendLanguageTag = languageTag)
+                )
+            }
+        }
+    }
+
     private fun sincronizarUsuarioConBackendAsync(user: UserInfo) {
         val syncKey = user.googleId.ifBlank { user.email }
         if (syncKey.isBlank() || syncingGoogleUserId == syncKey || _uiState.value.isDeletingAccount) {
