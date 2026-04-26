@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -43,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,7 +59,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.modifier.modifierLocalConsumer
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -72,31 +75,86 @@ import com.safesteps.auth.UserInfo
 import com.safesteps.data.Feature
 import com.safesteps.i18n.appString
 
+private data class SearchBarVisuals(
+    val borderColor: Color = Color(0xFFE4ECE8),
+    val textColor: Color = Color(0xFF3D4A45),
+    val placeholderColor: Color = Color(0xFF9AA7A0)
+)
+
+private data class SearchBarConfig(
+    val placeholder: String,
+    val testTag: String? = null,
+    val visuals: SearchBarVisuals = SearchBarVisuals(),
+    val onFocus: (() -> Unit)? = null
+)
+
+internal data class TopPanelAccountActions(
+    val currentUser: UserInfo?,
+    val onLoginClick: () -> Unit,
+    val onProfileClick: () -> Unit
+)
+
+private data class TopSearchPanelState(
+    val origen: String,
+    val destino: String,
+    val mostrarOrigen: Boolean,
+    val adrecesSuggerides: List<Feature>,
+    val campActiu: textField
+)
+
+internal data class TopSearchPanelCallbacks(
+    val onOrigenChange: (String) -> Unit,
+    val onDestinoChange: (String) -> Unit,
+    val onOrigenFocus: () -> Unit,
+    val onDestinoFocus: () -> Unit,
+    val onAdrecaSeleccionada: (Feature) -> Unit,
+    val onHeightChanged: (Float) -> Unit
+)
+
+internal data class FloatingActionsState(
+    val bottomPadding: Dp,
+    val compactMode: Boolean,
+    val showPoiAction: Boolean,
+    val showMapStyleAction: Boolean,
+    val showMyLocationAction: Boolean
+)
+
+internal data class FloatingActionLabels(
+    val hideExtraInfoLabel: String,
+    val showExtraInfoLabel: String,
+    val standardMapStyleLabel: String,
+    val satelliteMapStyleLabel: String,
+    val myLocationLabel: String
+)
+
+internal data class FloatingActionCallbacks(
+    val onTogglePuntsInteres: () -> Unit,
+    val onToggleMapStyle: () -> Unit,
+    val onMyLocationClick: () -> Unit
+)
+
 @Composable
 private fun SearchBarItem(
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String,
+    config: SearchBarConfig,
     leadingIcon: @Composable () -> Unit,
     modifier: Modifier = Modifier,
-    testTag: String? = null,
-    borderColor: Color = Color(0xFFE4ECE8),
-    textColor: Color = Color(0xFF3D4A45),
-    placeholderColor: Color = Color(0xFF9AA7A0),
-    onFocus: (() -> Unit)? = null,
     trailingIcon: @Composable (() -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null
 ) {
+    val shape = RoundedCornerShape(26.dp)
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(52.dp)
             .border(
                 width = 1.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(26.dp)
+                color = config.visuals.borderColor,
+                shape = shape
             )
-            .background(Color.White, RoundedCornerShape(26.dp))
+            .background(Color.White, shape)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -112,44 +170,85 @@ private fun SearchBarItem(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.CenterStart
             ) {
-                if (value.isBlank()) {
-                    Text(
-                        text = placeholder,
-                        color = placeholderColor,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+                SearchBarPlaceholder(
+                    value = value,
+                    placeholder = config.placeholder,
+                    placeholderColor = config.visuals.placeholderColor
+                )
 
-                BasicTextField(
+                SearchBarTextField(
                     value = value,
                     onValueChange = onValueChange,
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = textColor
-                    ),
-                    cursorBrush = SolidColor(Color(0xFF5AC98B)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .then(if (testTag != null) Modifier.testTag(testTag) else Modifier)
-                        .onFocusChanged {
-                            if (it.isFocused) {
-                                onFocus?.invoke()
-                            }
-                        }
+                    config = config
                 )
             }
 
-            if (trailingIcon != null) {
-                Spacer(modifier = Modifier.width(4.dp))
-                trailingIcon()
-            }
+            SearchBarAccessory(
+                content = trailingIcon,
+                spacing = 4.dp
+            )
 
-            if (trailingContent != null) {
-                Spacer(modifier = Modifier.width(10.dp))
-                trailingContent()
-            }
+            SearchBarAccessory(
+                content = trailingContent,
+                spacing = 10.dp
+            )
         }
     }
+}
+
+@Composable
+private fun SearchBarPlaceholder(
+    value: String,
+    placeholder: String,
+    placeholderColor: Color
+) {
+    if (value.isNotBlank()) {
+        return
+    }
+
+    Text(
+        text = placeholder,
+        color = placeholderColor,
+        style = MaterialTheme.typography.bodyMedium
+    )
+}
+
+@Composable
+private fun SearchBarTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    config: SearchBarConfig
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(
+            color = config.visuals.textColor
+        ),
+        cursorBrush = SolidColor(Color(0xFF5AC98B)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (config.testTag != null) Modifier.testTag(config.testTag) else Modifier)
+            .onFocusChanged {
+                if (it.isFocused) {
+                    config.onFocus?.invoke()
+                }
+            }
+    )
+}
+
+@Composable
+private fun SearchBarAccessory(
+    content: (@Composable (() -> Unit))?,
+    spacing: Dp
+) {
+    if (content == null) {
+        return
+    }
+
+    Spacer(modifier = Modifier.width(spacing))
+    content()
 }
 
 @Composable
@@ -289,11 +388,16 @@ private fun OriginSearchSection(
         SearchBarItem(
             value = origen,
             onValueChange = onOrigenChange,
-            placeholder = appString(R.string.my_location),
-            testTag = "input_origen",
-            borderColor = actualBorderColor,
-            textColor = actualTextColor,
-            placeholderColor = actualPlaceholderColor,
+            config = SearchBarConfig(
+                placeholder = appString(R.string.my_location),
+                testTag = "input_origen",
+                visuals = SearchBarVisuals(
+                    borderColor = actualBorderColor,
+                    textColor = actualTextColor,
+                    placeholderColor = actualPlaceholderColor
+                ),
+                onFocus = onOrigenFocus
+            ),
             leadingIcon = {
                 Icon(
                     imageVector = actualIconVector,
@@ -304,8 +408,7 @@ private fun OriginSearchSection(
             },
             trailingIcon = {
                 BotonBorrarOrigen(origen, onOrigenChange)
-            },
-            onFocus = onOrigenFocus
+            }
         )
 
         if (campActiu == textField.ORIGIN) {
@@ -325,58 +428,54 @@ private fun BotonBorrarOrigen(origen: String, onOrigenChange: (String) -> Unit) 
 
 @Composable
 private fun TopSearchPanel(
-    origen: String,
-    onOrigenChange: (String) -> Unit,
-    destino: String,
-    onDestinoChange: (String) -> Unit,
-    mostrarOrigen: Boolean,
-    onOrigenFocus: () -> Unit,
-    onDestinoFocus: () -> Unit,
-    adrecesSuggerides: List<Feature>,
-    onAdrecaSeleccionada: (Feature) -> Unit,
-    campActiu: textField,
-    currentUser: UserInfo?,
-    onLoginClick: () -> Unit,
-    onProfileClick: () -> Unit
+    state: TopSearchPanelState,
+    callbacks: TopSearchPanelCallbacks,
+    accountActions: TopPanelAccountActions
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(horizontal = 14.dp, vertical = 8.dp)
-            .shadow(10.dp, RoundedCornerShape(24.dp), clip = false),
+            .shadow(10.dp, RoundedCornerShape(24.dp), clip = false)
+            .onGloballyPositioned {
+                callbacks.onHeightChanged(it.size.height.toFloat())
+            },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             TopPanelHeader(
-                currentUser = currentUser,
-                onLoginClick = onLoginClick,
-                onProfileClick = onProfileClick
+                currentUser = accountActions.currentUser,
+                onLoginClick = accountActions.onLoginClick,
+                onProfileClick = accountActions.onProfileClick
             )
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            AnimatedVisibility(visible = mostrarOrigen) {
+            AnimatedVisibility(visible = state.mostrarOrigen) {
                 Column {
                     OriginSearchSection(
-                        origen = origen,
-                        onOrigenChange = onOrigenChange,
-                        onOrigenFocus = onOrigenFocus,
-                        campActiu = campActiu,
-                        adrecesSuggerides = adrecesSuggerides,
-                        onAdrecaSeleccionada = onAdrecaSeleccionada
+                        origen = state.origen,
+                        onOrigenChange = callbacks.onOrigenChange,
+                        onOrigenFocus = callbacks.onOrigenFocus,
+                        campActiu = state.campActiu,
+                        adrecesSuggerides = state.adrecesSuggerides,
+                        onAdrecaSeleccionada = callbacks.onAdrecaSeleccionada
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                 }
             }
 
             SearchBarItem(
-                value = destino,
-                onValueChange = onDestinoChange,
-                placeholder = appString(R.string.destination_label),
-                testTag = "input_desti",
-                borderColor = Color(0xFFF2D8D4),
+                value = state.destino,
+                onValueChange = callbacks.onDestinoChange,
+                config = SearchBarConfig(
+                    placeholder = appString(R.string.destination_label),
+                    testTag = "input_desti",
+                    visuals = SearchBarVisuals(borderColor = Color(0xFFF2D8D4)),
+                    onFocus = callbacks.onDestinoFocus
+                ),
                 leadingIcon = {
                     Icon(
                         Icons.Default.LocationOn,
@@ -386,17 +485,16 @@ private fun TopSearchPanel(
                     )
                 },
                 trailingIcon = {
-                    if (destino.isNotEmpty()) {
-                        IconButton(onClick = { onDestinoChange("") }) {
+                    if (state.destino.isNotEmpty()) {
+                        IconButton(onClick = { callbacks.onDestinoChange("") }) {
                             Icon(Icons.Default.Clear, null, tint = Color.Gray)
                         }
                     }
-                },
-                onFocus = onDestinoFocus
+                }
             )
 
-            if (campActiu == textField.DESTINY) {
-                DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
+            if (state.campActiu == textField.DESTINY) {
+                DropdownSuggeriments(state.adrecesSuggerides, callbacks.onAdrecaSeleccionada)
             }
         }
     }
@@ -405,33 +503,29 @@ private fun TopSearchPanel(
 @Composable
 internal fun BoxScope.MainMapOverlay(
     uiState: MapUiState,
-    currentUser: UserInfo?,
-    onLoginClick: () -> Unit,
-    onProfileClick: () -> Unit,
-    onOrigenChange: (String) -> Unit,
-    onDestinoChange: (String) -> Unit,
-    onOrigenFocus: () -> Unit,
-    onDestinoFocus: () -> Unit,
-    onAdrecaSeleccionada: (Feature) -> Unit
+    accountActions: TopPanelAccountActions,
+    callbacks: TopSearchPanelCallbacks
 ) {
+    LaunchedEffect(uiState.modoRuta) {
+        if (uiState.modoRuta) {
+            callbacks.onHeightChanged(0f)
+        }
+    }
+
     AnimatedVisibility(
         visible = !uiState.modoRuta,
         modifier = Modifier.align(Alignment.TopCenter)
     ) {
         TopSearchPanel(
-            origen = uiState.textoOrigen,
-            onOrigenChange = onOrigenChange,
-            destino = uiState.textoDestino,
-            onDestinoChange = onDestinoChange,
-            mostrarOrigen = uiState.mostrarOrigen,
-            onOrigenFocus = onOrigenFocus,
-            onDestinoFocus = onDestinoFocus,
-            adrecesSuggerides = uiState.adrecesSuggerides,
-            onAdrecaSeleccionada = onAdrecaSeleccionada,
-            campActiu = uiState.campActiu,
-            currentUser = currentUser,
-            onLoginClick = onLoginClick,
-            onProfileClick = onProfileClick
+            state = TopSearchPanelState(
+                origen = uiState.textoOrigen,
+                destino = uiState.textoDestino,
+                mostrarOrigen = uiState.mostrarOrigen,
+                adrecesSuggerides = uiState.adrecesSuggerides,
+                campActiu = uiState.campActiu
+            ),
+            callbacks = callbacks,
+            accountActions = accountActions
         )
     }
 }
@@ -442,8 +536,20 @@ private fun MapActionPill(
     icon: ImageVector,
     selected: Boolean,
     onClick: () -> Unit,
+    compactMode: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val shape = RoundedCornerShape(if (compactMode) 16.dp else 18.dp)
+    val horizontalPadding = if (compactMode) 10.dp else 14.dp
+    val verticalPadding = if (compactMode) 8.dp else 11.dp
+    val iconSize = if (compactMode) 16.dp else 18.dp
+    val spacing = if (compactMode) 6.dp else 8.dp
+    val textStyle = if (compactMode) {
+        MaterialTheme.typography.labelMedium
+    } else {
+        MaterialTheme.typography.labelLarge
+    }
+
     val containerColor by animateColorAsState(
         targetValue = if (selected) Color(0xFFE8F0FE) else Color.White,
         label = "mapActionPillContainer"
@@ -459,30 +565,30 @@ private fun MapActionPill(
 
     Surface(
         modifier = modifier
-            .shadow(12.dp, RoundedCornerShape(18.dp), clip = false)
-            .clip(RoundedCornerShape(18.dp))
+            .shadow(12.dp, shape, clip = false)
+            .clip(shape)
             .clickable(onClick = onClick),
         color = containerColor,
-        shape = RoundedCornerShape(18.dp)
+        shape = shape
     ) {
         Row(
             modifier = Modifier
-                .border(1.dp, borderColor, RoundedCornerShape(18.dp))
-                .padding(horizontal = 14.dp, vertical = 11.dp),
+                .border(1.dp, borderColor, shape)
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(spacing)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(iconSize)
             )
             Text(
                 text = label,
                 color = contentColor,
                 fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.labelLarge
+                style = textStyle
             )
         }
     }
@@ -494,11 +600,15 @@ private fun MapActionCircleButton(
     contentDescription: String,
     iconTint: Color,
     onClick: () -> Unit,
+    compactMode: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val buttonSize = if (compactMode) 46.dp else 54.dp
+    val iconSize = if (compactMode) 18.dp else 22.dp
+
     Surface(
         modifier = modifier
-            .size(54.dp)
+            .size(buttonSize)
             .shadow(12.dp, CircleShape, clip = false)
             .clip(CircleShape)
             .clickable(onClick = onClick),
@@ -515,7 +625,7 @@ private fun MapActionCircleButton(
                 imageVector = icon,
                 contentDescription = contentDescription,
                 tint = iconTint,
-                modifier = Modifier.size(22.dp)
+                modifier = Modifier.size(iconSize)
             )
         }
     }
@@ -524,65 +634,106 @@ private fun MapActionCircleButton(
 @Composable
 internal fun BoxScope.MapFloatingActions(
     uiState: MapUiState,
-    bottomPadding: Dp,
-    hideExtraInfoLabel: String,
-    showExtraInfoLabel: String,
-    standardMapStyleLabel: String,
-    satelliteMapStyleLabel: String,
-    myLocationLabel: String,
-    onTogglePuntsInteres: () -> Unit,
-    onToggleMapStyle: () -> Unit,
-    onMyLocationClick: () -> Unit
+    state: FloatingActionsState,
+    labels: FloatingActionLabels,
+    callbacks: FloatingActionCallbacks
 ) {
+    val navigationBarsBottomPadding = WindowInsets.navigationBars
+        .asPaddingValues()
+        .calculateBottomPadding()
+    val resolvedBottomPadding = maxOf(state.bottomPadding, navigationBarsBottomPadding + 16.dp)
+    val hasVisibleActions = hasVisibleFloatingActions(state)
+
     AnimatedVisibility(
-        visible = true,
+        visible = hasVisibleActions,
         enter = slideInVertically(initialOffsetY = { it / 2 }),
         exit = slideOutVertically(targetOffsetY = { it / 2 }),
         modifier = Modifier.align(Alignment.BottomEnd)
     ) {
         Column(
             modifier = Modifier
-                .navigationBarsPadding()
-                .padding(end = 16.dp, bottom = bottomPadding),
+                .padding(
+                    end = if (state.compactMode) 12.dp else 16.dp,
+                    bottom = resolvedBottomPadding
+                ),
             horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(if (state.compactMode) 8.dp else 10.dp)
         ) {
-            AnimatedVisibility(visible = uiState.puntsInteres.isNotEmpty()) {
-                MapActionPill(
-                    label = if (uiState.mostrarPuntsInteres) {
-                        hideExtraInfoLabel
-                    } else {
-                        showExtraInfoLabel
-                    },
-                    icon = Icons.Default.LocationOn,
-                    selected = uiState.mostrarPuntsInteres,
-                    onClick = onTogglePuntsInteres,
-                    modifier = Modifier.width(132.dp)
-                )
-            }
-
-            MapActionPill(
-                label = if (uiState.estiloSatelite) {
-                    standardMapStyleLabel
-                } else {
-                    satelliteMapStyleLabel
-                },
-                icon = Icons.Default.Layers,
-                selected = uiState.estiloSatelite,
-                onClick = onToggleMapStyle,
-                modifier = Modifier
-                    .width(132.dp)
-                    .testTag("btn_satellit")
-            )
-
-            MapActionCircleButton(
-                icon = Icons.Default.MyLocation,
-                contentDescription = myLocationLabel,
-                iconTint = if (uiState.modoRuta) Color(0xFF1A73E8) else Color(0xFF159957),
-                onClick = onMyLocationClick,
-                modifier = Modifier.testTag("btn_ubicacio_actual")
-            )
+            PoiFloatingAction(uiState = uiState, state = state, labels = labels, onClick = callbacks.onTogglePuntsInteres)
+            MapStyleFloatingAction(uiState = uiState, state = state, labels = labels, onClick = callbacks.onToggleMapStyle)
+            MyLocationFloatingAction(uiState = uiState, state = state, label = labels.myLocationLabel, onClick = callbacks.onMyLocationClick)
         }
+    }
+}
+
+private fun hasVisibleFloatingActions(state: FloatingActionsState): Boolean {
+    return state.showPoiAction || state.showMapStyleAction || state.showMyLocationAction
+}
+
+@Composable
+private fun PoiFloatingAction(
+    uiState: MapUiState,
+    state: FloatingActionsState,
+    labels: FloatingActionLabels,
+    onClick: () -> Unit
+) {
+    AnimatedVisibility(visible = state.showPoiAction && uiState.puntsInteres.isNotEmpty()) {
+        MapActionPill(
+            label = if (uiState.mostrarPuntsInteres) {
+                labels.hideExtraInfoLabel
+            } else {
+                labels.showExtraInfoLabel
+            },
+            icon = Icons.Default.LocationOn,
+            selected = uiState.mostrarPuntsInteres,
+            onClick = onClick,
+            compactMode = state.compactMode,
+            modifier = Modifier.width(if (state.compactMode) 112.dp else 132.dp)
+        )
+    }
+}
+
+@Composable
+private fun MapStyleFloatingAction(
+    uiState: MapUiState,
+    state: FloatingActionsState,
+    labels: FloatingActionLabels,
+    onClick: () -> Unit
+) {
+    AnimatedVisibility(visible = state.showMapStyleAction) {
+        MapActionPill(
+            label = if (uiState.estiloSatelite) {
+                labels.standardMapStyleLabel
+            } else {
+                labels.satelliteMapStyleLabel
+            },
+            icon = Icons.Default.Layers,
+            selected = uiState.estiloSatelite,
+            onClick = onClick,
+            compactMode = state.compactMode,
+            modifier = Modifier
+                .width(if (state.compactMode) 112.dp else 132.dp)
+                .testTag("btn_satellit")
+        )
+    }
+}
+
+@Composable
+private fun MyLocationFloatingAction(
+    uiState: MapUiState,
+    state: FloatingActionsState,
+    label: String,
+    onClick: () -> Unit
+) {
+    AnimatedVisibility(visible = state.showMyLocationAction) {
+        MapActionCircleButton(
+            icon = Icons.Default.MyLocation,
+            contentDescription = label,
+            iconTint = if (uiState.modoRuta) Color(0xFF1A73E8) else Color(0xFF159957),
+            onClick = onClick,
+            compactMode = state.compactMode,
+            modifier = Modifier.testTag("btn_ubicacio_actual")
+        )
     }
 }
 

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -83,6 +84,15 @@ private data class RoutePlannerSheetState(
     val puntsInteres: List<com.safesteps.data.PuntInteres>
 )
 
+private data class RoutePrioritySpec(
+    val priority: RoutePriority,
+    val title: String,
+    val description: String,
+    val icon: ImageVector,
+    val activeColor: Color,
+    val footer: String? = null
+)
+
 @Composable
 private fun RoutePriorityCompactOption(
     title: String,
@@ -92,7 +102,7 @@ private fun RoutePriorityCompactOption(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bgColor = if (selected) activeColor.copy(alpha = 0.15f) else Color.Transparent
+    val bgColor = if (selected) activeColor.copy(alpha = 0.14f) else Color.White
     val contentColor = if (selected) activeColor else Color(0xFF77837D)
     val borderColor = if (selected) activeColor else Color(0xFFE7ECE8)
 
@@ -102,22 +112,68 @@ private fun RoutePriorityCompactOption(
             .background(bgColor)
             .border(width = if (selected) 2.dp else 1.dp, color = borderColor, shape = RoundedCornerShape(16.dp))
             .clickable { onClick() }
-            .padding(vertical = 12.dp, horizontal = 4.dp),
+            .padding(vertical = 8.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = contentColor,
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(20.dp)
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = title,
             color = contentColor,
             fontWeight = FontWeight.SemiBold,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1
+            style = MaterialTheme.typography.labelSmall,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            maxLines = 2
+        )
+    }
+}
+
+@Composable
+private fun routePrioritySpec(
+    priority: RoutePriority,
+    showProfilePreferences: Boolean
+): RoutePrioritySpec {
+    return when (priority) {
+        RoutePriority.SAFETY -> RoutePrioritySpec(
+            priority = priority,
+            title = appString(R.string.filter_safety),
+            description = appString(R.string.route_priority_safety_description),
+            icon = Icons.Default.Security,
+            activeColor = Color(0xFF1F4A85)
+        )
+
+        RoutePriority.ACCESSIBILITY -> RoutePrioritySpec(
+            priority = priority,
+            title = appString(R.string.filter_comfort),
+            description = appString(R.string.route_priority_accessibility_description),
+            icon = Icons.AutoMirrored.Filled.Accessible,
+            activeColor = Color(0xFF4FAF7D)
+        )
+
+        RoutePriority.HEAT -> RoutePrioritySpec(
+            priority = priority,
+            title = appString(R.string.filter_climate),
+            description = appString(R.string.route_priority_heat_description),
+            icon = Icons.Default.WbSunny,
+            activeColor = Color(0xFFFF7B42)
+        )
+
+        RoutePriority.PERSONALIZED -> RoutePrioritySpec(
+            priority = priority,
+            title = appString(R.string.filter_preferences),
+            description = appString(R.string.route_priority_personalized_description),
+            icon = Icons.Default.Person,
+            activeColor = Color(0xFF6A768F),
+            footer = if (showProfilePreferences) {
+                appString(R.string.route_priority_personalized_footer)
+            } else {
+                null
+            }
         )
     }
 }
@@ -171,59 +227,103 @@ private fun RoutePrioritySelector(
     onPrioritySelected: (RoutePriority) -> Unit,
     showProfilePreferences: Boolean = false
 ) {
+    val options = buildList {
+        add(routePrioritySpec(RoutePriority.SAFETY, showProfilePreferences))
+        add(routePrioritySpec(RoutePriority.ACCESSIBILITY, showProfilePreferences))
+        add(routePrioritySpec(RoutePriority.HEAT, showProfilePreferences))
+        if (showProfilePreferences) {
+            add(routePrioritySpec(RoutePriority.PERSONALIZED, showProfilePreferences))
+        }
+    }
+    val selectedSpec = options.firstOrNull { it.priority == selectedPriority }
+        ?: routePrioritySpec(selectedPriority, showProfilePreferences)
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            RoutePriorityCompactOption(
-                title = appString(R.string.filter_safety),
-                selected = selectedPriority == RoutePriority.SAFETY,
-                icon = Icons.Default.Security,
-                activeColor = Color(0xFF1F4A85),
-                onClick = { onPrioritySelected(RoutePriority.SAFETY) },
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("btn_safety")
-            )
-
-            RoutePriorityCompactOption(
-                title = appString(R.string.filter_comfort),
-                selected = selectedPriority == RoutePriority.ACCESSIBILITY,
-                icon = Icons.AutoMirrored.Filled.Accessible,
-                activeColor = Color(0xFF7FD7AA),
-                onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("btn_accessibility")
-            )
-
-            RoutePriorityCompactOption(
-                title = appString(R.string.filter_climate),
-                selected = selectedPriority == RoutePriority.HEAT,
-                icon = Icons.Default.WbSunny,
-                activeColor = Color(0xFFFF7B42),
-                onClick = { onPrioritySelected(RoutePriority.HEAT) },
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("btn_clima")
-            )
+            options.forEach { option ->
+                val testModifier = when (option.priority) {
+                    RoutePriority.SAFETY -> Modifier.testTag("btn_safety")
+                    RoutePriority.ACCESSIBILITY -> Modifier.testTag("btn_accessibility")
+                    RoutePriority.HEAT -> Modifier.testTag("btn_clima")
+                    RoutePriority.PERSONALIZED -> Modifier.testTag("btn_preferences")
+                }
+                RoutePriorityCompactOption(
+                    title = option.title,
+                    selected = selectedPriority == option.priority,
+                    icon = option.icon,
+                    activeColor = option.activeColor,
+                    onClick = { onPrioritySelected(option.priority) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(testModifier)
+                )
+            }
         }
 
-        if (showProfilePreferences) {
-            RoutePriorityCompactOption(
-                title = appString(R.string.filter_preferences),
-                selected = selectedPriority == RoutePriority.PERSONALIZED,
-                icon = Icons.Default.Person,
-                activeColor = Color(0xFF6A768F),
-                onClick = { onPrioritySelected(RoutePriority.PERSONALIZED) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("btn_preferences")
-            )
+        SelectedRoutePrioritySummary(spec = selectedSpec)
+    }
+}
+
+@Composable
+private fun SelectedRoutePrioritySummary(spec: RoutePrioritySpec) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = spec.activeColor.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, spec.activeColor.copy(alpha = 0.18f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Surface(
+                modifier = Modifier.size(34.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = spec.activeColor.copy(alpha = 0.14f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = spec.icon,
+                        contentDescription = null,
+                        tint = spec.activeColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = spec.title,
+                    color = Color(0xFF1F2C3B),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = spec.description,
+                    color = Color(0xFF5E6763),
+                    style = MaterialTheme.typography.bodySmall
+                )
+                spec.footer?.let { footer ->
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Text(
+                        text = footer,
+                        color = spec.activeColor,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         }
     }
 }
@@ -343,7 +443,7 @@ private fun RoutePlannerSheet(
 
             RoutePlannerHeader(onClose = onClose)
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             RoutePrioritySelector(
                 selectedPriority = sheetState.selectedPriority,
@@ -351,7 +451,7 @@ private fun RoutePlannerSheet(
                 showProfilePreferences = sheetState.showProfilePreferences
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             PoiSummary(puntsInteres = sheetState.puntsInteres)
 

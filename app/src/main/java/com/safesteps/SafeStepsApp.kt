@@ -79,6 +79,11 @@ fun SafeStepsApp(
         currentUser = authUiState.currentUser,
         onUserChanged = profileViewModel::onCurrentUserChanged
     )
+    HandleProfileFiltersRefreshEffect(
+        currentUser = authUiState.currentUser,
+        currentDestination = currentDestination,
+        onProfileOpened = profileViewModel::onFiltersScreenOpened
+    )
     val onLanguageSelected: (AppLanguage) -> Unit = remember(languageViewModel, authViewModel) {
         { language ->
             languageViewModel.onLanguageSelected(
@@ -137,6 +142,19 @@ private fun HandleProfileFiltersSyncEffect(
 ) {
     LaunchedEffect(currentUser?.googleId) {
         onUserChanged(currentUser)
+    }
+}
+
+@Composable
+private fun HandleProfileFiltersRefreshEffect(
+    currentUser: UserInfo?,
+    currentDestination: SafeStepsDestination,
+    onProfileOpened: () -> Unit
+) {
+    LaunchedEffect(currentDestination, currentUser?.googleId) {
+        if (isProfileDestination(currentDestination) && currentUser != null) {
+            onProfileOpened()
+        }
     }
 }
 
@@ -243,6 +261,7 @@ private fun SafeStepsBody(
                 onLanguageSelected = onLanguageSelected,
                 filterValues = profileUiState.filterValues,
                 onFilterValueChange = onFilterValueChange,
+                isLoadingFilters = profileUiState.isLoadingFilters,
                 areFiltersEnabled = !profileUiState.isLoadingFilters,
                 onBack = onNavigateToMap,
                 onLogout = onLogout,

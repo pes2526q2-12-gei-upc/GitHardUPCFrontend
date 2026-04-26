@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.auth.UserInfo
+import com.safesteps.data.UserFilters
 import com.safesteps.data.actualizarFiltrosUsuario
 import com.safesteps.data.cargarFiltrosUsuario
 import kotlinx.coroutines.CancellationException
@@ -24,7 +25,9 @@ data class ProfileUiState(
 )
 
 class ProfileViewModel(
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val loadFilters: suspend (String) -> UserFilters = ::cargarFiltrosUsuario,
+    private val saveFilters: suspend (String, UserFilters) -> UserFilters = ::actualizarFiltrosUsuario
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
@@ -32,18 +35,23 @@ class ProfileViewModel(
     private var currentUser: UserInfo? = null
     private var loadJob: Job? = null
     private var saveJob: Job? = null
+    private var latestLoadVersion = 0L
     private var latestSaveVersion = 0L
+    private var refreshAfterSave = false
 
     fun onCurrentUserChanged(user: UserInfo?) {
         val googleId = user?.googleId?.takeIf { it.isNotBlank() }
         val currentGoogleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
         if (googleId == currentGoogleId) {
+            currentUser = user
             return
         }
 
         currentUser = user
         loadJob?.cancel()
         saveJob?.cancel()
+        refreshAfterSave = false
+        latestLoadVersion += 1
         latestSaveVersion += 1
 
         if (googleId == null) {
@@ -51,15 +59,57 @@ class ProfileViewModel(
             return
         }
 
-        _uiState.value = ProfileUiState(isLoadingFilters = true)
+        startLoadingFilters(
+            googleId = googleId,
+            preserveCurrentValues = false
+        )
+    }
+
+    fun onFiltersScreenOpened() {
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() } ?: return
+
+        if (saveJob?.isActive == true) {
+            refreshAfterSave = true
+            _uiState.update {
+                it.copy(
+                    isLoadingFilters = true,
+                    isSavingFilters = true
+                )
+            }
+            return
+        }
+
+        startLoadingFilters(
+            googleId = googleId,
+            preserveCurrentValues = true
+        )
+    }
+
+    private fun startLoadingFilters(
+        googleId: String,
+        preserveCurrentValues: Boolean
+    ) {
+        loadJob?.cancel()
+        val loadVersion = ++latestLoadVersion
+
+        _uiState.update { state ->
+            if (preserveCurrentValues) {
+                state.copy(
+                    isLoadingFilters = true,
+                    isSavingFilters = false
+                )
+            } else {
+                ProfileUiState(isLoadingFilters = true)
+            }
+        }
 
         loadJob = viewModelScope.launch {
             try {
                 val loadedFilters = withContext(ioDispatcher) {
-                    cargarFiltrosUsuario(googleId)
+                    loadFilters(googleId)
                 }
 
-                if (currentUser?.googleId != googleId) {
+                if (loadVersion != latestLoadVersion || currentUser?.googleId != googleId) {
                     return@launch
                 }
 
@@ -73,7 +123,7 @@ class ProfileViewModel(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
-                if (currentUser?.googleId != googleId) {
+                if (loadVersion != latestLoadVersion || currentUser?.googleId != googleId) {
                     return@launch
                 }
 
@@ -104,13 +154,14 @@ class ProfileViewModel(
         }
 
         saveJob?.cancel()
+        refreshAfterSave = false
         latestSaveVersion += 1
         val saveVersion = latestSaveVersion
 
         saveJob = viewModelScope.launch {
             try {
                 val persistedFilters = withContext(ioDispatcher) {
-                    actualizarFiltrosUsuario(googleId, updatedFilters.toUserFilters())
+                    saveFilters(googleId, updatedFilters.toUserFilters())
                 }
 
                 if (saveVersion != latestSaveVersion || currentUser?.googleId != googleId) {
@@ -123,6 +174,8 @@ class ProfileViewModel(
                         isSavingFilters = false
                     )
                 }
+
+                maybeRefreshAfterSave(googleId)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -136,7 +189,20 @@ class ProfileViewModel(
                     error
                 )
                 _uiState.update { it.copy(isSavingFilters = false) }
+                maybeRefreshAfterSave(googleId)
             }
         }
+    }
+
+    private fun maybeRefreshAfterSave(googleId: String) {
+        if (!refreshAfterSave || currentUser?.googleId != googleId) {
+            return
+        }
+
+        refreshAfterSave = false
+        startLoadingFilters(
+            googleId = googleId,
+            preserveCurrentValues = true
+        )
     }
 }

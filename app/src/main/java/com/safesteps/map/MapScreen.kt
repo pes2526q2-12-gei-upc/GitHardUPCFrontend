@@ -7,19 +7,25 @@ import android.location.LocationListener
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -49,6 +55,36 @@ private data class MapScreenStrings(
     val calculatingBestRouteLabel: String
 )
 
+private data class FloatingActionsLayout(
+    val compactMode: Boolean,
+    val showPoiAction: Boolean,
+    val showMapStyleAction: Boolean,
+    val showMyLocationAction: Boolean
+)
+
+private data class MapScreenEffectCallbacks(
+    val requestLocationPermissions: () -> Unit,
+    val onNavigationHeadingChanged: (Float?) -> Unit
+)
+
+private data class MapRenderContext(
+    val mapView: MapView,
+    val context: Context,
+    val viewModel: MapViewModel,
+    val navigationHeadingDegrees: Float?,
+    val originLabel: String,
+    val destinationLabel: String
+)
+
+private data class NavigationTrackingState(
+    val locationGranted: Boolean,
+    val mapaListo: Boolean,
+    val modoRuta: Boolean,
+    val routeCompleted: Boolean,
+    val navigationCameraFollowing: Boolean,
+    val currentLocation: Location?
+)
+
 @Composable
 fun MapLibreScreen(
     modifier: Modifier = Modifier,
@@ -67,6 +103,8 @@ fun MapLibreScreen(
     var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
 
     var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
+    var topOverlayHeightPx by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
 
     val requestLocationPermissions = rememberLocationPermissionRequester(
         context = context,
@@ -108,25 +146,52 @@ fun MapLibreScreen(
             searchingGpsSignalMessage = strings.searchingGpsSignalMessage
         )
     }
+    val renderContext = MapRenderContext(
+        mapView = mapView,
+        context = context,
+        viewModel = viewModel,
+        navigationHeadingDegrees = navigationHeadingDegrees,
+        originLabel = strings.originLabel,
+        destinationLabel = strings.destinationLabel
+    )
 
     LaunchedEffect(currentUser?.googleId) {
         viewModel.onCurrentUserChanged(currentUser)
     }
 
     MapScreenEffects(
-        mapView = mapView,
         currentLanguage = currentLanguage,
         uiState = uiState,
-        context = context,
-        viewModel = viewModel,
-        requestLocationPermissions = requestLocationPermissions,
-        navigationHeadingDegrees = navigationHeadingDegrees,
-        onNavigationHeadingChanged = { navigationHeadingDegrees = it },
-        originLabel = strings.originLabel,
-        destinationLabel = strings.destinationLabel
+        renderContext = renderContext,
+        callbacks = MapScreenEffectCallbacks(
+            requestLocationPermissions = requestLocationPermissions,
+            onNavigationHeadingChanged = { navigationHeadingDegrees = it }
+        )
     )
 
-    Box(modifier = modifier.fillMaxSize()) {
+    LaunchedEffect(uiState.modoRuta) {
+        if (uiState.modoRuta) {
+            topOverlayHeightPx = 0f
+        }
+    }
+
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val navigationBarsBottomPadding = WindowInsets.navigationBars
+            .asPaddingValues()
+            .calculateBottomPadding()
+        val effectiveFloatingActionsBottomPadding = maxOf(
+            floatingActionsBottomPadding,
+            navigationBarsBottomPadding + 16.dp
+        )
+        val availableHeightPx = with(density) {
+            maxHeight.toPx() - effectiveFloatingActionsBottomPadding.toPx() - topOverlayHeightPx
+        }
+        val floatingActionsLayout = resolveFloatingActionsLayout(
+            freeHeightPx = availableHeightPx,
+            density = density,
+            hasPoiAction = uiState.puntsInteres.isNotEmpty()
+        )
+
         MapViewSurface(
             mapView = mapView,
             uiState = uiState,
@@ -135,30 +200,35 @@ fun MapLibreScreen(
 
         MainMapOverlay(
             uiState = uiState,
-            currentUser = currentUser,
-            onLoginClick = onLoginClick,
-            onProfileClick = onProfileClick,
-            onOrigenChange = { text ->
-                viewModel.onTextoBuscadorModificado(text, textField.ORIGIN)
-                if (text.isEmpty()) {
-                    viewModel.limpiarOrigen()
-                    viewModel.cancelarRutaVisual()
-                }
-            },
-            onDestinoChange = { text ->
-                viewModel.onTextoBuscadorModificado(text, textField.DESTINY)
-                if (text.isEmpty()) {
-                    viewModel.limpiarDestino()
-                    viewModel.cancelarRutaVisual()
-                }
-            },
-            onOrigenFocus = {
-                viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN)
-            },
-            onDestinoFocus = {
-                viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY)
-            },
-            onAdrecaSeleccionada = onAddressSelected
+            accountActions = TopPanelAccountActions(
+                currentUser = currentUser,
+                onLoginClick = onLoginClick,
+                onProfileClick = onProfileClick
+            ),
+            callbacks = TopSearchPanelCallbacks(
+                onOrigenChange = { text ->
+                    viewModel.onTextoBuscadorModificado(text, textField.ORIGIN)
+                    if (text.isEmpty()) {
+                        viewModel.limpiarOrigen()
+                        viewModel.cancelarRutaVisual()
+                    }
+                },
+                onDestinoChange = { text ->
+                    viewModel.onTextoBuscadorModificado(text, textField.DESTINY)
+                    if (text.isEmpty()) {
+                        viewModel.limpiarDestino()
+                        viewModel.cancelarRutaVisual()
+                    }
+                },
+                onOrigenFocus = {
+                    viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN)
+                },
+                onDestinoFocus = {
+                    viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY)
+                },
+                onAdrecaSeleccionada = onAddressSelected,
+                onHeightChanged = { topOverlayHeightPx = it }
+            )
         )
 
         RouteExperienceOverlay(
@@ -184,15 +254,25 @@ fun MapLibreScreen(
 
         MapFloatingActions(
             uiState = uiState,
-            bottomPadding = floatingActionsBottomPadding,
-            hideExtraInfoLabel = strings.hideExtraInfoLabel,
-            showExtraInfoLabel = strings.showExtraInfoLabel,
-            standardMapStyleLabel = strings.standardMapStyleLabel,
-            satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
-            myLocationLabel = strings.myLocationLabel,
-            onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
-            onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
-            onMyLocationClick = onCenterCurrentLocation
+            state = FloatingActionsState(
+                bottomPadding = effectiveFloatingActionsBottomPadding,
+                compactMode = floatingActionsLayout.compactMode,
+                showPoiAction = floatingActionsLayout.showPoiAction,
+                showMapStyleAction = floatingActionsLayout.showMapStyleAction,
+                showMyLocationAction = floatingActionsLayout.showMyLocationAction
+            ),
+            labels = FloatingActionLabels(
+                hideExtraInfoLabel = strings.hideExtraInfoLabel,
+                showExtraInfoLabel = strings.showExtraInfoLabel,
+                standardMapStyleLabel = strings.standardMapStyleLabel,
+                satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
+                myLocationLabel = strings.myLocationLabel
+            ),
+            callbacks = FloatingActionCallbacks(
+                onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
+                onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
+                onMyLocationClick = onCenterCurrentLocation
+            )
         )
 
         CalculatingRouteOverlay(
@@ -248,88 +328,79 @@ private fun rememberLocationPermissionRequester(
 
 @Composable
 private fun MapScreenEffects(
-    mapView: MapView,
     currentLanguage: AppLanguage,
     uiState: MapUiState,
-    context: Context,
-    viewModel: MapViewModel,
-    requestLocationPermissions: () -> Unit,
-    navigationHeadingDegrees: Float?,
-    onNavigationHeadingChanged: (Float?) -> Unit,
-    originLabel: String,
-    destinationLabel: String
+    renderContext: MapRenderContext,
+    callbacks: MapScreenEffectCallbacks
 ) {
     PrepareMapSessionEffect(
-        mapView = mapView,
-        viewModel = viewModel
+        mapView = renderContext.mapView,
+        viewModel = renderContext.viewModel
     )
     LanguageChangeEffect(
         currentLanguage = currentLanguage,
-        viewModel = viewModel
+        viewModel = renderContext.viewModel
     )
     InitialLocationPermissionEffect(
-        context = context,
-        viewModel = viewModel,
-        requestLocationPermissions = requestLocationPermissions
+        context = renderContext.context,
+        viewModel = renderContext.viewModel,
+        requestLocationPermissions = callbacks.requestLocationPermissions
     )
     LocationComponentActivationEffect(
         locationGranted = uiState.locationGranted,
         mapaListo = uiState.mapaListo,
         ultimaUbicacion = uiState.ultimaUbicacion,
-        mapView = mapView
+        mapView = renderContext.mapView
     )
     NavigationHeadingSensorEffect(
-        context = context,
+        context = renderContext.context,
         enabled = uiState.modoRuta && !uiState.routeCompleted && uiState.navigationCameraFollowing,
-        onHeadingChanged = onNavigationHeadingChanged
+        onHeadingChanged = callbacks.onNavigationHeadingChanged
     )
     NavigationCameraTrackingEffect(
-        locationGranted = uiState.locationGranted,
-        mapaListo = uiState.mapaListo,
-        modoRuta = uiState.modoRuta,
-        routeCompleted = uiState.routeCompleted,
-        navigationCameraFollowing = uiState.navigationCameraFollowing,
-        currentLocation = uiState.ultimaUbicacion,
-        headingDegrees = navigationHeadingDegrees,
-        mapView = mapView,
+        trackingState = NavigationTrackingState(
+            locationGranted = uiState.locationGranted,
+            mapaListo = uiState.mapaListo,
+            modoRuta = uiState.modoRuta,
+            routeCompleted = uiState.routeCompleted,
+            navigationCameraFollowing = uiState.navigationCameraFollowing,
+            currentLocation = uiState.ultimaUbicacion
+        ),
+        mapView = renderContext.mapView,
+        headingDegrees = renderContext.navigationHeadingDegrees
     )
     NavigationCameraGestureDismissEffect(
-        mapView = mapView,
+        mapView = renderContext.mapView,
         uiState = uiState,
-        viewModel = viewModel
+        viewModel = renderContext.viewModel
     )
     RouteRecalculationEffect(
         destinoSeleccionado = uiState.destinoSeleccionado,
         origenSeleccionado = uiState.origenSeleccionado,
         ultimaUbicacion = uiState.ultimaUbicacion,
-        viewModel = viewModel
+        viewModel = renderContext.viewModel
     )
     NavigationNoticeEffect(
         navigationNotice = uiState.navigationNotice,
-        context = context,
-        viewModel = viewModel
+        context = renderContext.context,
+        viewModel = renderContext.viewModel
     )
     MapStyleRenderingEffect(
-        mapView = mapView,
         uiState = uiState,
-        context = context,
-        viewModel = viewModel,
-        navigationHeadingDegrees = navigationHeadingDegrees,
-        originLabel = originLabel,
-        destinationLabel = destinationLabel
+        renderContext = renderContext
     )
     LocationUpdatesEffect(
         locationGranted = uiState.locationGranted,
-        context = context,
-        mapView = mapView,
-        viewModel = viewModel
+        context = renderContext.context,
+        mapView = renderContext.mapView,
+        viewModel = renderContext.viewModel
     )
     InitialZoomEffect(
         ultimaUbicacion = uiState.ultimaUbicacion,
         mapaListo = uiState.mapaListo,
         firstLocationZoomDone = uiState.firstLocationZoomDone,
-        mapView = mapView,
-        viewModel = viewModel
+        mapView = renderContext.mapView,
+        viewModel = renderContext.viewModel
     )
 }
 
@@ -444,13 +515,8 @@ private fun NavigationNoticeEffect(
 
 @Composable
 private fun MapStyleRenderingEffect(
-    mapView: MapView,
     uiState: MapUiState,
-    context: Context,
-    viewModel: MapViewModel,
-    navigationHeadingDegrees: Float?,
-    originLabel: String,
-    destinationLabel: String
+    renderContext: MapRenderContext
 ) {
     LaunchedEffect(
         uiState.estiloSatelite,
@@ -462,18 +528,13 @@ private fun MapStyleRenderingEffect(
         uiState.destinoSeleccionado
     ) {
         val targetStyleUrl = resolveMapStyleUrl(uiState.estiloSatelite)
-        mapView.getMapAsync { map ->
+        renderContext.mapView.getMapAsync { map ->
             val currentStyle = map.style
             if (currentStyle?.isFullyLoaded == true && currentStyle.uri == targetStyleUrl) {
                 renderMapStateAfterStyleLoaded(
                     map = map,
-                    mapView = mapView,
                     uiState = uiState,
-                    context = context,
-                    viewModel = viewModel,
-                    navigationHeadingDegrees = navigationHeadingDegrees,
-                    originLabel = originLabel,
-                    destinationLabel = destinationLabel
+                    renderContext = renderContext
                 )
                 return@getMapAsync
             }
@@ -481,17 +542,88 @@ private fun MapStyleRenderingEffect(
             map.setStyle(targetStyleUrl) {
                 renderMapStateAfterStyleLoaded(
                     map = map,
-                    mapView = mapView,
                     uiState = uiState,
-                    context = context,
-                    viewModel = viewModel,
-                    navigationHeadingDegrees = navigationHeadingDegrees,
-                    originLabel = originLabel,
-                    destinationLabel = destinationLabel
+                    renderContext = renderContext
                 )
             }
         }
     }
+}
+
+private fun resolveFloatingActionsLayout(
+    freeHeightPx: Float,
+    density: androidx.compose.ui.unit.Density,
+    hasPoiAction: Boolean
+): FloatingActionsLayout {
+    val safeFreeHeightPx = (freeHeightPx - with(density) { 24.dp.toPx() }).coerceAtLeast(0f)
+    val layoutCandidates = floatingActionsLayoutCandidates(hasPoiAction)
+
+    return layoutCandidates.firstOrNull { layout ->
+        safeFreeHeightPx >= with(density) { estimatedFloatingActionsHeight(layout).toPx() }
+    } ?: layoutCandidates.last()
+}
+
+private fun floatingActionsLayoutCandidates(hasPoiAction: Boolean): List<FloatingActionsLayout> {
+    return listOf(
+        FloatingActionsLayout(
+            compactMode = false,
+            showPoiAction = hasPoiAction,
+            showMapStyleAction = true,
+            showMyLocationAction = true
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = hasPoiAction,
+            showMapStyleAction = true,
+            showMyLocationAction = true
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = false,
+            showMapStyleAction = true,
+            showMyLocationAction = true
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = false,
+            showMapStyleAction = false,
+            showMyLocationAction = true
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = false,
+            showMapStyleAction = false,
+            showMyLocationAction = false
+        )
+    )
+}
+
+private fun estimatedFloatingActionsHeight(layout: FloatingActionsLayout): Dp {
+    val itemHeights = listOfNotNull(
+        floatingActionHeightOrNull(layout.showPoiAction, layout.compactMode, compactHeight = 34.dp, expandedHeight = 40.dp),
+        floatingActionHeightOrNull(layout.showMapStyleAction, layout.compactMode, compactHeight = 34.dp, expandedHeight = 40.dp),
+        floatingActionHeightOrNull(layout.showMyLocationAction, layout.compactMode, compactHeight = 46.dp, expandedHeight = 54.dp)
+    )
+
+    if (itemHeights.isEmpty()) {
+        return 0.dp
+    }
+
+    val spacing = if (layout.compactMode) 8.dp else 10.dp
+    return itemHeights.reduce { total, item -> total + item } + spacing * (itemHeights.size - 1)
+}
+
+private fun floatingActionHeightOrNull(
+    visible: Boolean,
+    compactMode: Boolean,
+    compactHeight: Dp,
+    expandedHeight: Dp
+): Dp? {
+    if (!visible) {
+        return null
+    }
+
+    return if (compactMode) compactHeight else expandedHeight
 }
 
 @Composable
@@ -537,36 +669,31 @@ private fun InitialZoomEffect(
 
 @Composable
 private fun NavigationCameraTrackingEffect(
-    locationGranted: Boolean,
-    mapaListo: Boolean,
-    modoRuta: Boolean,
-    routeCompleted: Boolean,
-    navigationCameraFollowing: Boolean,
-    currentLocation: Location?,
-    headingDegrees: Float?,
-    mapView: MapView
+    trackingState: NavigationTrackingState,
+    mapView: MapView,
+    headingDegrees: Float?
 ) {
     LaunchedEffect(
-        locationGranted,
-        mapaListo,
-        modoRuta,
-        routeCompleted,
-        navigationCameraFollowing,
-        currentLocation?.latitude,
-        currentLocation?.longitude,
-        currentLocation?.bearing,
+        trackingState.locationGranted,
+        trackingState.mapaListo,
+        trackingState.modoRuta,
+        trackingState.routeCompleted,
+        trackingState.navigationCameraFollowing,
+        trackingState.currentLocation?.latitude,
+        trackingState.currentLocation?.longitude,
+        trackingState.currentLocation?.bearing,
         headingDegrees?.toInt()
     ) {
-        if (!locationGranted || !mapaListo) {
+        if (!trackingState.locationGranted || !trackingState.mapaListo) {
             return@LaunchedEffect
         }
 
         syncNavigationCameraTracking(
             mapView = mapView,
-            modoRuta = modoRuta,
-            routeCompleted = routeCompleted,
-            navigationCameraFollowing = navigationCameraFollowing,
-            currentLocation = currentLocation,
+            modoRuta = trackingState.modoRuta,
+            routeCompleted = trackingState.routeCompleted,
+            navigationCameraFollowing = trackingState.navigationCameraFollowing,
+            currentLocation = trackingState.currentLocation,
             headingDegrees = headingDegrees?.toDouble(),
             applyZoom = false
         )
@@ -666,6 +793,7 @@ private fun configureMapClickHandling(
             uiState = uiStateProvider(),
             viewModel = viewModel
         )
+        true
     }
 }
 
@@ -674,9 +802,9 @@ private fun handleMapClick(
     point: LatLng,
     uiState: MapUiState,
     viewModel: MapViewModel
-): Boolean {
+){
     if (uiState.modoRuta) {
-        return true
+        return
     }
 
     viewModel.onMapClicked(point)
@@ -684,7 +812,6 @@ private fun handleMapClick(
         CameraUpdateFactory.newLatLngZoom(point, 15.0),
         1000
     )
-    return true
 }
 
 private fun processLocationPermissionResult(
@@ -838,54 +965,49 @@ private fun requestRouteCalculation(
 
 private fun renderMapStateAfterStyleLoaded(
     map: MapLibreMap,
-    mapView: MapView,
     uiState: MapUiState,
-    context: Context,
-    viewModel: MapViewModel,
-    navigationHeadingDegrees: Float?,
-    originLabel: String,
-    destinationLabel: String
+    renderContext: MapRenderContext
 ) {
-    viewModel.onMapaListo()
+    renderContext.viewModel.onMapaListo()
     enableLocationOnMapIfNeeded(
         locationGranted = uiState.locationGranted,
-        mapView = mapView,
+        mapView = renderContext.mapView,
         currentLocation = uiState.ultimaUbicacion
     )
     syncNavigationCameraTracking(
-        mapView = mapView,
+        mapView = renderContext.mapView,
         modoRuta = uiState.modoRuta,
         routeCompleted = uiState.routeCompleted,
         navigationCameraFollowing = uiState.navigationCameraFollowing,
         currentLocation = uiState.ultimaUbicacion,
-        headingDegrees = navigationHeadingDegrees?.toDouble(),
+        headingDegrees = renderContext.navigationHeadingDegrees?.toDouble(),
         applyZoom = false
     )
 
     if (uiState.rutaCoordenades.isNotEmpty()) {
         drawCurrentRoute(
-            mapView = mapView,
+            mapView = renderContext.mapView,
             uiState = uiState,
-            context = context,
-            originLabel = originLabel,
-            destinationLabel = destinationLabel
+            context = renderContext.context,
+            originLabel = renderContext.originLabel,
+            destinationLabel = renderContext.destinationLabel
         )
         addPoiMarkersIfVisible(
             map = map,
             mostrarPuntsInteres = uiState.mostrarPuntsInteres,
             puntsInteres = uiState.puntsInteres,
-            context = context
+            context = renderContext.context
         )
         return
     }
 
     addSelectionMarkers(
         map = map,
-        context = context,
+        context = renderContext.context,
         origin = uiState.origenSeleccionado,
         destination = uiState.destinoSeleccionado,
-        originLabel = originLabel,
-        destinationLabel = destinationLabel
+        originLabel = renderContext.originLabel,
+        destinationLabel = renderContext.destinationLabel
     )
 }
 
