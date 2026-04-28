@@ -37,6 +37,7 @@
     <string name="navigation_route_recalculated_notice">You moved more than %1$s away from the route. Recalculating.</string>
     <string name="navigation_route_completed_title">Route completed</string>
     <string name="navigation_route_completed_message">You have reached your destination. Tap Exit to close the route.</string>
+    <string name="navigation_route_summary_title">Route summary</string>
     <string name="navigation_route_summary_distance">Distance walked</string>
     <string name="navigation_route_summary_duration">Total time</string>
     <string name="exit_route">Exit</string>

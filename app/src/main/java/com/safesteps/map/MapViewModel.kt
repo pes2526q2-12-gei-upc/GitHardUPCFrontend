@@ -78,6 +78,7 @@ class MapViewModel(
                 durationText = DEFAULT_DURATION_TEXT,
                 etaText = DEFAULT_ETA_TEXT,
                 rutaCoordenades = emptyList(),
+                activeRouteMode = ActiveRouteMode.NONE,
                 modoRuta = false,
                 navigationCameraFollowing = false,
                 routeCompleted = false,
@@ -98,6 +99,7 @@ class MapViewModel(
         resetNavigationState()
         _uiState.update { it.copy(
             rutaCoordenades = emptyList(),
+            activeRouteMode = ActiveRouteMode.NONE,
             modoRuta = false,
             navigationCameraFollowing = false,
             routeCompleted = false,
@@ -300,21 +302,29 @@ class MapViewModel(
         }
     }
 
-    fun iniciarNavegacio() {
+    fun iniciarRuta(): ActiveRouteMode {
+        val startedRouteMode = resolveStartedRouteMode(
+            selectedOrigin = _uiState.value.origenSeleccionado?.toCoordenada(),
+            currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada()
+        )
         lastNavigationProgressMeters = 0.0
         _uiState.update {
             it.copy(
+                activeRouteMode = startedRouteMode,
                 modoRuta = true,
-                navigationCameraFollowing = true,
+                navigationCameraFollowing = startedRouteMode == ActiveRouteMode.USER_LOCATION_NAVIGATION,
                 routeCompleted = false,
                 routeCompletionSummary = null,
+                activeNavigationInstruction = null,
                 navigationNotice = null
             )
         }
-        refreshNavigationProgress(
-            currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate(),
-            force = true
-        )
+        if (startedRouteMode == ActiveRouteMode.USER_LOCATION_NAVIGATION) {
+            refreshNavigationProgress(
+                currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate()
+            )
+        }
+        return startedRouteMode
     }
 
     fun onMapaListo() {
@@ -323,7 +333,7 @@ class MapViewModel(
 
     fun onNavigationCameraDismissedByGesture() {
         _uiState.update { state ->
-            if (!state.modoRuta || !state.navigationCameraFollowing) {
+            if (!state.usesLiveNavigation || !state.navigationCameraFollowing) {
                 state
             } else {
                 state.copy(navigationCameraFollowing = false)
@@ -333,7 +343,7 @@ class MapViewModel(
 
     fun resumeNavigationCameraTracking() {
         _uiState.update { state ->
-            if (!state.modoRuta || state.routeCompleted) {
+            if (!state.usesLiveNavigation || state.routeCompleted) {
                 state
             } else {
                 state.copy(navigationCameraFollowing = true)
@@ -466,10 +476,9 @@ class MapViewModel(
             )
         }
 
-        if (_uiState.value.modoRuta) {
+        if (_uiState.value.usesLiveNavigation) {
             refreshNavigationProgress(
-                currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate(),
-                force = true
+                currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate()
             )
         }
     }
@@ -481,15 +490,12 @@ class MapViewModel(
         lastAutomaticRecalculationAtMs = 0L
     }
 
-    private fun refreshNavigationProgress(
-        currentLocation: Coordenada?,
-        force: Boolean = false
-    ) {
+    private fun refreshNavigationProgress(currentLocation: Coordenada?) {
         val route = navigationRoute ?: return
         val location = currentLocation ?: return
         val state = _uiState.value
 
-        if (!force && !state.modoRuta) {
+        if (!state.usesLiveNavigation) {
             return
         }
 
@@ -516,9 +522,14 @@ class MapViewModel(
         lastNavigationProgressMeters = progress.progressMeters
 
         val remainingDurationMinutes = remainingDurationMinutes(progress.instruction.remainingDistanceMeters)
+        val remainingCoordinates = remainingRouteCoordinates(
+            route = route,
+            progressMeters = progress.progressMeters
+        )
 
         _uiState.update {
             it.copy(
+                rutaCoordenades = remainingCoordinates,
                 activeNavigationInstruction = progress.instruction,
                 distanceText = formatDistance(progress.instruction.remainingDistanceMeters),
                 durationText = formatDuration(remainingDurationMinutes),
@@ -531,7 +542,7 @@ class MapViewModel(
         state: MapUiState,
         progress: NavigationProgressResult
     ): Boolean {
-        if (!state.modoRuta || state.calculantRuta || state.routeCompleted) {
+        if (!state.usesLiveNavigation || state.calculantRuta || state.routeCompleted) {
             return false
         }
 
@@ -609,17 +620,26 @@ class MapViewModel(
         }
 
         val routeSummary = currentRouteSummary
+        val routeProgressReferenceDistanceMeters = navigationRoute?.totalDistanceMeters
         return when {
             routeSummary != null &&
                 routeSummary.totalDurationMinutes > 0 &&
+                routeProgressReferenceDistanceMeters != null &&
+                routeProgressReferenceDistanceMeters > 0.0 -> {
+                proportionalRemainingDurationMinutes(
+                    totalDurationMinutes = routeSummary.totalDurationMinutes,
+                    remainingDistanceMeters = remainingDistanceMeters,
+                    routeProgressReferenceDistanceMeters = routeProgressReferenceDistanceMeters
+                )
+            }
+
+            routeSummary != null &&
+                routeSummary.totalDurationMinutes > 0 &&
                 routeSummary.totalDistanceMeters > 0.0 -> {
-                max(
-                    1,
-                    (
-                        routeSummary.totalDurationMinutes.toDouble() *
-                            remainingDistanceMeters /
-                            routeSummary.totalDistanceMeters
-                        ).roundToInt()
+                proportionalRemainingDurationMinutes(
+                    totalDurationMinutes = routeSummary.totalDurationMinutes,
+                    remainingDistanceMeters = remainingDistanceMeters,
+                    routeProgressReferenceDistanceMeters = routeSummary.totalDistanceMeters
                 )
             }
 
@@ -632,7 +652,7 @@ class MapViewModel(
     }
 
     private fun routeOriginForState(state: MapUiState): Coordenada? {
-        return if (state.modoRuta) {
+        return if (state.usesLiveNavigation) {
             state.ultimaUbicacion?.toCoordenada() ?: state.origenSeleccionado?.toCoordenada()
         } else {
             state.origenSeleccionado?.toCoordenada() ?: state.ultimaUbicacion?.toCoordenada()
@@ -666,4 +686,33 @@ internal fun formatReadableDuration(durationMinutes: Int): String {
         minutes == 0 -> "$hours h"
         else -> "$hours h $minutes min"
     }
+}
+
+internal fun proportionalRemainingDurationMinutes(
+    totalDurationMinutes: Int,
+    remainingDistanceMeters: Double,
+    routeProgressReferenceDistanceMeters: Double
+): Int {
+    require(totalDurationMinutes > 0) {
+        "totalDurationMinutes must be greater than 0"
+    }
+    require(routeProgressReferenceDistanceMeters > 0.0) {
+        "routeProgressReferenceDistanceMeters must be greater than 0"
+    }
+
+    val clampedRemainingDistanceMeters = remainingDistanceMeters
+        .coerceIn(0.0, routeProgressReferenceDistanceMeters)
+
+    if (clampedRemainingDistanceMeters <= 0.0) {
+        return 0
+    }
+
+    return max(
+        1,
+        (
+            totalDurationMinutes.toDouble() *
+                clampedRemainingDistanceMeters /
+                routeProgressReferenceDistanceMeters
+            ).roundToInt()
+    )
 }

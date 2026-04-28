@@ -26,7 +26,8 @@ fun drawRoute(
     desti: LatLng?,
     context: Context,
     originTitle: String,
-    destinationTitle: String
+    destinationTitle: String,
+    animateCamera: Boolean = true
 ) {
     if (coordenades.isEmpty()) return
 
@@ -38,7 +39,9 @@ fun drawRoute(
         val puntsRuta = buildRoutePoints(coordenades, origen, desti)
         drawRoutePolyline(map, puntsRuta)
         addRouteMarkers(map, origen, desti, context, originTitle, destinationTitle)
-        animateCameraToRoute(map, puntsRuta)
+        if (animateCamera) {
+            animateCameraToRoute(map, puntsRuta)
+        }
     }
 }
 

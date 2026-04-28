@@ -236,14 +236,22 @@ fun MapLibreScreen(
             showProfilePreferences = !currentUser?.googleId.isNullOrBlank(),
             onPrioritySelected = onPrioritySelected,
             onStartRoute = {
-                viewModel.iniciarNavegacio()
-                uiState.ultimaUbicacion?.let { location ->
-                    enableNavigationCameraTracking(
-                        mapView = mapView,
-                        currentLocation = location,
-                        headingDegrees = navigationHeadingDegrees?.toDouble(),
-                        applyZoom = true
-                    )
+                when (viewModel.iniciarRuta()) {
+                    ActiveRouteMode.USER_LOCATION_NAVIGATION -> {
+                        uiState.ultimaUbicacion?.let { location ->
+                            enableNavigationCameraTracking(
+                                mapView = mapView,
+                                currentLocation = location,
+                                headingDegrees = navigationHeadingDegrees?.toDouble(),
+                                applyZoom = true
+                            )
+                        }
+                    }
+
+                    ActiveRouteMode.FIXED_OVERVIEW,
+                    ActiveRouteMode.NONE -> {
+                        disableNavigationCameraTracking(mapView)
+                    }
                 }
             },
             onClose = resetToMainMenu,
@@ -354,14 +362,14 @@ private fun MapScreenEffects(
     )
     NavigationHeadingSensorEffect(
         context = renderContext.context,
-        enabled = uiState.modoRuta && !uiState.routeCompleted && uiState.navigationCameraFollowing,
+        enabled = uiState.usesLiveNavigation && !uiState.routeCompleted && uiState.navigationCameraFollowing,
         onHeadingChanged = callbacks.onNavigationHeadingChanged
     )
     NavigationCameraTrackingEffect(
         trackingState = NavigationTrackingState(
             locationGranted = uiState.locationGranted,
             mapaListo = uiState.mapaListo,
-            modoRuta = uiState.modoRuta,
+            modoRuta = uiState.usesLiveNavigation,
             routeCompleted = uiState.routeCompleted,
             navigationCameraFollowing = uiState.navigationCameraFollowing,
             currentLocation = uiState.ultimaUbicacion
@@ -909,7 +917,7 @@ private fun recenterOnCurrentLocation(
     val currentLocation = uiState.ultimaUbicacion
 
     if (uiState.modoRuta) {
-        if (!uiState.routeCompleted) {
+        if (uiState.usesLiveNavigation && !uiState.routeCompleted) {
             viewModel.resumeNavigationCameraTracking()
             enableNavigationCameraTracking(
                 mapView = mapView,
@@ -926,7 +934,7 @@ private fun recenterOnCurrentLocation(
 
         if (currentLocation == null) {
             Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
-        } else if (uiState.routeCompleted) {
+        } else if (!uiState.usesLiveNavigation || uiState.routeCompleted) {
             centerMapOnLocation(mapView, currentLocation)
         }
         return
@@ -1052,7 +1060,7 @@ private fun drawCurrentRoute(
     originLabel: String,
     destinationLabel: String
 ) {
-    val routeOrigin = if (uiState.modoRuta) {
+    val routeOrigin = if (uiState.usesLiveNavigation) {
         uiState.ultimaUbicacion?.toLatLng() ?: uiState.origenSeleccionado
     } else {
         uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.toLatLng()
@@ -1065,7 +1073,8 @@ private fun drawCurrentRoute(
         desti = uiState.destinoSeleccionado,
         context = context,
         originTitle = originLabel,
-        destinationTitle = destinationLabel
+        destinationTitle = destinationLabel,
+        animateCamera = !uiState.usesLiveNavigation
     )
 }
 

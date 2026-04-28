@@ -36,6 +36,7 @@
     <string name="navigation_route_recalculated_notice">Te has desviado m&#225;s de %1$s de la ruta. Recalculando.</string>
     <string name="navigation_route_completed_title">Ruta finalizada</string>
     <string name="navigation_route_completed_message">Has llegado a tu destino. Pulsa Salir para cerrar la ruta.</string>
+    <string name="navigation_route_summary_title">Resumen de la ruta</string>
     <string name="navigation_route_summary_distance">Distancia recorrida</string>
     <string name="navigation_route_summary_duration">Tiempo total</string>
     <string name="exit_route">Salir</string>

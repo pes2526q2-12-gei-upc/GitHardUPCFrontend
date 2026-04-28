@@ -582,19 +582,122 @@ private fun NavigationTopBanner(
     }
 }
 
+@Composable
+private fun FixedRouteSummaryCard(
+    destinationText: String,
+    distanceText: String,
+    durationText: String,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val closeLabel = appString(R.string.close)
+    val summaryTitle = appString(R.string.navigation_route_summary_title)
+    val destinationFallback = appString(R.string.destination_label)
+    val resolvedDestination = destinationText.ifBlank { destinationFallback }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(30.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(54.dp),
+                    shape = CircleShape,
+                    color = Color(0xFFFFF1E8)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                            contentDescription = null,
+                            tint = Color(0xFFC86A37),
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = summaryTitle,
+                        color = Color(0xFF5F6368),
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = compactDestinationText(resolvedDestination),
+                        color = Color(0xFF202124),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    shape = CircleShape,
+                    color = Color(0xFFF1F3F4)
+                ) {
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = closeLabel,
+                            tint = Color(0xFF3D4A45)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                NavigationCompactMetric(
+                    icon = Icons.Default.LocationOn,
+                    value = distanceText,
+                    accentColor = Color(0xFF1A73E8),
+                    modifier = Modifier.weight(1f)
+                )
+                NavigationCompactMetric(
+                    icon = Icons.Default.AccessTime,
+                    value = durationText,
+                    accentColor = Color(0xFF34A853),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
 private fun routeOverlayBottomPadding(
     uiState: MapUiState,
     density: androidx.compose.ui.unit.Density,
     sheetHeightPx: Float,
     sheetOffsetPx: Float,
     routeBottomBarHeightPx: Float,
+    fixedRouteSummaryCardHeightPx: Float,
     routeCompletedCardHeightPx: Float
 ): Dp {
     val plannerFloatingActionsClearance = 40.dp
 
     return when {
-        uiState.routeCompleted -> with(density) { routeCompletedCardHeightPx.toDp() } + 18.dp
-        uiState.modoRuta -> with(density) { routeBottomBarHeightPx.toDp() } + 18.dp
+        uiState.usesLiveNavigation && uiState.routeCompleted -> {
+            with(density) { routeCompletedCardHeightPx.toDp() } + 18.dp
+        }
+        uiState.usesLiveNavigation -> with(density) { routeBottomBarHeightPx.toDp() } + 18.dp
+        uiState.showsFixedRouteSummary -> with(density) { fixedRouteSummaryCardHeightPx.toDp() } + 18.dp
         uiState.destinoSeleccionado != null -> {
             val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
             with(density) { currentVisibleHeightPx.toDp() } + plannerFloatingActionsClearance
@@ -621,7 +724,7 @@ private fun overlayPlannerSheetState(uiState: MapUiState): RoutePlannerSheetStat
 @Composable
 private fun BoxScope.NavigationTopBannerOverlay(uiState: MapUiState) {
     AnimatedVisibility(
-        visible = uiState.modoRuta && !uiState.routeCompleted,
+        visible = uiState.usesLiveNavigation && !uiState.routeCompleted,
         enter = slideInVertically(initialOffsetY = { -it / 2 }),
         exit = slideOutVertically(targetOffsetY = { -it / 2 }),
         modifier = Modifier
@@ -632,6 +735,34 @@ private fun BoxScope.NavigationTopBannerOverlay(uiState: MapUiState) {
         NavigationTopBanner(
             destinationText = uiState.textoDestino,
             activeInstruction = uiState.activeNavigationInstruction
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.FixedRouteSummaryBottomCardOverlay(
+    uiState: MapUiState,
+    fixedRouteSummaryCardHeightPxState: androidx.compose.runtime.MutableFloatState,
+    onClose: () -> Unit
+) {
+    AnimatedVisibility(
+        visible = uiState.showsFixedRouteSummary,
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it }),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .onGloballyPositioned {
+                fixedRouteSummaryCardHeightPxState.floatValue = it.size.height.toFloat()
+            }
+    ) {
+        FixedRouteSummaryCard(
+            destinationText = uiState.textoDestino,
+            distanceText = uiState.distanceText,
+            durationText = uiState.durationText,
+            onClose = onClose,
+            modifier = Modifier
+                .navigationBarsPadding()
+                .padding(start = 10.dp, end = 10.dp, bottom = 10.dp)
         )
     }
 }
@@ -695,7 +826,7 @@ private fun BoxScope.RouteActiveBottomBarOverlay(
     onClose: () -> Unit
 ) {
     AnimatedVisibility(
-        visible = uiState.modoRuta && !uiState.routeCompleted,
+        visible = uiState.usesLiveNavigation && !uiState.routeCompleted,
         enter = slideInVertically(initialOffsetY = { it }),
         exit = slideOutVertically(targetOffsetY = { it }),
         modifier = Modifier
@@ -720,7 +851,7 @@ private fun BoxScope.RouteCompletedBottomCardOverlay(
     onClose: () -> Unit
 ) {
     AnimatedVisibility(
-        visible = uiState.routeCompleted && uiState.routeCompletionSummary != null,
+        visible = uiState.usesLiveNavigation && uiState.routeCompleted && uiState.routeCompletionSummary != null,
         enter = slideInVertically(initialOffsetY = { it }),
         exit = slideOutVertically(targetOffsetY = { it }),
         modifier = Modifier
@@ -1107,6 +1238,7 @@ internal fun BoxScope.RouteExperienceOverlay(
     val sheetHeightPxState = remember { mutableFloatStateOf(0f) }
     var sheetOffsetPx by remember { mutableFloatStateOf(0f) }
     val routeBottomBarHeightPxState = remember { mutableFloatStateOf(0f) }
+    val fixedRouteSummaryCardHeightPxState = remember { mutableFloatStateOf(0f) }
     val routeCompletedCardHeightPxState = remember { mutableFloatStateOf(0f) }
 
     val visibleSheetHeightPx = with(density) { 150.dp.toPx() }
@@ -1119,6 +1251,7 @@ internal fun BoxScope.RouteExperienceOverlay(
             sheetHeightPx = sheetHeightPxState.floatValue,
             sheetOffsetPx = sheetOffsetPx,
             routeBottomBarHeightPx = routeBottomBarHeightPxState.floatValue,
+            fixedRouteSummaryCardHeightPx = fixedRouteSummaryCardHeightPxState.floatValue,
             routeCompletedCardHeightPx = routeCompletedCardHeightPxState.floatValue
         ),
         label = "routeOverlayBottomPadding"
@@ -1141,6 +1274,11 @@ internal fun BoxScope.RouteExperienceOverlay(
     }
 
     NavigationTopBannerOverlay(uiState = uiState)
+    FixedRouteSummaryBottomCardOverlay(
+        uiState = uiState,
+        fixedRouteSummaryCardHeightPxState = fixedRouteSummaryCardHeightPxState,
+        onClose = onClose
+    )
     RoutePlannerSheetOverlay(
         uiState = uiState,
         density = density,
