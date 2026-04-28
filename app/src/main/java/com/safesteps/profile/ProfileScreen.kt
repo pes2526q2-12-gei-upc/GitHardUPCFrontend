@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -57,7 +58,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
@@ -110,7 +113,7 @@ fun ProfileScreen(
             .statusBarsPadding()
             .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -170,7 +173,7 @@ fun ProfileScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 28.dp),
+                    .padding(horizontal = 16.dp, vertical = 22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 ProfileHeader(user = user)
@@ -278,8 +281,8 @@ private fun ProfileFiltersSection(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
-            .border(1.dp, Color(0xFFD7E5DC), RoundedCornerShape(26.dp)),
-        shape = RoundedCornerShape(26.dp),
+            .border(1.dp, Color(0xFFD7E5DC), RoundedCornerShape(22.dp)),
+        shape = RoundedCornerShape(22.dp),
         color = Color(0xFFF2F7F3)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -293,7 +296,7 @@ private fun ProfileFiltersSection(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 18.dp)
+                    .padding(horizontal = 14.dp, vertical = 14.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -307,7 +310,7 @@ private fun ProfileFiltersSection(
                         modifier = Modifier.weight(1f),
                         text = appString(R.string.profile_filters_intro_title),
                         color = Color(0xFF23333A),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
 
@@ -329,7 +332,7 @@ private fun ProfileFiltersSection(
                 Text(
                     text = appString(R.string.profile_filters_intro_message),
                     color = Color(0xFF60716A),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodySmall
                 )
 
                 if (isLoadingFilters) {
@@ -487,7 +490,7 @@ private fun FilterAccordion(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -496,7 +499,7 @@ private fun FilterAccordion(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(36.dp),
                     shape = CircleShape,
                     color = accentColor.copy(alpha = 0.14f)
                 ) {
@@ -505,7 +508,7 @@ private fun FilterAccordion(
                             imageVector = icon,
                             contentDescription = null,
                             tint = accentColor,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -516,14 +519,16 @@ private fun FilterAccordion(
                     Text(
                         text = title,
                         color = Color(0xFF23333A),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = description,
                         color = Color(0xFF77837D),
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -536,9 +541,9 @@ private fun FilterAccordion(
                     ) {
                         Text(
                             text = filterCountText,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             color = accentColor,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -566,7 +571,7 @@ private fun FilterAccordion(
                     )
 
                     if (index < filterLabels.lastIndex) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                     }
                 }
             }
@@ -592,125 +597,150 @@ private fun FilterPreferenceControl(
     }
     val selectedDescription = appString(filterLevelDescriptionResIds[safeValue])
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = Color.White
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp)
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val usesCompactHeader = maxWidth < 340.dp
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    modifier = Modifier.weight(1f),
-                    text = title,
-                    color = Color(0xFF23333A),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                PreferenceBadge(
-                    label = selectedLabel,
-                    accentColor = accentColor
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Surface(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .toggleable(
-                        value = isFilterEnabled,
-                        enabled = enabled,
-                        role = Role.Checkbox,
-                        onValueChange = onEnabledChange
-                    ),
-                shape = RoundedCornerShape(14.dp),
-                color = accentColor.copy(alpha = 0.08f),
-                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.18f))
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = isFilterEnabled,
-                        onCheckedChange = null,
-                        enabled = enabled,
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = accentColor,
-                            uncheckedColor = Color(0xFF8A948F),
-                            checkmarkColor = Color.White
+                if (usesCompactHeader) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = title,
+                            color = Color(0xFF23333A),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
-                    )
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
-                    Text(
-                        text = appString(R.string.profile_filter_toggle_label),
-                        color = Color(0xFF23333A),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = if (isFilterEnabled) {
-                    selectedDescription
+                        PreferenceBadge(
+                            label = selectedLabel,
+                            accentColor = accentColor
+                        )
+                    }
                 } else {
-                    appString(R.string.profile_filter_disabled)
-                },
-                color = Color(0xFF6D7B75),
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            if (isFilterEnabled) {
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Slider(
-                    value = safeValue.toFloat(),
-                    onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 3)) },
-                    valueRange = 0f..3f,
-                    steps = 2,
-                    enabled = enabled,
-                    colors = SliderDefaults.colors(
-                        thumbColor = accentColor,
-                        activeTrackColor = accentColor,
-                        activeTickColor = accentColor,
-                        inactiveTrackColor = Color(0xFFE3E9E6),
-                        inactiveTickColor = Color(0xFFC8D3CD)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    filterLevelResIds.forEachIndexed { index, labelResId ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             modifier = Modifier.weight(1f),
-                            text = appString(labelResId),
-                            color = if (index == safeValue) accentColor else Color(0xFF8A948F),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (index == safeValue) FontWeight.SemiBold else FontWeight.Normal,
-                            textAlign = when (index) {
-                                0 -> TextAlign.Start
-                                filterLevelResIds.lastIndex -> TextAlign.End
-                                else -> TextAlign.Center
-                            },
-                            maxLines = 2
+                            text = title,
+                            color = Color(0xFF23333A),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
                         )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        PreferenceBadge(
+                            label = selectedLabel,
+                            accentColor = accentColor
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(
+                            value = isFilterEnabled,
+                            enabled = enabled,
+                            role = Role.Checkbox,
+                            onValueChange = onEnabledChange
+                        ),
+                    shape = RoundedCornerShape(12.dp),
+                    color = accentColor.copy(alpha = 0.08f),
+                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.18f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = isFilterEnabled,
+                            onCheckedChange = null,
+                            enabled = enabled,
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = accentColor,
+                                uncheckedColor = Color(0xFF8A948F),
+                                checkmarkColor = Color.White
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        Text(
+                            text = appString(R.string.profile_filter_toggle_label),
+                            color = Color(0xFF23333A),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = if (isFilterEnabled) {
+                        selectedDescription
+                    } else {
+                        appString(R.string.profile_filter_disabled)
+                    },
+                    color = Color(0xFF6D7B75),
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                if (isFilterEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Slider(
+                        value = safeValue.toFloat(),
+                        onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 3)) },
+                        valueRange = 0f..3f,
+                        steps = 2,
+                        enabled = enabled,
+                        colors = SliderDefaults.colors(
+                            thumbColor = accentColor,
+                            activeTrackColor = accentColor,
+                            activeTickColor = accentColor,
+                            inactiveTrackColor = Color(0xFFE3E9E6),
+                            inactiveTickColor = Color(0xFFC8D3CD)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        filterLevelResIds.forEachIndexed { index, labelResId ->
+                            Text(
+                                modifier = Modifier.weight(1f),
+                                text = appString(labelResId),
+                                color = if (index == safeValue) accentColor else Color(0xFF8A948F),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    lineHeight = 12.sp
+                                ),
+                                fontWeight = if (index == safeValue) FontWeight.SemiBold else FontWeight.Normal,
+                                textAlign = when (index) {
+                                    0 -> TextAlign.Start
+                                    filterLevelResIds.lastIndex -> TextAlign.End
+                                    else -> TextAlign.Center
+                                },
+                                maxLines = 2
+                            )
+                        }
                     }
                 }
             }
@@ -729,9 +759,9 @@ private fun PreferenceBadge(
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             color = accentColor,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold
         )
     }
