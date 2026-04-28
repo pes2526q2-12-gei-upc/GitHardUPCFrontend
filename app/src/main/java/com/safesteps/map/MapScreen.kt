@@ -2,8 +2,10 @@ package com.safesteps.map
 
 import android.Manifest
 import android.content.Context
+import android.graphics.drawable.Icon
 import android.location.Location
 import android.location.LocationListener
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,6 +27,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
@@ -33,6 +37,7 @@ import com.safesteps.data.PuntInteres
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
+import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -206,15 +211,26 @@ fun MapLibreScreen(
             calculatingBestRouteLabel = strings.calculatingBestRouteLabel
         )
 
+        val textMevaUbicacio = appString(R.string.my_location)
+        val textExit = context.getString(R.string.report_registered)
+
         ReportIssueDialog(
             visible = uiState.mostrarIncidencies,
             isLoggedIn = currentUser != null,
-            defaultLocationText = appString(R.string.my_location),
-            onDismiss = { viewModel.toggleMenuIncidencies(false) },
-            onConfirm = {
+            defaultLocationText = textMevaUbicacio,
+            onDismiss = {
                 viewModel.toggleMenuIncidencies(false)
-                val missatge = context.getString(R.string.report_registered)
-                Toast.makeText(context, missatge, Toast.LENGTH_SHORT).show()
+            },
+            onConfirm = { tipus, ubicacio, descripcio ->
+                viewModel.reportIssue(
+                    tipus = tipus,
+                    adrecaText = ubicacio,
+                    descripcio = descripcio,
+                    textMevaUbicacio = textMevaUbicacio
+                )
+
+                viewModel.toggleMenuIncidencies(false)
+                Toast.makeText(context, textExit, Toast.LENGTH_SHORT).show()
             },
             onNavigateToLogin = onLoginClick,
             properties = DialogProperties(
@@ -485,7 +501,8 @@ private fun MapStyleRenderingEffect(
         uiState.mostrarPuntsInteres,
         uiState.puntsInteres,
         uiState.origenSeleccionado,
-        uiState.destinoSeleccionado
+        uiState.destinoSeleccionado,
+        uiState.issues
     ) {
         mapView.getMapAsync { map ->
             map.setStyle(resolveMapStyleUrl(uiState.estiloSatelite)) {
@@ -499,6 +516,18 @@ private fun MapStyleRenderingEffect(
                     originLabel = originLabel,
                     destinationLabel = destinationLabel
                 )
+            }
+
+            map.getStyle { _ ->
+                uiState.issues.forEach { issue ->
+                    val position = LatLng(issue.coordinates.lat, issue.coordinates.lon)
+                    addLegacyMarker(
+                        map = map,
+                        position = position,
+                        title = issue.type.name,
+                        icon = createIssueIcon(context)
+                    )
+                }
             }
         }
     }
@@ -1062,3 +1091,14 @@ private fun resolveMapStyleUrl(estiloSatelite: Boolean): String {
 }
 
 private fun Location.toLatLng(): LatLng = LatLng(latitude, longitude)
+
+private fun createIssueIcon(context: Context): org.maplibre.android.annotations.Icon? {
+    val drawable = ContextCompat.getDrawable(context, R.drawable.ic_warning_map)
+    val bitmap = drawable?.toBitmap()
+
+    return if (bitmap != null) {
+        org.maplibre.android.annotations.IconFactory.getInstance(context).fromBitmap(bitmap)
+    } else {
+        null
+    }
+}

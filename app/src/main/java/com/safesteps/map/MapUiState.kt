@@ -5,6 +5,7 @@ import androidx.annotation.StringRes
 import com.safesteps.R
 import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
+import com.safesteps.data.IssueResponseDTO
 import com.safesteps.data.PuntInteres
 import com.safesteps.domain.RoutePriority
 import org.maplibre.android.geometry.LatLng
@@ -16,8 +17,10 @@ enum class textField {
 }
 
 enum class IssueType(@StringRes val labelRes: Int) {
-    WORKSITE(R.string.issue_type_worksite),
-    OTHERS(R.string.issue_type_others)
+    OBRES(R.string.issue_type_worksite),
+    ACCESSIBILITAT(R.string.issue_type_accessibility),
+    SEGURETAT(R.string.issue_type_security),
+    ALTRES(R.string.issue_type_others)
 }
 
 data class RouteCompletionSummary(
@@ -52,6 +55,7 @@ data class MapUiState(
     val navigationNotice: String? = null,
     val calculantRuta: Boolean = false,
     val puntsInteres: List<PuntInteres> = emptyList(),
+    val issues: List<IssueResponseDTO> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
     val puntInteresSeleccionat: PuntInteres? = null,
     val mostrarIncidencies: Boolean = false

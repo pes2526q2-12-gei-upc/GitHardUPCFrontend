@@ -86,6 +86,8 @@
     <string name="report_issue">Incidencia</string>
     <string name="issue_type_worksite">Obres</string>
     <string name="issue_type_others">Altres</string>
+    <string name="issue_type_accessibility">Accessibilitat</string>
+    <string name="issue_type_security">Seguretat</string>
     <string name="report_issue_failed_label">Acció restringida</string>
     <string name="report_issue_failed_text">Unicament els usuaris registrats poden reportar incidències per motius de seguretat</string>
     <string name="report_issue_title">Informar incidencia</string>

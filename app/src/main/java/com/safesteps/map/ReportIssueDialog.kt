@@ -31,6 +31,8 @@ import com.safesteps.i18n.appString
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 
 enum class LocationWrapperState {
     MY_LOCATION,
@@ -194,7 +196,7 @@ fun ReportIssueDialog(
     isLoggedIn: Boolean,
     defaultLocationText: String,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
+    onConfirm: (IssueType, String, String) -> Unit,
     onNavigateToLogin: () -> Unit,
     modifier: Modifier = Modifier,
     properties: DialogProperties = DialogProperties(usePlatformDefaultWidth = false)
@@ -203,7 +205,7 @@ fun ReportIssueDialog(
 
     val temaTaronja = Color(0xFFF57C00)
 
-    var tipusSeleccionat by remember { mutableStateOf(IssueType.WORKSITE) }
+    var tipusSeleccionat by remember { mutableStateOf(IssueType.OBRES) }
     var descripcioText by remember { mutableStateOf("") }
     var errorMsgRes by remember { mutableStateOf<Int?>(null) }
 
@@ -301,7 +303,13 @@ fun ReportIssueDialog(
                         fontWeight = FontWeight.SemiBold,
                         color = Color.Black
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         IssueType.entries.forEach { type ->
                             FilterChip(
                                 selected = tipusSeleccionat == type,
@@ -445,7 +453,7 @@ fun ReportIssueDialog(
                                 if (wrapperState == LocationWrapperState.TYPING || ubicacioText.isBlank() || descripcioText.isBlank()) {
                                     errorMsgRes = R.string.report_error_msg_text
                                 } else {
-                                    onConfirm()
+                                    onConfirm(tipusSeleccionat, ubicacioText, descripcioText)
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = temaTaronja)

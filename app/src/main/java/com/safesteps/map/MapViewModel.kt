@@ -5,12 +5,17 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.auth.UserInfo
+import com.safesteps.data.Coord
 import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
+import com.safesteps.data.IssueApiType
+import com.safesteps.data.IssueRequestDTO
 import com.safesteps.data.PhotonApi
 import com.safesteps.data.PuntInteres
 import com.safesteps.data.RouteCoordinatesRequest
 import com.safesteps.data.RouteType
+import com.safesteps.data.crearIncidencia
+import com.safesteps.data.getAllIssues
 import com.safesteps.data.obtenirCoordenadesRuta
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
@@ -48,6 +53,9 @@ class MapViewModel(
     private var lastAutomaticRecalculationAtMs: Long = 0L
     private var currentGoogleId: String? = null
 
+    init {
+        loadIssuesMap()
+    }
     fun onLanguageChanged(language: AppLanguage) {
         currentLanguage = language
     }
@@ -659,5 +667,77 @@ class MapViewModel(
 
     fun toggleMenuIncidencies(show: Boolean){
         _uiState.update { it.copy(mostrarIncidencies = show) }
+    }
+
+    fun reportIssue(
+        tipus: IssueType,
+        adrecaText: String,
+        descripcio: String,
+        textMevaUbicacio: String
+    ) {
+        val currentGoogleIdLocal = currentGoogleId
+        if (currentGoogleIdLocal == null) {
+            Log.e("MapViewModel", "No es pot reportar sense estar logat.")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val coord = if (adrecaText == textMevaUbicacio) {
+                    val loc = _uiState.value.ultimaUbicacion
+                    if (loc == null) {
+                        Log.e("MapViewModel", "No s'ha pogut obtenir la ubicació GPS actual")
+                        return@launch
+                    }
+                    Coord(lat = loc.latitude, lon = loc.longitude)
+                } else {
+                    val idiomaRecuperat = textProvider.photonLanguage(currentLanguage)
+                    val photonResponse = PhotonApi.service.findAddress(
+                        query = adrecaText,
+                        lang = idiomaRecuperat,
+                        limit = 1
+                    )
+
+                    val feature = photonResponse.features.firstOrNull()
+                    if (feature == null) {
+                        Log.e("MapViewModel", "No s'han pogut trobar coordenades per aquesta adreça")
+                        return@launch
+                    }
+
+                    Coord(lat = feature.geometry.latitud, lon = feature.geometry.longitud)
+                }
+
+                val tipusApi = when (tipus) {
+                    IssueType.OBRES -> IssueApiType.OBRES
+                    IssueType.ACCESSIBILITAT -> IssueApiType.ACCESSIBILITAT
+                    IssueType.SEGURETAT -> IssueApiType.SEGURETAT
+                    IssueType.ALTRES -> IssueApiType.ALTRES
+                }
+
+                val request = IssueRequestDTO(
+                    googleId = currentGoogleIdLocal,
+                    type = tipusApi,
+                    description = descripcio,
+                    coordinates = coord
+                )
+
+                crearIncidencia(request)
+
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "Error on registering issue: ${e.message}")
+            }
+        }
+    }
+
+    fun loadIssuesMap() {
+
+        viewModelScope.launch {
+            try {
+                val llista = getAllIssues()
+
+                _uiState.update { it.copy(issues = llista) }
+            } catch (e: Exception) {
+            }
+        }
     }
 }
