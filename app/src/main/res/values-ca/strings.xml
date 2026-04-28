@@ -66,6 +66,8 @@
     <string name="profile_filters_intro_title">Personalitza els teus filtres de ruta</string>
     <string name="profile_filters_intro_message">Obre aquesta secci&#243; per decidir quant ha d\'influir cada factor en la teva ruta.</string>
     <string name="profile_filters_section_hint">Mou cada slider per indicar quant pes ha de tenir aquest factor.</string>
+    <string name="profile_filter_toggle_label">Fes servir aquest filtre</string>
+    <string name="profile_filter_disabled">Filtre desactivat</string>
     <string name="profile_filters_sync_loading">Actualitzant des de l\'API</string>
     <string name="profile_filters_sync_saving">Guardant canvis</string>
     <string name="profile_filters_sync_ready">Perfil sincronitzat</string>

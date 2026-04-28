@@ -8,11 +8,15 @@ private val profileFilterIndexes = profileFilterKeys.withIndex().associate { (in
 }
 
 internal data class ProfileFiltersUiModel(
-    val values: List<Int> = List(PROFILE_FILTER_COUNT) { 1 }
+    val values: List<Int> = List(PROFILE_FILTER_COUNT) { 1 },
+    val enabledStates: List<Boolean> = List(PROFILE_FILTER_COUNT) { true }
 ) {
     init {
         require(values.size == PROFILE_FILTER_COUNT) {
             "Expected $PROFILE_FILTER_COUNT profile filters but found ${values.size}"
+        }
+        require(enabledStates.size == PROFILE_FILTER_COUNT) {
+            "Expected $PROFILE_FILTER_COUNT filter enabled states but found ${enabledStates.size}"
         }
     }
 
@@ -29,6 +33,24 @@ internal data class ProfileFiltersUiModel(
         return ProfileFiltersUiModel(
             values = values.toMutableList().also { updatedValues ->
                 updatedValues[index] = sanitizedValue
+            },
+            enabledStates = enabledStates
+        )
+    }
+
+    fun updatedEnabledState(index: Int, enabled: Boolean): ProfileFiltersUiModel {
+        if (index !in enabledStates.indices) {
+            return this
+        }
+
+        if (enabledStates[index] == enabled) {
+            return this
+        }
+
+        return ProfileFiltersUiModel(
+            values = values,
+            enabledStates = enabledStates.toMutableList().also { updatedEnabledStates ->
+                updatedEnabledStates[index] = enabled
             }
         )
     }
@@ -54,12 +76,20 @@ internal fun UserFilters.toProfileFiltersUiModel(): ProfileFiltersUiModel {
     return ProfileFiltersUiModel(
         values = profileFilterKeys.map { filterKey ->
             valueFor(filterKey).toSliderValue()
+        },
+        enabledStates = profileFilterKeys.map { filterKey ->
+            valueFor(filterKey) > 0.0
         }
     )
 }
 
 private fun ProfileFiltersUiModel.filterWeight(filterKey: ProfileFilterKey): Double {
-    return values[profileFilterIndexes.getValue(filterKey)].toFilterWeight()
+    val filterIndex = profileFilterIndexes.getValue(filterKey)
+    return if (enabledStates[filterIndex]) {
+        values[filterIndex].toFilterWeight()
+    } else {
+        0.0
+    }
 }
 
 private fun UserFilters.valueFor(filterKey: ProfileFilterKey): Double {
@@ -83,6 +113,10 @@ private fun Int.toFilterWeight(): Double {
 }
 
 private fun Double.toSliderValue(): Int {
+    if (this <= 0.0) {
+        return 1
+    }
+
     val clampedValue = coerceIn(0.0, 1.0)
     return when {
         clampedValue < 0.375 -> 0

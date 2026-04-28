@@ -66,6 +66,8 @@
     <string name="profile_filters_intro_title">Personaliza tus filtros de ruta</string>
     <string name="profile_filters_intro_message">Abre esta secci&#243;n para decidir cu&#225;nto debe influir cada factor en tu ruta.</string>
     <string name="profile_filters_section_hint">Mueve cada slider para indicar cu&#225;nto peso debe tener ese factor.</string>
+    <string name="profile_filter_toggle_label">Usar este filtro</string>
+    <string name="profile_filter_disabled">Filtro desactivado</string>
     <string name="profile_filters_sync_loading">Actualizando desde la API</string>
     <string name="profile_filters_sync_saving">Guardando cambios</string>
     <string name="profile_filters_sync_ready">Perfil sincronizado</string>

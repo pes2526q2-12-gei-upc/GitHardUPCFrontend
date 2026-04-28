@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 
 data class ProfileUiState(
     val filterValues: List<Int> = ProfileFiltersUiModel().values,
+    val filterEnabledStates: List<Boolean> = ProfileFiltersUiModel().enabledStates,
     val isLoadingFilters: Boolean = false,
     val isSavingFilters: Boolean = false
 )
@@ -113,9 +114,11 @@ class ProfileViewModel(
                     return@launch
                 }
 
+                val loadedUiModel = loadedFilters.toProfileFiltersUiModel()
                 _uiState.update {
                     it.copy(
-                        filterValues = loadedFilters.toProfileFiltersUiModel().values,
+                        filterValues = loadedUiModel.values,
+                        filterEnabledStates = loadedUiModel.enabledStates,
                         isLoadingFilters = false,
                         isSavingFilters = false
                     )
@@ -140,7 +143,7 @@ class ProfileViewModel(
     fun onFilterValueChanged(filterIndex: Int, value: Int) {
         val user = currentUser ?: return
         val googleId = user.googleId.takeIf { it.isNotBlank() } ?: return
-        val currentFilters = ProfileFiltersUiModel(_uiState.value.filterValues)
+        val currentFilters = currentUiFilters()
         val updatedFilters = currentFilters.updated(filterIndex, value)
         if (updatedFilters == currentFilters) {
             return
@@ -149,6 +152,7 @@ class ProfileViewModel(
         _uiState.update {
             it.copy(
                 filterValues = updatedFilters.values,
+                filterEnabledStates = updatedFilters.enabledStates,
                 isSavingFilters = true
             )
         }
@@ -168,9 +172,14 @@ class ProfileViewModel(
                     return@launch
                 }
 
+                val persistedUiModel = mergePersistedUiModel(
+                    persistedFilters = persistedFilters,
+                    fallbackUiModel = updatedFilters
+                )
                 _uiState.update {
                     it.copy(
-                        filterValues = persistedFilters.toProfileFiltersUiModel().values,
+                        filterValues = persistedUiModel.values,
+                        filterEnabledStates = persistedUiModel.enabledStates,
                         isSavingFilters = false
                     )
                 }
@@ -192,6 +201,93 @@ class ProfileViewModel(
                 maybeRefreshAfterSave(googleId)
             }
         }
+    }
+
+    fun onFilterEnabledChanged(filterIndex: Int, enabled: Boolean) {
+        val user = currentUser ?: return
+        val googleId = user.googleId.takeIf { it.isNotBlank() } ?: return
+        val currentFilters = currentUiFilters()
+        val updatedFilters = currentFilters.updatedEnabledState(filterIndex, enabled)
+        if (updatedFilters == currentFilters) {
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                filterValues = updatedFilters.values,
+                filterEnabledStates = updatedFilters.enabledStates,
+                isSavingFilters = true
+            )
+        }
+
+        saveJob?.cancel()
+        refreshAfterSave = false
+        latestSaveVersion += 1
+        val saveVersion = latestSaveVersion
+
+        saveJob = viewModelScope.launch {
+            try {
+                val persistedFilters = withContext(ioDispatcher) {
+                    saveFilters(googleId, updatedFilters.toUserFilters())
+                }
+
+                if (saveVersion != latestSaveVersion || currentUser?.googleId != googleId) {
+                    return@launch
+                }
+
+                val persistedUiModel = mergePersistedUiModel(
+                    persistedFilters = persistedFilters,
+                    fallbackUiModel = updatedFilters
+                )
+                _uiState.update {
+                    it.copy(
+                        filterValues = persistedUiModel.values,
+                        filterEnabledStates = persistedUiModel.enabledStates,
+                        isSavingFilters = false
+                    )
+                }
+
+                maybeRefreshAfterSave(googleId)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (saveVersion != latestSaveVersion || currentUser?.googleId != googleId) {
+                    return@launch
+                }
+
+                Log.e(
+                    "PROFILE_VIEW_MODEL",
+                    "No se pudieron guardar los filtros del usuario",
+                    error
+                )
+                _uiState.update { it.copy(isSavingFilters = false) }
+                maybeRefreshAfterSave(googleId)
+            }
+        }
+    }
+
+    private fun currentUiFilters(): ProfileFiltersUiModel {
+        return ProfileFiltersUiModel(
+            values = _uiState.value.filterValues,
+            enabledStates = _uiState.value.filterEnabledStates
+        )
+    }
+
+    private fun mergePersistedUiModel(
+        persistedFilters: UserFilters,
+        fallbackUiModel: ProfileFiltersUiModel
+    ): ProfileFiltersUiModel {
+        val persistedUiModel = persistedFilters.toProfileFiltersUiModel()
+        return ProfileFiltersUiModel(
+            values = persistedUiModel.values.mapIndexed { index, persistedValue ->
+                if (persistedUiModel.enabledStates[index]) {
+                    persistedValue
+                } else {
+                    fallbackUiModel.values[index]
+                }
+            },
+            enabledStates = persistedUiModel.enabledStates
+        )
     }
 
     private fun maybeRefreshAfterSave(googleId: String) {

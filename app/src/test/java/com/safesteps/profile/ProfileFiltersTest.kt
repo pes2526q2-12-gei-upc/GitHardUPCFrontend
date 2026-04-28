@@ -49,6 +49,32 @@ class ProfileFiltersTest {
             listOf(2, 0, 1, 3, 1, 2, 3, 0, 0, 2, 1),
             uiModel.values
         )
+        assertEquals(List(PROFILE_FILTER_COUNT) { true }, uiModel.enabledStates)
+        assertEquals(filters, uiModel.toUserFilters())
+    }
+
+    @Test
+    fun `disabled filters are mapped to zero and hide behind enabled state`() {
+        val filters = UserFilters(
+            comissaries = 0.0,
+            fetsPenals = 0.5,
+            cameresSeguretat = 0.0,
+            infraccions = 1.0,
+            fontsAigua = 0.0,
+            bancs = 0.5,
+            contaminacioAcustica = 0.75,
+            escalesMecaniques = 1.0,
+            arbres = 0.0,
+            refugisClimatics = 0.5,
+            qualitatAire = 0.75
+        )
+
+        val uiModel = filters.toProfileFiltersUiModel()
+
+        assertEquals(
+            listOf(false, false, true, true, true, true, true, false, false, true, true),
+            uiModel.enabledStates
+        )
         assertEquals(filters, uiModel.toUserFilters())
     }
 }

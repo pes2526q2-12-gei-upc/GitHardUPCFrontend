@@ -67,6 +67,8 @@
     <string name="profile_filters_intro_title">Customize your route filters</string>
     <string name="profile_filters_intro_message">Open this section to choose how much each factor should influence your route.</string>
     <string name="profile_filters_section_hint">Move each slider to indicate how much weight that factor should have.</string>
+    <string name="profile_filter_toggle_label">Use this filter</string>
+    <string name="profile_filter_disabled">Filter disabled</string>
     <string name="profile_filters_sync_loading">Refreshing from API</string>
     <string name="profile_filters_sync_saving">Saving changes</string>
     <string name="profile_filters_sync_ready">Profile synced</string>

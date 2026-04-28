@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +33,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -83,7 +87,9 @@ fun ProfileScreen(
     currentLanguage: AppLanguage,
     onLanguageSelected: (AppLanguage) -> Unit,
     filterValues: List<Int>,
+    filterEnabledStates: List<Boolean>,
     onFilterValueChange: (Int, Int) -> Unit,
+    onFilterEnabledChange: (Int, Boolean) -> Unit,
     isLoadingFilters: Boolean,
     areFiltersEnabled: Boolean,
     onBack: () -> Unit,
@@ -173,6 +179,7 @@ fun ProfileScreen(
 
                 ProfileFiltersSection(
                     filterValues = filterValues,
+                    filterEnabledStates = filterEnabledStates,
                     expanded = isFiltersSectionExpanded,
                     expandedGroups = expandedGroups,
                     isLoadingFilters = isLoadingFilters,
@@ -185,7 +192,8 @@ fun ProfileScreen(
                             groups[groupIndex] = !groups[groupIndex]
                         }
                     },
-                    onFilterValueChange = onFilterValueChange
+                    onFilterValueChange = onFilterValueChange,
+                    onFilterEnabledChange = onFilterEnabledChange
                 )
 
                 Spacer(modifier = Modifier.height(28.dp))
@@ -256,13 +264,15 @@ fun ProfileScreen(
 @Composable
 private fun ProfileFiltersSection(
     filterValues: List<Int>,
+    filterEnabledStates: List<Boolean>,
     expanded: Boolean,
     expandedGroups: List<Boolean>,
     isLoadingFilters: Boolean,
     areFiltersEnabled: Boolean,
     onExpandedChange: () -> Unit,
     onExpandedGroupToggle: (Int) -> Unit,
-    onFilterValueChange: (Int, Int) -> Unit
+    onFilterValueChange: (Int, Int) -> Unit,
+    onFilterEnabledChange: (Int, Boolean) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -352,10 +362,16 @@ private fun ProfileFiltersSection(
                             filterValues = group.filters.indices.map { localIndex ->
                                 filterValues.getOrElse(groupStartIndex + localIndex) { 1 }
                             },
+                            filterEnabledStates = group.filters.indices.map { localIndex ->
+                                filterEnabledStates.getOrElse(groupStartIndex + localIndex) { true }
+                            },
                             enabled = areFiltersEnabled,
                             onExpandedChange = { onExpandedGroupToggle(groupIndex) },
                             onValueChange = { localIndex, newValue ->
                                 onFilterValueChange(groupStartIndex + localIndex, newValue)
+                            },
+                            onFilterEnabledChange = { localIndex, isEnabled ->
+                                onFilterEnabledChange(groupStartIndex + localIndex, isEnabled)
                             }
                         )
 
@@ -455,9 +471,11 @@ private fun FilterAccordion(
     expanded: Boolean,
     filterLabels: List<String>,
     filterValues: List<Int>,
+    filterEnabledStates: List<Boolean>,
     enabled: Boolean,
     onExpandedChange: () -> Unit,
-    onValueChange: (Int, Int) -> Unit
+    onValueChange: (Int, Int) -> Unit,
+    onFilterEnabledChange: (Int, Boolean) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -540,9 +558,11 @@ private fun FilterAccordion(
                     FilterPreferenceControl(
                         title = label,
                         value = filterValues.getOrElse(index) { 1 },
+                        isFilterEnabled = filterEnabledStates.getOrElse(index) { true },
                         accentColor = accentColor,
                         enabled = enabled,
-                        onValueChange = { onValueChange(index, it) }
+                        onValueChange = { onValueChange(index, it) },
+                        onEnabledChange = { onFilterEnabledChange(index, it) }
                     )
 
                     if (index < filterLabels.lastIndex) {
@@ -558,12 +578,18 @@ private fun FilterAccordion(
 private fun FilterPreferenceControl(
     title: String,
     value: Int,
+    isFilterEnabled: Boolean,
     accentColor: Color,
     enabled: Boolean,
-    onValueChange: (Int) -> Unit
+    onValueChange: (Int) -> Unit,
+    onEnabledChange: (Boolean) -> Unit
 ) {
     val safeValue = value.coerceIn(0, filterLevelResIds.lastIndex)
-    val selectedLabel = appString(filterLevelResIds[safeValue])
+    val selectedLabel = if (isFilterEnabled) {
+        appString(filterLevelResIds[safeValue])
+    } else {
+        appString(R.string.profile_filter_disabled)
+    }
     val selectedDescription = appString(filterLevelDescriptionResIds[safeValue])
 
     Surface(
@@ -598,45 +624,94 @@ private fun FilterPreferenceControl(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = isFilterEnabled,
+                        enabled = enabled,
+                        role = Role.Checkbox,
+                        onValueChange = onEnabledChange
+                    ),
+                shape = RoundedCornerShape(14.dp),
+                color = accentColor.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.18f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isFilterEnabled,
+                        onCheckedChange = null,
+                        enabled = enabled,
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = accentColor,
+                            uncheckedColor = Color(0xFF8A948F),
+                            checkmarkColor = Color.White
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = appString(R.string.profile_filter_toggle_label),
+                        color = Color(0xFF23333A),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
             Text(
-                text = selectedDescription,
+                text = if (isFilterEnabled) {
+                    selectedDescription
+                } else {
+                    appString(R.string.profile_filter_disabled)
+                },
                 color = Color(0xFF6D7B75),
                 style = MaterialTheme.typography.bodyMedium
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            if (isFilterEnabled) {
+                Spacer(modifier = Modifier.height(10.dp))
 
-            Slider(
-                value = safeValue.toFloat(),
-                onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 3)) },
-                valueRange = 0f..3f,
-                steps = 2,
-                enabled = enabled,
-                colors = SliderDefaults.colors(
-                    thumbColor = accentColor,
-                    activeTrackColor = accentColor,
-                    activeTickColor = accentColor,
-                    inactiveTrackColor = Color(0xFFE3E9E6),
-                    inactiveTickColor = Color(0xFFC8D3CD)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
+                Slider(
+                    value = safeValue.toFloat(),
+                    onValueChange = { onValueChange(it.roundToInt().coerceIn(0, 3)) },
+                    valueRange = 0f..3f,
+                    steps = 2,
+                    enabled = enabled,
+                    colors = SliderDefaults.colors(
+                        thumbColor = accentColor,
+                        activeTrackColor = accentColor,
+                        activeTickColor = accentColor,
+                        inactiveTrackColor = Color(0xFFE3E9E6),
+                        inactiveTickColor = Color(0xFFC8D3CD)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            Row(modifier = Modifier.fillMaxWidth()) {
-                filterLevelResIds.forEachIndexed { index, labelResId ->
-                    Text(
-                        modifier = Modifier.weight(1f),
-                        text = appString(labelResId),
-                        color = if (index == safeValue) accentColor else Color(0xFF8A948F),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (index == safeValue) FontWeight.SemiBold else FontWeight.Normal,
-                        textAlign = when (index) {
-                            0 -> TextAlign.Start
-                            filterLevelResIds.lastIndex -> TextAlign.End
-                            else -> TextAlign.Center
-                        },
-                        maxLines = 2
-                    )
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    filterLevelResIds.forEachIndexed { index, labelResId ->
+                        Text(
+                            modifier = Modifier.weight(1f),
+                            text = appString(labelResId),
+                            color = if (index == safeValue) accentColor else Color(0xFF8A948F),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (index == safeValue) FontWeight.SemiBold else FontWeight.Normal,
+                            textAlign = when (index) {
+                                0 -> TextAlign.Start
+                                filterLevelResIds.lastIndex -> TextAlign.End
+                                else -> TextAlign.Center
+                            },
+                            maxLines = 2
+                        )
+                    }
                 }
             }
         }

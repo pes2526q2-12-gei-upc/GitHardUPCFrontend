@@ -97,19 +97,20 @@ fun SafeStepsApp(
         currentDestination = SafeStepsDestination.MAP
     }
 
-    SafeStepsLocalizedContent(
-        modifier = modifier,
-        authUiState = authUiState,
-        currentLanguage = languageUiState.currentLanguage,
-        authViewModel = authViewModel,
-        currentDestination = currentDestination,
-        profileUiState = profileUiState,
-        onLanguageSelected = onLanguageSelected,
-        onFilterValueChange = profileViewModel::onFilterValueChanged,
-        onLoginClick = onLoginClick,
-        onNavigateToMap = { currentDestination = SafeStepsDestination.MAP },
-        onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE }
-    )
+        SafeStepsLocalizedContent(
+            modifier = modifier,
+            authUiState = authUiState,
+            currentLanguage = languageUiState.currentLanguage,
+            authViewModel = authViewModel,
+            currentDestination = currentDestination,
+            profileUiState = profileUiState,
+            onLanguageSelected = onLanguageSelected,
+            onFilterValueChange = profileViewModel::onFilterValueChanged,
+            onFilterEnabledChange = profileViewModel::onFilterEnabledChanged,
+            onLoginClick = onLoginClick,
+            onNavigateToMap = { currentDestination = SafeStepsDestination.MAP },
+            onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE }
+        )
 }
 
 @Composable
@@ -168,6 +169,7 @@ private fun SafeStepsLocalizedContent(
     profileUiState: com.safesteps.profile.ProfileUiState,
     onLanguageSelected: (AppLanguage) -> Unit,
     onFilterValueChange: (Int, Int) -> Unit,
+    onFilterEnabledChange: (Int, Boolean) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit
@@ -197,6 +199,7 @@ private fun SafeStepsLocalizedContent(
             profileUiState = profileUiState,
             onLanguageSelected = onLanguageSelected,
             onFilterValueChange = onFilterValueChange,
+            onFilterEnabledChange = onFilterEnabledChange,
             onLoginClick = onLoginClick,
             onNavigateToMap = onNavigateToMap,
             onNavigateToProfile = onNavigateToProfile,
@@ -244,6 +247,7 @@ private fun SafeStepsBody(
     profileUiState: com.safesteps.profile.ProfileUiState,
     onLanguageSelected: (AppLanguage) -> Unit,
     onFilterValueChange: (Int, Int) -> Unit,
+    onFilterEnabledChange: (Int, Boolean) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit,
@@ -260,7 +264,9 @@ private fun SafeStepsBody(
                 currentLanguage = currentLanguage,
                 onLanguageSelected = onLanguageSelected,
                 filterValues = profileUiState.filterValues,
+                filterEnabledStates = profileUiState.filterEnabledStates,
                 onFilterValueChange = onFilterValueChange,
+                onFilterEnabledChange = onFilterEnabledChange,
                 isLoadingFilters = profileUiState.isLoadingFilters,
                 areFiltersEnabled = !profileUiState.isLoadingFilters,
                 onBack = onNavigateToMap,
