@@ -29,6 +29,7 @@ import com.safesteps.i18n.ProvideLocalizedStrings
 import com.safesteps.i18n.appString
 import com.safesteps.map.MapLibreScreen
 import com.safesteps.profile.ProfileScreen
+import com.safesteps.profile.ProfileScreenCallbacks
 import com.safesteps.profile.ProfileViewModel
 
 private enum class SafeStepsDestination {
@@ -262,16 +263,15 @@ private fun SafeStepsBody(
                 modifier = Modifier.fillMaxSize(),
                 user = currentUser,
                 currentLanguage = currentLanguage,
-                onLanguageSelected = onLanguageSelected,
-                filterValues = profileUiState.filterValues,
-                filterEnabledStates = profileUiState.filterEnabledStates,
-                onFilterValueChange = onFilterValueChange,
-                onFilterEnabledChange = onFilterEnabledChange,
-                isLoadingFilters = profileUiState.isLoadingFilters,
-                areFiltersEnabled = !profileUiState.isLoadingFilters,
-                onBack = onNavigateToMap,
-                onLogout = onLogout,
-                onDeleteAccount = { onDeleteAccount(currentUser) }
+                profileUiState = profileUiState,
+                callbacks = ProfileScreenCallbacks(
+                    onLanguageSelected = onLanguageSelected,
+                    onFilterValueChange = onFilterValueChange,
+                    onFilterEnabledChange = onFilterEnabledChange,
+                    onBack = onNavigateToMap,
+                    onLogout = onLogout,
+                    onDeleteAccount = { onDeleteAccount(currentUser) }
+                )
             )
         } else {
             MapLibreScreen(
