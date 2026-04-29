@@ -16,11 +16,11 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,13 +33,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,16 +43,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import com.safesteps.R
 import kotlinx.coroutines.CoroutineScope
@@ -94,10 +94,6 @@ private val NotificationTextPrimary = Color(0xFF173A35)
 private val NotificationTextSecondary = Color(0xFF58716A)
 private val NotificationBorder = Color(0xCCFFFFFF)
 private val NotificationTrack = Color(0x261A6A5A)
-private val NotificationDismissGradient = listOf(
-    Color(0xFFB55436),
-    Color(0xFFD98556)
-)
 
 data class ScreenNotification(
     val id: Long,
@@ -105,6 +101,11 @@ data class ScreenNotification(
     val text: String,
     val durationMillis: Long
 )
+
+private enum class NotificationDismissMode {
+    AUTO,
+    USER
+}
 
 object ScreenNotificationManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -179,30 +180,39 @@ fun ScreenNotificationHost(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DismissibleScreenNotification(
     notification: ScreenNotification,
     onDismiss: () -> Unit
 ) {
-    val dismissState = rememberSwipeToDismissBoxState()
     val progress = remember(notification.id) { Animatable(1f) }
+    val dragOffset = remember(notification.id) { Animatable(0f) }
     val topPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 14.dp
+    val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
+    val dismissThresholdPx = remember(density) { with(density) { 72.dp.toPx() } }
     var isVisible by remember(notification.id) { mutableStateOf(false) }
     var dismissalRequested by remember(notification.id) { mutableStateOf(false) }
+    var dismissMode by remember(notification.id) { mutableStateOf(NotificationDismissMode.AUTO) }
 
-    fun requestDismiss() {
+    fun requestDismiss(mode: NotificationDismissMode) {
         if (dismissalRequested) {
             return
         }
 
+        dismissMode = mode
         dismissalRequested = true
-        isVisible = false
+        if (mode == NotificationDismissMode.AUTO) {
+            isVisible = false
+        } else {
+            onDismiss()
+        }
     }
 
     LaunchedEffect(notification.id) {
         isVisible = true
         progress.snapTo(1f)
+        dragOffset.snapTo(0f)
         progress.animateTo(
             targetValue = 0f,
             animationSpec = tween(
@@ -210,17 +220,11 @@ private fun DismissibleScreenNotification(
                 easing = LinearEasing
             )
         )
-        requestDismiss()
-    }
-
-    LaunchedEffect(dismissState.currentValue) {
-        if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
-            requestDismiss()
-        }
+        requestDismiss(NotificationDismissMode.AUTO)
     }
 
     LaunchedEffect(dismissalRequested) {
-        if (dismissalRequested) {
+        if (dismissalRequested && dismissMode == NotificationDismissMode.AUTO) {
             delay(ExitAnimationDurationMillis)
             onDismiss()
         }
@@ -247,19 +251,52 @@ private fun DismissibleScreenNotification(
                 animationSpec = tween(durationMillis = ExitAnimationDurationMillis.toInt())
             )
     ) {
-        SwipeToDismissBox(
-            state = dismissState,
-            backgroundContent = {
-                NotificationDismissBackground(
-                    dismissDirection = dismissState.dismissDirection
-                )
-            },
+        Box(
             modifier = Modifier
                 .fillMaxWidth(0.93f)
                 .widthIn(max = 560.dp)
-                .padding(top = topPadding),
-            enableDismissFromStartToEnd = true,
-            enableDismissFromEndToStart = true
+                .padding(top = topPadding)
+                .graphicsLayer {
+                    translationY = dragOffset.value
+                    alpha = (1f - ((-dragOffset.value) / (dismissThresholdPx * 1.7f)))
+                        .coerceIn(0.45f, 1f)
+                }
+                .pointerInput(notification.id, dismissThresholdPx) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { _, dragAmount ->
+                            val updatedOffset = (dragOffset.value + dragAmount).coerceAtMost(0f)
+                            coroutineScope.launch {
+                                dragOffset.snapTo(updatedOffset)
+                            }
+                        },
+                        onDragEnd = {
+                            if (-dragOffset.value >= dismissThresholdPx) {
+                                requestDismiss(NotificationDismissMode.USER)
+                            } else {
+                                coroutineScope.launch {
+                                    dragOffset.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = tween(
+                                            durationMillis = 180,
+                                            easing = FastOutSlowInEasing
+                                        )
+                                    )
+                                }
+                            }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch {
+                                dragOffset.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = tween(
+                                        durationMillis = 180,
+                                        easing = FastOutSlowInEasing
+                                    )
+                                )
+                            }
+                        }
+                    )
+                }
         ) {
             NotificationCard(
                 notification = notification,
@@ -330,8 +367,6 @@ private fun NotificationCard(
                             color = NotificationTextSecondary
                         )
                     }
-
-                    SwipeCue()
                 }
 
                 NotificationProgressBar(progress = progress)
@@ -360,24 +395,6 @@ private fun NotificationAvatar() {
 }
 
 @Composable
-private fun SwipeCue() {
-    Column(
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        repeat(3) { index ->
-            Box(
-                modifier = Modifier
-                    .width((16 - index * 2).dp)
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0x6623524A))
-            )
-        }
-    }
-}
-
-@Composable
 private fun NotificationProgressBar(progress: Float) {
     Box(
         modifier = Modifier
@@ -393,42 +410,5 @@ private fun NotificationProgressBar(progress: Float) {
                 .clip(RoundedCornerShape(999.dp))
                 .background(brush = Brush.linearGradient(NotificationAccentGradient))
         )
-    }
-}
-
-@Composable
-private fun RowScope.NotificationDismissBackground(
-    dismissDirection: SwipeToDismissBoxValue
-) {
-    val alignment = when (dismissDirection) {
-        SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
-        SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
-        SwipeToDismissBoxValue.Settled -> Alignment.CenterEnd
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clip(NotificationShape)
-            .background(brush = Brush.linearGradient(NotificationDismissGradient))
-            .padding(horizontal = 22.dp),
-        contentAlignment = alignment
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Color.White.copy(alpha = 0.18f)
-        ) {
-            Box(
-                modifier = Modifier.size(44.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "X",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
     }
 }
