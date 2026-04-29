@@ -93,6 +93,9 @@
     <string name="map_style_standard">Est&#225;ndar</string>
     <string name="map_style_satellite">Sat&#233;lite</string>
     <string name="calculating_best_route">Calculando la mejor ruta&#8230;</string>
+    <string name="notification_title_auth">Autenticaci&#243;n</string>
+    <string name="notification_title_map">Mapa</string>
+    <string name="notification_title_permissions">Permisos</string>
     <string name="sign_in_failed">No se ha podido iniciar sesi&#243;n. Int&#233;ntalo de nuevo.</string>
     <string name="auth_banner_login_success">Inicio de sesi&#243;n correcto.</string>
     <string name="auth_banner_register_success">Usuario registrado correctamente.</string>

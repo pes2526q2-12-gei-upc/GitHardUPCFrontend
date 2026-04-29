@@ -94,6 +94,9 @@
     <string name="map_style_standard">Standard</string>
     <string name="map_style_satellite">Satellite</string>
     <string name="calculating_best_route">Calculating the best route&#8230;</string>
+    <string name="notification_title_auth">Authentication</string>
+    <string name="notification_title_map">Map</string>
+    <string name="notification_title_permissions">Permissions</string>
     <string name="sign_in_failed">Sign in failed, please try again.</string>
     <string name="auth_banner_login_success">Sign-in completed successfully.</string>
     <string name="auth_banner_register_success">User registered successfully.</string>

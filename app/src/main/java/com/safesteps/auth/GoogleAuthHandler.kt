@@ -3,7 +3,6 @@ package com.safesteps.auth
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.safesteps.R
+import com.safesteps.ui.notifications.ScreenNotificationManager
 
 @Composable
 fun rememberGoogleSignInAction(
@@ -149,9 +149,8 @@ private fun restoreSession(
 }
 
 private fun notifySignInFailure(context: Context) {
-    Toast.makeText(
-        context,
-        context.getString(R.string.sign_in_failed),
-        Toast.LENGTH_SHORT
-    ).show()
+    ScreenNotificationManager.showNotification(
+        notificationName = context.getString(R.string.notification_title_auth),
+        text = context.getString(R.string.sign_in_failed)
+    )
 }

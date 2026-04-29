@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.location.Location
 import android.location.LocationListener
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -36,12 +35,15 @@ import com.safesteps.data.PuntInteres
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
+import com.safesteps.ui.notifications.ScreenNotificationManager
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 
 private data class MapScreenStrings(
+    val mapNotificationTitle: String,
+    val permissionNotificationTitle: String,
     val locationPermissionRequiredMessage: String,
     val waitingGpsLocationMessage: String,
     val searchingGpsSignalMessage: String,
@@ -109,6 +111,7 @@ fun MapLibreScreen(
     val requestLocationPermissions = rememberLocationPermissionRequester(
         context = context,
         viewModel = viewModel,
+        permissionNotificationTitle = strings.permissionNotificationTitle,
         locationPermissionRequiredMessage = strings.locationPermissionRequiredMessage
     )
     val resetToMainMenu = {
@@ -123,7 +126,7 @@ fun MapLibreScreen(
             priority = priority,
             uiState = uiState,
             viewModel = viewModel,
-            context = context,
+            notificationTitle = strings.mapNotificationTitle,
             waitingGpsLocationMessage = strings.waitingGpsLocationMessage
         )
     }
@@ -140,9 +143,9 @@ fun MapLibreScreen(
             uiState = uiState,
             viewModel = viewModel,
             mapView = mapView,
-            context = context,
             requestLocationPermissions = requestLocationPermissions,
             navigationHeadingDegrees = navigationHeadingDegrees,
+            notificationTitle = strings.mapNotificationTitle,
             searchingGpsSignalMessage = strings.searchingGpsSignalMessage
         )
     }
@@ -163,6 +166,7 @@ fun MapLibreScreen(
         currentLanguage = currentLanguage,
         uiState = uiState,
         renderContext = renderContext,
+        mapNotificationTitle = strings.mapNotificationTitle,
         callbacks = MapScreenEffectCallbacks(
             requestLocationPermissions = requestLocationPermissions,
             onNavigationHeadingChanged = { navigationHeadingDegrees = it }
@@ -293,6 +297,8 @@ fun MapLibreScreen(
 @Composable
 private fun mapScreenStrings(): MapScreenStrings {
     return MapScreenStrings(
+        mapNotificationTitle = appString(R.string.notification_title_map),
+        permissionNotificationTitle = appString(R.string.notification_title_permissions),
         locationPermissionRequiredMessage = appString(R.string.location_permission_required),
         waitingGpsLocationMessage = appString(R.string.waiting_gps_location),
         searchingGpsSignalMessage = appString(R.string.searching_gps_signal),
@@ -311,6 +317,7 @@ private fun mapScreenStrings(): MapScreenStrings {
 private fun rememberLocationPermissionRequester(
     context: Context,
     viewModel: MapViewModel,
+    permissionNotificationTitle: String,
     locationPermissionRequiredMessage: String
 ): () -> Unit {
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -320,6 +327,7 @@ private fun rememberLocationPermissionRequester(
             context = context,
             permissions = permissions,
             viewModel = viewModel,
+            permissionNotificationTitle = permissionNotificationTitle,
             locationPermissionRequiredMessage = locationPermissionRequiredMessage
         )
     }
@@ -339,6 +347,7 @@ private fun MapScreenEffects(
     currentLanguage: AppLanguage,
     uiState: MapUiState,
     renderContext: MapRenderContext,
+    mapNotificationTitle: String,
     callbacks: MapScreenEffectCallbacks
 ) {
     PrepareMapSessionEffect(
@@ -390,7 +399,7 @@ private fun MapScreenEffects(
     )
     NavigationNoticeEffect(
         navigationNotice = uiState.navigationNotice,
-        context = renderContext.context,
+        notificationTitle = mapNotificationTitle,
         viewModel = renderContext.viewModel
     )
     MapStyleRenderingEffect(
@@ -508,7 +517,7 @@ private fun RouteRecalculationEffect(
 @Composable
 private fun NavigationNoticeEffect(
     navigationNotice: String?,
-    context: Context,
+    notificationTitle: String,
     viewModel: MapViewModel
 ) {
     LaunchedEffect(navigationNotice) {
@@ -516,7 +525,10 @@ private fun NavigationNoticeEffect(
             return@LaunchedEffect
         }
 
-        Toast.makeText(context, navigationNotice, Toast.LENGTH_SHORT).show()
+        ScreenNotificationManager.showNotification(
+            notificationName = notificationTitle,
+            text = navigationNotice
+        )
         viewModel.onNavigationNoticeConsumed()
     }
 }
@@ -826,6 +838,7 @@ private fun processLocationPermissionResult(
     context: Context,
     permissions: Map<String, Boolean>,
     viewModel: MapViewModel,
+    permissionNotificationTitle: String,
     locationPermissionRequiredMessage: String
 ) {
     val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
@@ -838,7 +851,10 @@ private fun processLocationPermissionResult(
         return
     }
 
-    Toast.makeText(context, locationPermissionRequiredMessage, Toast.LENGTH_SHORT).show()
+    ScreenNotificationManager.showNotification(
+        notificationName = permissionNotificationTitle,
+        text = locationPermissionRequiredMessage
+    )
 }
 
 private fun resetMapToMainMenu(
@@ -861,7 +877,7 @@ private fun processPrioritySelection(
     priority: RoutePriority,
     uiState: MapUiState,
     viewModel: MapViewModel,
-    context: Context,
+    notificationTitle: String,
     waitingGpsLocationMessage: String
 ) {
     viewModel.onPrioritySelected(priority)
@@ -869,7 +885,10 @@ private fun processPrioritySelection(
     val destination = uiState.destinoSeleccionado ?: return
     val originPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.toLatLng()
     if (originPoint == null) {
-        Toast.makeText(context, waitingGpsLocationMessage, Toast.LENGTH_SHORT).show()
+        ScreenNotificationManager.showNotification(
+            notificationName = notificationTitle,
+            text = waitingGpsLocationMessage
+        )
         return
     }
 
@@ -904,9 +923,9 @@ private fun recenterOnCurrentLocation(
     uiState: MapUiState,
     viewModel: MapViewModel,
     mapView: MapView,
-    context: Context,
     requestLocationPermissions: () -> Unit,
     navigationHeadingDegrees: Float?,
+    notificationTitle: String,
     searchingGpsSignalMessage: String
 ) {
     if (!uiState.locationGranted) {
@@ -933,7 +952,10 @@ private fun recenterOnCurrentLocation(
         }
 
         if (currentLocation == null) {
-            Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
+            ScreenNotificationManager.showNotification(
+                notificationName = notificationTitle,
+                text = searchingGpsSignalMessage
+            )
         } else if (!uiState.usesLiveNavigation || uiState.routeCompleted) {
             centerMapOnLocation(mapView, currentLocation)
         }
@@ -947,7 +969,10 @@ private fun recenterOnCurrentLocation(
     )
 
     if (currentLocation == null) {
-        Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
+        ScreenNotificationManager.showNotification(
+            notificationName = notificationTitle,
+            text = searchingGpsSignalMessage
+        )
         return
     }
 

@@ -1,6 +1,5 @@
 package com.safesteps
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +30,7 @@ import com.safesteps.map.MapLibreScreen
 import com.safesteps.profile.ProfileScreen
 import com.safesteps.profile.ProfileScreenCallbacks
 import com.safesteps.profile.ProfileViewModel
+import com.safesteps.ui.notifications.ScreenNotificationManager
 
 private enum class SafeStepsDestination {
     MAP,
@@ -38,6 +38,7 @@ private enum class SafeStepsDestination {
 }
 
 private data class AuthNoticeTexts(
+    val title: String,
     val loginSuccess: String,
     val registerSuccess: String,
     val serverError: String,
@@ -179,6 +180,7 @@ private fun SafeStepsLocalizedContent(
         HandleAuthNoticeEffect(
             authUiState = authUiState,
             noticeTexts = AuthNoticeTexts(
+                title = appString(R.string.notification_title_auth),
                 loginSuccess = appString(R.string.auth_banner_login_success),
                 registerSuccess = appString(R.string.auth_banner_register_success),
                 serverError = appString(R.string.auth_banner_server_error),
@@ -220,16 +222,13 @@ private fun HandleAuthNoticeEffect(
     onLogout: () -> Unit,
     onClearAuthNotice: (Long) -> Unit
 ) {
-    val context = LocalContext.current
-
     LaunchedEffect(authUiState.authNotice?.id, authUiState.pendingDeleteAccountSignOut) {
         val notice = authUiState.authNotice ?: return@LaunchedEffect
 
-        Toast.makeText(
-            context,
-            resolveAuthNoticeMessage(notice.message, noticeTexts),
-            Toast.LENGTH_SHORT
-        ).show()
+        ScreenNotificationManager.showNotification(
+            notificationName = noticeTexts.title,
+            text = resolveAuthNoticeMessage(notice.message, noticeTexts)
+        )
 
         if (authUiState.pendingDeleteAccountSignOut) {
             onLogout()

@@ -93,6 +93,9 @@
     <string name="map_style_standard">Est&#224;ndard</string>
     <string name="map_style_satellite">Sat&#232;l&#183;lit</string>
     <string name="calculating_best_route">Calculant la millor ruta&#8230;</string>
+    <string name="notification_title_auth">Autenticaci&#243;</string>
+    <string name="notification_title_map">Mapa</string>
+    <string name="notification_title_permissions">Permisos</string>
     <string name="sign_in_failed">No s\'ha pogut iniciar la sessi&#243;. Torna-ho a provar.</string>
     <string name="auth_banner_login_success">Inici de sessi&#243; correcte.</string>
     <string name="auth_banner_register_success">Usuari registrat correctament.</string>
