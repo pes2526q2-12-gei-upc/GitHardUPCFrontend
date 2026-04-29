@@ -117,6 +117,7 @@
     <string name="customize_name_style">Username Style</string>
     <string name="customize_change">Change</string>
 
+
     <plurals name="poi_fountains">
         <item quantity="one">%d fountain</item>
         <item quantity="other">%d fountains</item>
