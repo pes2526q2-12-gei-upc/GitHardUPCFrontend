@@ -53,6 +53,7 @@
     <string name="profile_filter_security_cameras">Security cameras</string>
     <string name="profile_filter_police_stations">Police stations</string>
     <string name="profile_filter_criminal_incidents">Criminal incidents</string>
+    <string name="profile_filter_user_reported_incidents">Incidents reported by other users</string>
     <string name="profile_filter_infractions">Infractions</string>
     <string name="profile_filter_benches">Benches</string>
     <string name="profile_filter_noise_pollution">Noise pollution</string>
@@ -105,6 +106,16 @@
     <string name="delete_account_banner_message">All your information, including reported incidents and route history, will be permanently deleted. Do you want to continue?</string>
     <string name="cancel_action">Cancel</string>
     <string name="confirm_action">Confirm</string>
+
+    <!-- STRINGS RECUPERADOS DE LA FEATURE -->
+    <string name="profile_level">Level %1$d</string>
+    <string name="profile_points">%1$d / %2$d pts</string>
+    <string name="profile_customize">Customize</string>
+    <string name="customize_title">Customize Profile</string>
+    <string name="customize_photo">Profile Photo</string>
+    <string name="customize_route_color">Route Color</string>
+    <string name="customize_name_style">Username Style</string>
+    <string name="customize_change">Change</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d fountain</item>

@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.data.eliminarUsuarioDelBackend
+import com.safesteps.data.sincronizarUsuarioConBackend as sincronizarUsuarioConBackendApi
+// import com.safesteps.data.sincronizarPersonalizacionUsuario as sincronizarPersonalizacionUsuarioApi
 import com.safesteps.data.UserSyncOutcome
 import com.safesteps.data.sincronizarUsuarioConBackend as sincronizarUsuarioConBackendApi
 import com.safesteps.data.UserSyncResult
@@ -106,7 +108,11 @@ class AuthViewModel(
             }.onSuccess { result ->
                 syncingGoogleUserId = null
                 blockedRestoreGoogleUserId = null
-                val syncedUser = user.copy(backendLanguageTag = result.languageTag)
+                val syncedUser = user.copy(
+                    backendLanguageTag = result.languageTag
+                    // routeColor = result.routeColor,
+                    // nameStyle = result.nameStyle
+                )
                 _uiState.update {
                     it.copy(
                         currentUser = syncedUser,
@@ -175,6 +181,27 @@ class AuthViewModel(
         }
     }
 
+    fun onUpdateUserProfile(updatedUser: UserInfo) {
+        if (_uiState.value.currentUser?.googleId != updatedUser.googleId) {
+            return
+        }
+
+        viewModelScope.launch {
+            runCatching {
+                // withContext(ioDispatcher) {
+                //     sincronizarPersonalizacionUsuarioApi(updatedUser)
+                // }
+            }.onSuccess {
+                _uiState.update { it.copy(currentUser = updatedUser) }
+            }.onFailure { error ->
+                Log.e(
+                    "AUTH_VIEW_MODEL",
+                    "No se pudo actualizar la personalización del usuario en el backend",
+                    error
+                )
+            }
+        }
+    }
     private fun createNotice(result: UserSyncOutcome): AuthNotice {
         return when (result.result) {
             UserSyncResult.EXISTING_USER_UPDATED -> {

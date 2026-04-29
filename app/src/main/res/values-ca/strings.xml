@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="change_language">Canvia l\'idioma</string>
     <string name="log_in">Inicia sessi&#243;</string>
@@ -52,6 +52,7 @@
     <string name="profile_filter_security_cameras">C&#224;meres de seguretat</string>
     <string name="profile_filter_police_stations">Comissaries</string>
     <string name="profile_filter_criminal_incidents">Fets penals</string>
+    <string name="profile_filter_user_reported_incidents">Incid&#232;ncies reportades per altres usuaris</string>
     <string name="profile_filter_infractions">Infraccions</string>
     <string name="profile_filter_benches">Bancs</string>
     <string name="profile_filter_noise_pollution">Contaminaci&#243; ac&#250;stica</string>
@@ -104,6 +105,16 @@
     <string name="delete_account_banner_message">Tota la teva informaci&#243;, incloses les incid&#232;ncies reportades i l\'historial de rutes, s\'esborrar&#224; de forma definitiva. Vols continuar?</string>
     <string name="cancel_action">Cancel&#183;la</string>
     <string name="confirm_action">Confirma</string>
+
+    <!-- STRINGS RECUPERADOS DE LA FEATURE ANTIGUA -->
+    <string name="profile_level">Nivell %1$d</string>
+    <string name="profile_points">%1$d / %2$d pts</string>
+    <string name="profile_customize">Personalitza</string>
+    <string name="customize_title">Personalitzar Perfil</string>
+    <string name="customize_photo">Foto de perfil</string>
+    <string name="customize_route_color">Color de ruta</string>
+    <string name="customize_name_style">Estil d\'usuari</string>
+    <string name="customize_change">Canviar</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d font</item>

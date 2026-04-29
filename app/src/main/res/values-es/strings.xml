@@ -52,6 +52,7 @@
     <string name="profile_filter_security_cameras">C&#225;maras de seguridad</string>
     <string name="profile_filter_police_stations">Comisar&#237;as</string>
     <string name="profile_filter_criminal_incidents">Hechos penales</string>
+    <string name="profile_filter_user_reported_incidents">Incidencias reportadas por otros usuarios</string>
     <string name="profile_filter_infractions">Infracciones</string>
     <string name="profile_filter_benches">Bancos</string>
     <string name="profile_filter_noise_pollution">Contaminaci&#243;n ac&#250;stica</string>
@@ -101,9 +102,19 @@
     <string name="delete_account_error">Error del servidor. No se ha podido eliminar la cuenta.</string>
     <string name="delete_account_short">Eliminar cuenta</string>
     <string name="delete_account_banner_title">&#191;Eliminar la cuenta definitivamente?</string>
-    <string name="delete_account_banner_message">Toda tu informaci&#243;n, incluidas las incidencias reportadas y el historial de rutas, se borrar&#225; de forma definitiva. &#191;Quieres continuar?</string>
+    <string name="delete_account_banner_message">Toda tu informaci&#243;, incluidas las incidencias reportadas y el historial de rutas, se borrar&#225; de forma definitiva. &#191;Quieres continuar?</string>
     <string name="cancel_action">Cancelar</string>
     <string name="confirm_action">Confirmar</string>
+
+    <!-- STRINGS RECUPERADOS DE LA FEATURE ANTIGUA -->
+    <string name="profile_level">Nivel %1$d</string>
+    <string name="profile_points">%1$d / %2$d pts</string>
+    <string name="profile_customize">Personalizar</string>
+    <string name="customize_title">Personalizar Perfil</string>
+    <string name="customize_photo">Foto de perfil</string>
+    <string name="customize_route_color">Color de ruta</string>
+    <string name="customize_name_style">Estilo de usuario</string>
+    <string name="customize_change">Cambiar</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d fuente</item>
