@@ -167,6 +167,7 @@ private fun HandleProfileFiltersRefreshEffect(
     }
 }
 
+
 @Composable
 private fun SafeStepsLocalizedContent(
     modifier: Modifier,
