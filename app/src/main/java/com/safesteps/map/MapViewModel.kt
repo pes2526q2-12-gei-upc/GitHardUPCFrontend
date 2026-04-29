@@ -58,6 +58,7 @@ class MapViewModel(
 
     fun onCurrentUserChanged(user: UserInfo?) {
         currentGoogleId = user?.googleId?.takeIf { it.isNotBlank() }
+        _uiState.update { it.copy(routeColor = user?.routeColor) }
     }
 
     fun toggleEstiloSatelite() {

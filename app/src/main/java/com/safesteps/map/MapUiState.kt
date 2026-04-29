@@ -51,6 +51,7 @@ data class MapUiState(
     val activeNavigationInstruction: ActiveNavigationInstruction? = null,
     val navigationNotice: String? = null,
     val calculantRuta: Boolean = false,
+    val routeColor: String? = null,
     val puntsInteres: List<PuntInteres> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
     val puntInteresSeleccionat: PuntInteres? = null

@@ -1099,7 +1099,8 @@ private fun drawCurrentRoute(
         context = context,
         originTitle = originLabel,
         destinationTitle = destinationLabel,
-        animateCamera = !uiState.usesLiveNavigation
+        animateCamera = !uiState.usesLiveNavigation,
+        routeColor = uiState.routeColor
     )
 }
 
