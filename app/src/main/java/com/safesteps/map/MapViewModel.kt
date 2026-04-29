@@ -4,37 +4,61 @@ import android.location.Location
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.safesteps.auth.UserInfo
+import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
 import com.safesteps.data.PhotonApi
+import com.safesteps.data.PuntInteres
+import com.safesteps.data.RouteCoordinatesRequest
+import com.safesteps.data.RouteType
 import com.safesteps.data.obtenirCoordenadesRuta
 import com.safesteps.domain.RoutePriority
+import com.safesteps.i18n.AppLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-class MapViewModel : ViewModel() {
+class MapViewModel(
+    private val textProvider: MapTextProvider
+) : ViewModel() {
+    private companion object {
+        const val DEFAULT_DISTANCE_TEXT = "-- km"
+        const val DEFAULT_DURATION_TEXT = "-- min"
+        const val DEFAULT_ETA_TEXT = "--:--"
+        const val OFF_ROUTE_RECALCULATION_THRESHOLD_METERS = 200.0
+        const val OFF_ROUTE_RECALCULATION_COOLDOWN_MS = 15_000L
+        const val MIN_DISTANCE_FOR_ACTIVE_NAVIGATION_METERS = 30.0
+    }
 
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
+    private var currentLanguage: AppLanguage = AppLanguage.default
+    private var searchJob: kotlinx.coroutines.Job? = null
+    private var navigationRoute: NavigationRouteModel? = null
+    private var currentRouteSummary: RouteSummary? = null
+    private var lastNavigationProgressMeters: Double = 0.0
+    private var lastAutomaticRecalculationAtMs: Long = 0L
+    private var currentGoogleId: String? = null
 
-    fun onOrigenChange(texto: String) {
-        _uiState.update { it.copy(textoOrigen = texto) }
+    fun onLanguageChanged(language: AppLanguage) {
+        currentLanguage = language
     }
 
-    fun onDestinoChange(texto: String) {
-        _uiState.update { it.copy(textoDestino = texto) }
-    }
-
-    fun onPrioridadSeleccionada(prioridad: RoutePriority) {
+    fun onPrioritySelected(prioridad: RoutePriority) {
         _uiState.update { it.copy(prioridadSeleccionada = prioridad) }
+    }
+
+    fun onCurrentUserChanged(user: UserInfo?) {
+        currentGoogleId = user?.googleId?.takeIf { it.isNotBlank() }
+        _uiState.update { it.copy(routeColor = user?.routeColor) }
     }
 
     fun toggleEstiloSatelite() {
@@ -46,15 +70,22 @@ class MapViewModel : ViewModel() {
     }
 
     fun clearRuta() {
+        resetNavigationState()
         _uiState.update {
             it.copy(
                 destinoSeleccionado = null,
                 textoDestino = "",
-                distanceText = "-- km",
-                durationText = "-- min",
-                etaText = "--:--",
+                distanceText = DEFAULT_DISTANCE_TEXT,
+                durationText = DEFAULT_DURATION_TEXT,
+                etaText = DEFAULT_ETA_TEXT,
                 rutaCoordenades = emptyList(),
+                activeRouteMode = ActiveRouteMode.NONE,
                 modoRuta = false,
+                navigationCameraFollowing = false,
+                routeCompleted = false,
+                routeCompletionSummary = null,
+                activeNavigationInstruction = null,
+                navigationNotice = null,
                 adrecesSuggerides = emptyList(),
                 campActiu = textField.NONE,
                 isTyping = false,
@@ -66,12 +97,19 @@ class MapViewModel : ViewModel() {
     }
 
     fun cancelarRutaVisual() {
+        resetNavigationState()
         _uiState.update { it.copy(
             rutaCoordenades = emptyList(),
+            activeRouteMode = ActiveRouteMode.NONE,
             modoRuta = false,
-            distanceText = "-- km",
-            durationText = "-- min",
-            etaText = "--:--",
+            navigationCameraFollowing = false,
+            routeCompleted = false,
+            routeCompletionSummary = null,
+            activeNavigationInstruction = null,
+            navigationNotice = null,
+            distanceText = DEFAULT_DISTANCE_TEXT,
+            durationText = DEFAULT_DURATION_TEXT,
+            etaText = DEFAULT_ETA_TEXT,
             calculantRuta = false,
             puntsInteres = emptyList(),
             puntInteresSeleccionat = null
@@ -80,6 +118,11 @@ class MapViewModel : ViewModel() {
 
     fun updateLocation(location: Location) {
         _uiState.update { it.copy(ultimaUbicacion = location) }
+        refreshNavigationProgress(location.toCoordenada())
+    }
+
+    fun onNavigationNoticeConsumed() {
+        _uiState.update { it.copy(navigationNotice = null) }
     }
 
     fun onTextoBuscadorModificado(texto: String, campo: textField) {
@@ -89,19 +132,42 @@ class MapViewModel : ViewModel() {
                 isTyping = true,
                 textoOrigen = if (campo == textField.ORIGIN) texto else it.textoOrigen,
                 textoDestino = if (campo == textField.DESTINY) texto else it.textoDestino,
-                mostrarOrigen = if (campo == textField.DESTINY) true else it.mostrarOrigen
+                mostrarOrigen = campo == textField.DESTINY || it.mostrarOrigen
             )
         }
 
+        searchJob?.cancel()
+
         if (texto.length >= 3) {
-            viewModelScope.launch {
+            searchJob = viewModelScope.launch {
                 kotlinx.coroutines.delay(300)
                 try {
-                    val respuesta = PhotonApi.service.findAddress(query = texto)
+                    val queryFormatada = texto.replace(Regex("(?<=[a-zA-Z])\\s+(?=\\d+)"), ", ")
+
+                    val idiomaRecuperat = textProvider.photonLanguage(currentLanguage)
+
+                    val latActual = _uiState.value.ultimaUbicacion?.latitude
+                    val lonActual = _uiState.value.ultimaUbicacion?.longitude
+
+                    val respuesta = PhotonApi.service.findAddress(
+                        query = queryFormatada,
+                        lang = idiomaRecuperat,
+                        lat = latActual,
+                        lon = lonActual
+                    )
+
+                    val resultatsNets = respuesta.features
+                        .filter { feature ->
+                            !feature.properties.street.isNullOrBlank() || !feature.properties.name.isNullOrBlank()
+                        }
+                        .distinctBy { it.properties.getAddress().lowercase(Locale.ROOT) }
+                        .take(5)
+
                     _uiState.update { state ->
-                        state.copy(adrecesSuggerides = respuesta.features.distinctBy { it.properties.getAddress() })
+                        state.copy(adrecesSuggerides = resultatsNets)
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Log.e("PhotonAPI", "Error en la petició: ${e.message}")
                     _uiState.update { it.copy(adrecesSuggerides = emptyList()) }
                 }
             }
@@ -159,11 +225,11 @@ class MapViewModel : ViewModel() {
         _uiState.update {
             it.copy(
                 destinoSeleccionado = point,
-                textoDestino = "Buscant adreça...",
+                textoDestino = textProvider.searchingAddress(currentLanguage),
                 mostrarOrigen = true,
-                distanceText = "-- km",
-                durationText = "-- min",
-                etaText = "--:--"
+                distanceText = DEFAULT_DISTANCE_TEXT,
+                durationText = DEFAULT_DURATION_TEXT,
+                etaText = DEFAULT_ETA_TEXT
             )
         }
 
@@ -177,35 +243,40 @@ class MapViewModel : ViewModel() {
         _uiState.update { it.copy(firstLocationZoomDone = true) }
     }
 
+    fun prepararNuevaSesionMapa() {
+        _uiState.update {
+            it.copy(
+                mapaListo = false,
+                firstLocationZoomDone = false
+            )
+        }
+    }
+
     fun calcularRuta(
         origenLong: Double,
         origenLat: Double,
         destiLong: Double,
         destiLat: Double
     ) {
-        val prioridad = _uiState.value.prioridadSeleccionada
-        Log.d("PRUEBA_RUTA", "Llamando a calcularRuta. Prioridad actual: $prioridad")
-        val seguretatWeight = if (prioridad == RoutePriority.SAFETY) 1f else 0f
-        val eMecaniquesWeight = if (prioridad == RoutePriority.ACCESSIBILITY) 1f else 0f
-        val bancsWeight = if (prioridad == RoutePriority.ACCESSIBILITY) 1f else 0f
-        val ombraWeight = if (prioridad == RoutePriority.HEAT) 1f else 0f
-        val fontsAiguaWeight = if (prioridad == RoutePriority.HEAT) 1f else 0f
+        if (_uiState.value.calculantRuta) return
 
+        val prioridad = _uiState.value.prioridadSeleccionada
+        val routeType = routeTypeFor(prioridad)
+        Log.d("PRUEBA_RUTA", "Llamando a calcularRuta. Prioridad actual: $prioridad")
+
+        _uiState.update { it.copy(calculantRuta = true) }
         viewModelScope.launch {
-            _uiState.update { it.copy(calculantRuta = true) }
             try {
-                // 2. PASAMOS LOS PESOS A LA FUNCIÓN DE LA API
                 val infoRuta = obtenirCoordenadesRuta(
-                    origenLong = origenLong,
-                    origenLat = origenLat,
-                    destiLong = destiLong,
-                    destiLat = destiLat,
-                    nRoutes = 1,
-                    seguretat = seguretatWeight,
-                    fontsAigua = fontsAiguaWeight,
-                    ombra = ombraWeight,
-                    eMecaniques = eMecaniquesWeight,
-                    bancs = bancsWeight
+                    RouteCoordinatesRequest(
+                        googleId = currentGoogleId,
+                        origenLong = origenLong,
+                        origenLat = origenLat,
+                        destiLong = destiLong,
+                        destiLat = destiLat,
+                        nRoutes = 1,
+                        routeType = routeType
+                    )
                 )
 
                 val coordenadas = infoRuta.first
@@ -217,24 +288,13 @@ class MapViewModel : ViewModel() {
                 Log.d("distance", "distancia = ${tiempoDistancia.second}")
                 Log.d("POIS", "Puntos encontrados = ${puntosInteres.size}")
 
-                val routeDurationMinutes = when {
-                    tiempoDistancia.first > 0 -> tiempoDistancia.first
-                    tiempoDistancia.second > 0.0 -> estimateMinutesFromDistanceMeters(tiempoDistancia.second)
-                    else -> 0
-                }
-
-                _uiState.update {
-                    it.copy(
-                        rutaCoordenades = coordenadas,
-                        distanceText = if (tiempoDistancia.second > 0.0) formatDistance(tiempoDistancia.second) else it.distanceText,
-                        durationText = if (routeDurationMinutes > 0) formatDuration(routeDurationMinutes) else it.durationText,
-                        etaText = if (routeDurationMinutes > 0) formatEta(routeDurationMinutes) else it.etaText,
-                        adrecesSuggerides = emptyList(),
-                        campActiu = textField.NONE,
-                        isTyping = false,
-                        puntsInteres = puntosInteres // Guardamos los POIs en el estado
-                    )
-                }
+                val routeDurationMinutes = resolveRouteDurationMinutes(tiempoDistancia)
+                applyCalculatedRoute(
+                    coordenadas = coordenadas,
+                    tiempoDistancia = tiempoDistancia,
+                    routeDurationMinutes = routeDurationMinutes,
+                    puntosInteres = puntosInteres
+                )
             } catch (e: Exception) {
                 Log.e("ROUTE_VM", "Error calculant la ruta: ${e.message}")
             } finally {
@@ -243,12 +303,53 @@ class MapViewModel : ViewModel() {
         }
     }
 
-    fun iniciarNavegacio() {
-        _uiState.update { it.copy(modoRuta = true) }
+    fun iniciarRuta(): ActiveRouteMode {
+        val startedRouteMode = resolveStartedRouteMode(
+            selectedOrigin = _uiState.value.origenSeleccionado?.toCoordenada(),
+            currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada()
+        )
+        lastNavigationProgressMeters = 0.0
+        _uiState.update {
+            it.copy(
+                activeRouteMode = startedRouteMode,
+                modoRuta = true,
+                navigationCameraFollowing = startedRouteMode == ActiveRouteMode.USER_LOCATION_NAVIGATION,
+                routeCompleted = false,
+                routeCompletionSummary = null,
+                activeNavigationInstruction = null,
+                navigationNotice = null
+            )
+        }
+        if (startedRouteMode == ActiveRouteMode.USER_LOCATION_NAVIGATION) {
+            refreshNavigationProgress(
+                currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate()
+            )
+        }
+        return startedRouteMode
     }
 
     fun onMapaListo() {
         _uiState.update { it.copy(mapaListo = true) }
+    }
+
+    fun onNavigationCameraDismissedByGesture() {
+        _uiState.update { state ->
+            if (!state.usesLiveNavigation || !state.navigationCameraFollowing) {
+                state
+            } else {
+                state.copy(navigationCameraFollowing = false)
+            }
+        }
+    }
+
+    fun resumeNavigationCameraTracking() {
+        _uiState.update { state ->
+            if (!state.usesLiveNavigation || state.routeCompleted) {
+                state
+            } else {
+                state.copy(navigationCameraFollowing = true)
+            }
+        }
     }
 
     fun togglePuntsInteres() {
@@ -258,11 +359,13 @@ class MapViewModel : ViewModel() {
     fun onPuntInteresSeleccionat(punt: com.safesteps.data.PuntInteres?) {
         _uiState.update { it.copy(puntInteresSeleccionat = punt) }
     }
+
     private suspend fun getTextoDestino(point: LatLng): String {
         return try {
             val resposta = PhotonApi.service.reverseGeocode(
                 lat = point.latitude,
-                lon = point.longitude
+                lon = point.longitude,
+                lang = textProvider.photonLanguage(currentLanguage)
             )
             val adreca = resposta.features.firstOrNull()?.properties?.getAddress()
 
@@ -272,7 +375,7 @@ class MapViewModel : ViewModel() {
                 adreca
             }
         } catch (_: Exception) {
-            "Ubicació seleccionada al mapa"
+            textProvider.selectedMapLocation(currentLanguage)
         }
     }
 
@@ -280,24 +383,337 @@ class MapViewModel : ViewModel() {
         return if (distanceMeters < 1000.0) {
             "${distanceMeters.roundToInt()} m"
         } else {
-            String.format(Locale.US, "%.1f km", distanceMeters / 1000.0)
+            String.format(localeForCurrentLanguage(), "%.1f km", distanceMeters / 1000.0)
         }
     }
 
     private fun formatDuration(durationMinutes: Int): String {
-        return if (durationMinutes > 0) "$durationMinutes min" else "-- min"
+        if (durationMinutes <= 0) {
+            return DEFAULT_DURATION_TEXT
+        }
+
+        return formatReadableDuration(durationMinutes)
     }
 
     private fun formatEta(durationMinutes: Int): String {
-        if (durationMinutes <= 0) return "--:--"
+        if (durationMinutes <= 0) return DEFAULT_ETA_TEXT
         val calendar = Calendar.getInstance().apply {
             add(Calendar.MINUTE, durationMinutes)
         }
-        return SimpleDateFormat("h:mm a", Locale.getDefault()).format(calendar.time)
+        return DateFormat.getTimeInstance(DateFormat.SHORT, localeForCurrentLanguage())
+            .format(calendar.time)
     }
 
     private fun estimateMinutesFromDistanceMeters(distanceMeters: Double): Int {
         val km = distanceMeters / 1000.0
         return max(1, (km * 12.0).roundToInt())
     }
+
+    private fun localeForCurrentLanguage(): Locale {
+        return Locale.forLanguageTag(currentLanguage.languageTag)
+    }
+
+    private fun routeTypeFor(priority: RoutePriority): RouteType {
+        return when (priority) {
+            RoutePriority.SAFETY -> RouteType.SEGURETAT
+            RoutePriority.ACCESSIBILITY -> RouteType.CONFORT
+            RoutePriority.HEAT -> RouteType.CLIMA
+            RoutePriority.PERSONALIZED -> RouteType.PERSONALITZAT
+        }
+    }
+
+    private fun resolveRouteDurationMinutes(tiempoDistancia: Pair<Int, Double>): Int {
+        return when {
+            tiempoDistancia.first > 0 -> tiempoDistancia.first
+            tiempoDistancia.second > 0.0 -> estimateMinutesFromDistanceMeters(tiempoDistancia.second)
+            else -> 0
+        }
+    }
+
+    private fun applyCalculatedRoute(
+        coordenadas: List<Coordenada>,
+        tiempoDistancia: Pair<Int, Double>,
+        routeDurationMinutes: Int,
+        puntosInteres: List<PuntInteres>
+    ) {
+        val currentState = _uiState.value
+        val totalDistanceMeters = tiempoDistancia.second
+            .takeIf { distance -> distance > 0.0 }
+            ?: estimateTotalDistanceMeters(coordenadas)
+
+        navigationRoute = buildNavigationRouteModel(
+            coordinates = coordenadas,
+            origin = routeOriginForState(currentState),
+            destination = currentState.destinoSeleccionado?.toCoordenada()
+        )
+        currentRouteSummary = RouteSummary(
+            totalDurationMinutes = routeDurationMinutes,
+            totalDistanceMeters = totalDistanceMeters
+        )
+        lastNavigationProgressMeters = 0.0
+
+        _uiState.update {
+            it.copy(
+                rutaCoordenades = coordenadas,
+                routeCompleted = false,
+                routeCompletionSummary = null,
+                distanceText = tiempoDistancia.second
+                    .takeIf { distance -> distance > 0.0 }
+                    ?.let(::formatDistance)
+                    ?: it.distanceText,
+                durationText = routeDurationMinutes
+                    .takeIf { duration -> duration > 0 }
+                    ?.let(::formatDuration)
+                    ?: it.durationText,
+                etaText = routeDurationMinutes
+                    .takeIf { duration -> duration > 0 }
+                    ?.let(::formatEta)
+                    ?: it.etaText,
+                activeNavigationInstruction = if (it.modoRuta) it.activeNavigationInstruction else null,
+                adrecesSuggerides = emptyList(),
+                campActiu = textField.NONE,
+                isTyping = false,
+                puntsInteres = puntosInteres
+            )
+        }
+
+        if (_uiState.value.usesLiveNavigation) {
+            refreshNavigationProgress(
+                currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate()
+            )
+        }
+    }
+
+    private fun resetNavigationState() {
+        navigationRoute = null
+        currentRouteSummary = null
+        lastNavigationProgressMeters = 0.0
+        lastAutomaticRecalculationAtMs = 0L
+    }
+
+    private fun refreshNavigationProgress(currentLocation: Coordenada?) {
+        val route = navigationRoute ?: return
+        val location = currentLocation ?: return
+        val state = _uiState.value
+
+        if (!state.usesLiveNavigation) {
+            return
+        }
+
+        if (state.routeCompleted) {
+            return
+        }
+
+        val progress = resolveNavigationProgress(
+            route = route,
+            currentLocation = location,
+            minimumProgressMeters = lastNavigationProgressMeters
+        )
+
+        if (shouldCompleteRoute(progress)) {
+            completeRoute(progress)
+            return
+        }
+
+        if (shouldAutomaticallyRecalculateRoute(state, progress)) {
+            triggerAutomaticRouteRecalculation(location)
+            return
+        }
+
+        lastNavigationProgressMeters = progress.progressMeters
+
+        val remainingDurationMinutes = remainingDurationMinutes(progress.instruction.remainingDistanceMeters)
+        val remainingCoordinates = remainingRouteCoordinates(
+            route = route,
+            progressMeters = progress.progressMeters
+        )
+
+        _uiState.update {
+            it.copy(
+                rutaCoordenades = remainingCoordinates,
+                activeNavigationInstruction = progress.instruction,
+                distanceText = formatDistance(progress.instruction.remainingDistanceMeters),
+                durationText = formatDuration(remainingDurationMinutes),
+                etaText = formatEta(remainingDurationMinutes)
+            )
+        }
+    }
+
+    private fun shouldAutomaticallyRecalculateRoute(
+        state: MapUiState,
+        progress: NavigationProgressResult
+    ): Boolean {
+        if (!state.usesLiveNavigation || state.calculantRuta || state.routeCompleted) {
+            return false
+        }
+
+        if (state.destinoSeleccionado == null) {
+            return false
+        }
+
+        if (progress.distanceToRouteMeters <= OFF_ROUTE_RECALCULATION_THRESHOLD_METERS) {
+            return false
+        }
+
+        if (progress.instruction.remainingDistanceMeters <= MIN_DISTANCE_FOR_ACTIVE_NAVIGATION_METERS) {
+            return false
+        }
+
+        val now = System.currentTimeMillis()
+        return now - lastAutomaticRecalculationAtMs >= OFF_ROUTE_RECALCULATION_COOLDOWN_MS
+    }
+
+    private fun triggerAutomaticRouteRecalculation(currentLocation: Coordenada) {
+        val destination = _uiState.value.destinoSeleccionado ?: return
+        lastAutomaticRecalculationAtMs = System.currentTimeMillis()
+        _uiState.update {
+            it.copy(
+                navigationNotice = textProvider.routeRecalculated(
+                    language = currentLanguage,
+                    distanceText = formatDistance(OFF_ROUTE_RECALCULATION_THRESHOLD_METERS)
+                )
+            )
+        }
+        calcularRuta(
+            origenLong = currentLocation.lon,
+            origenLat = currentLocation.lat,
+            destiLong = destination.longitude,
+            destiLat = destination.latitude
+        )
+    }
+
+    private fun shouldCompleteRoute(progress: NavigationProgressResult): Boolean {
+        return progress.instruction.maneuver == NavigationManeuver.ARRIVE &&
+            progress.instruction.remainingDistanceMeters <= ARRIVAL_DISTANCE_METERS
+    }
+
+    private fun completeRoute(progress: NavigationProgressResult) {
+        val routeSummary = currentRouteSummary
+        val totalDistanceMeters = routeSummary?.totalDistanceMeters
+            ?.takeIf { it > 0.0 }
+            ?: navigationRoute?.totalDistanceMeters
+            ?: progress.progressMeters
+        val totalDurationMinutes = routeSummary?.totalDurationMinutes ?: 0
+        lastNavigationProgressMeters = navigationRoute?.totalDistanceMeters ?: progress.progressMeters
+
+        _uiState.update {
+            it.copy(
+                navigationCameraFollowing = false,
+                routeCompleted = true,
+                routeCompletionSummary = RouteCompletionSummary(
+                    distanceText = formatDistance(totalDistanceMeters),
+                    durationText = totalDurationMinutes
+                        .takeIf { duration -> duration > 0 }
+                        ?.let(::formatDuration)
+                        ?: it.durationText
+                ),
+                activeNavigationInstruction = progress.instruction,
+                distanceText = formatDistance(progress.instruction.remainingDistanceMeters),
+                durationText = formatDuration(0),
+                etaText = DEFAULT_ETA_TEXT
+            )
+        }
+    }
+
+    private fun remainingDurationMinutes(remainingDistanceMeters: Double): Int {
+        if (remainingDistanceMeters <= 0.0) {
+            return 0
+        }
+
+        val routeSummary = currentRouteSummary
+        val routeProgressReferenceDistanceMeters = navigationRoute?.totalDistanceMeters
+        return when {
+            routeSummary != null &&
+                routeSummary.totalDurationMinutes > 0 &&
+                routeProgressReferenceDistanceMeters != null &&
+                routeProgressReferenceDistanceMeters > 0.0 -> {
+                proportionalRemainingDurationMinutes(
+                    totalDurationMinutes = routeSummary.totalDurationMinutes,
+                    remainingDistanceMeters = remainingDistanceMeters,
+                    routeProgressReferenceDistanceMeters = routeProgressReferenceDistanceMeters
+                )
+            }
+
+            routeSummary != null &&
+                routeSummary.totalDurationMinutes > 0 &&
+                routeSummary.totalDistanceMeters > 0.0 -> {
+                proportionalRemainingDurationMinutes(
+                    totalDurationMinutes = routeSummary.totalDurationMinutes,
+                    remainingDistanceMeters = remainingDistanceMeters,
+                    routeProgressReferenceDistanceMeters = routeSummary.totalDistanceMeters
+                )
+            }
+
+            else -> estimateMinutesFromDistanceMeters(remainingDistanceMeters)
+        }
+    }
+
+    private fun estimateTotalDistanceMeters(coordenadas: List<Coordenada>): Double {
+        return buildNavigationRouteModel(coordenadas)?.totalDistanceMeters ?: 0.0
+    }
+
+    private fun routeOriginForState(state: MapUiState): Coordenada? {
+        return if (state.usesLiveNavigation) {
+            state.ultimaUbicacion?.toCoordenada() ?: state.origenSeleccionado?.toCoordenada()
+        } else {
+            state.origenSeleccionado?.toCoordenada() ?: state.ultimaUbicacion?.toCoordenada()
+        }
+    }
+
+    private fun routeStartCoordinate(): Coordenada? {
+        return navigationRoute?.points?.firstOrNull()
+    }
+
+    private fun LatLng.toCoordenada(): Coordenada = Coordenada(lat = latitude, lon = longitude)
+
+    private fun Location.toCoordenada(): Coordenada = Coordenada(lat = latitude, lon = longitude)
+
+    private data class RouteSummary(
+        val totalDurationMinutes: Int,
+        val totalDistanceMeters: Double
+    )
+}
+
+internal fun formatReadableDuration(durationMinutes: Int): String {
+    require(durationMinutes > 0) {
+        "durationMinutes must be greater than 0"
+    }
+
+    val hours = durationMinutes / 60
+    val minutes = durationMinutes % 60
+
+    return when {
+        hours == 0 -> "$durationMinutes min"
+        minutes == 0 -> "$hours h"
+        else -> "$hours h $minutes min"
+    }
+}
+
+internal fun proportionalRemainingDurationMinutes(
+    totalDurationMinutes: Int,
+    remainingDistanceMeters: Double,
+    routeProgressReferenceDistanceMeters: Double
+): Int {
+    require(totalDurationMinutes > 0) {
+        "totalDurationMinutes must be greater than 0"
+    }
+    require(routeProgressReferenceDistanceMeters > 0.0) {
+        "routeProgressReferenceDistanceMeters must be greater than 0"
+    }
+
+    val clampedRemainingDistanceMeters = remainingDistanceMeters
+        .coerceIn(0.0, routeProgressReferenceDistanceMeters)
+
+    if (clampedRemainingDistanceMeters <= 0.0) {
+        return 0
+    }
+
+    return max(
+        1,
+        (
+            totalDurationMinutes.toDouble() *
+                clampedRemainingDistanceMeters /
+                routeProgressReferenceDistanceMeters
+            ).roundToInt()
+    )
 }

@@ -1,876 +1,531 @@
 package com.safesteps.map
 
 import android.Manifest
+import android.content.Context
+import android.location.Location
 import android.location.LocationListener
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Accessible
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DirectionsWalk
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.safesteps.R
+import com.safesteps.auth.UserInfo
 import com.safesteps.data.Feature
+import com.safesteps.data.PuntInteres
 import com.safesteps.domain.RoutePriority
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import org.maplibre.android.annotations.MarkerOptions
+import com.safesteps.i18n.AppLanguage
+import com.safesteps.i18n.appString
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
-import kotlin.math.max
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
-import com.safesteps.R
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.graphicsLayer
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
 
-@Composable
-private fun SearchBarItem(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    leadingIcon: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-    borderColor: Color = Color(0xFFE4ECE8),
-    textColor: Color = Color(0xFF3D4A45),
-    placeholderColor: Color = Color(0xFF9AA7A0),
-    onFocus: (() -> Unit)? = null,
-    trailingIcon: @Composable (() -> Unit)? = null,
-    trailingContent: (@Composable () -> Unit)? = null
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(52.dp)
-            .border(
-                width = 1.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(26.dp)
-            )
-            .background(Color.White, RoundedCornerShape(26.dp))
-            .padding(horizontal = 14.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            leadingIcon()
+private data class MapScreenStrings(
+    val locationPermissionRequiredMessage: String,
+    val waitingGpsLocationMessage: String,
+    val searchingGpsSignalMessage: String,
+    val originLabel: String,
+    val destinationLabel: String,
+    val hideExtraInfoLabel: String,
+    val showExtraInfoLabel: String,
+    val standardMapStyleLabel: String,
+    val satelliteMapStyleLabel: String,
+    val myLocationLabel: String,
+    val calculatingBestRouteLabel: String
+)
 
-            Spacer(modifier = Modifier.width(10.dp))
+private data class FloatingActionsLayout(
+    val compactMode: Boolean,
+    val showPoiAction: Boolean,
+    val showMapStyleAction: Boolean,
+    val showMyLocationAction: Boolean
+)
 
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                if (value.isBlank()) {
-                    Text(
-                        text = placeholder,
-                        color = placeholderColor,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+private data class MapScreenEffectCallbacks(
+    val requestLocationPermissions: () -> Unit,
+    val onNavigationHeadingChanged: (Float?) -> Unit
+)
 
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = textColor
-                    ),
-                    cursorBrush = SolidColor(Color(0xFF5AC98B)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .onFocusChanged {
-                            if (it.isFocused) {
-                                onFocus?.invoke()
-                            }
-                        }
-                )
-            }
+private data class MapRenderContext(
+    val mapView: MapView,
+    val context: Context,
+    val viewModel: MapViewModel,
+    val navigationHeadingDegrees: Float?,
+    val originLabel: String,
+    val destinationLabel: String
+)
 
-            if (trailingIcon != null) {
-                Spacer(modifier = Modifier.width(4.dp))
-                trailingIcon()
-            }
-
-            if (trailingContent != null) {
-                Spacer(modifier = Modifier.width(10.dp))
-                trailingContent()
-            }
-        }
-    }
-}
-
-@Composable
-private fun DropdownSuggeriments(
-    adrecesSuggerides: List<Feature>,
-    onAdrecaSeleccionada: (Feature) -> Unit
-) {
-    AnimatedVisibility(visible = adrecesSuggerides.isNotEmpty()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp, bottom = 8.dp)
-                .shadow(4.dp, RoundedCornerShape(16.dp))
-                .background(Color.White, RoundedCornerShape(16.dp))
-                .border(1.dp, Color(0xFFE4ECE8), RoundedCornerShape(16.dp))
-        ) {
-            adrecesSuggerides.forEach { feature ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onAdrecaSeleccionada(feature) }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = Color(0xFF9AA7A0),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = feature.properties.getAddress(),
-                        color = Color(0xFF3D4A45),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                if (feature != adrecesSuggerides.last()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(Color(0xFFF4F6F5))
-                    )
-                }
-            }
-        }
-    }
-}
-
-
-@Composable
-private fun TopPanelHeader() {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Menu, null, tint = Color(0xFF66716C), modifier = Modifier.size(18.dp))
-            }
-        }
-        Spacer(modifier = Modifier.width(12.dp))
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
-            Text("SafeSteps", color = Color(0xFF33413B), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleMedium)
-        }
-        Surface(modifier = Modifier.size(36.dp), shape = CircleShape, color = Color(0xFF6DD29A)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(20.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun OriginSearchSection(
-    origen: String,
-    onOrigenChange: (String) -> Unit,
-    onOrigenFocus: () -> Unit,
-    campActiu: textField, // Mantenemos tu tipo exacto
-    adrecesSuggerides: List<Feature>,
-    onAdrecaSeleccionada: (Feature) -> Unit
-) {
-    val esUbicacioActual = origen.isBlank() && campActiu != textField.ORIGIN
-
-    // 1. Separamos las decisiones de estilo
-    val actualBorderColor = if (esUbicacioActual) Color(0xFFBBDEFB) else Color(0xFFDDEEE5)
-    val actualTextColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF3D4A45)
-    val actualPlaceholderColor = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF9AA7A0)
-
-    val actualIconVector = if (esUbicacioActual) Icons.Default.MyLocation else Icons.Default.RadioButtonUnchecked
-    val actualIconTint = if (esUbicacioActual) Color(0xFF1E88E5) else Color(0xFF74D3A2)
-
-    Column {
-        SearchBarItem(
-            value = origen,
-            onValueChange = onOrigenChange,
-            placeholder = "La meva ubicació",
-            borderColor = actualBorderColor,
-            textColor = actualTextColor,
-            placeholderColor = actualPlaceholderColor,
-            leadingIcon = {
-                Icon(
-                    imageVector = actualIconVector,
-                    contentDescription = null,
-                    tint = actualIconTint,
-                    modifier = Modifier.size(18.dp)
-                )
-            },
-            trailingIcon = {
-                // 2. Delegamos la lógica del botón a una función separada
-                BotonBorrarOrigen(origen, onOrigenChange)
-            },
-            onFocus = onOrigenFocus
-        )
-
-        if (campActiu == textField.ORIGIN) {
-            DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
-        }
-    }
-}
-
-@Composable
-private fun BotonBorrarOrigen(origen: String, onOrigenChange: (String) -> Unit) {
-    if (origen.isNotEmpty()) {
-        IconButton(onClick = { onOrigenChange("") }) {
-            Icon(Icons.Default.Clear, null, tint = Color.Gray)
-        }
-    }
-}
-
-@Composable
-private fun TopSearchPanel(
-    origen: String,
-    onOrigenChange: (String) -> Unit,
-    destino: String,
-    onDestinoChange: (String) -> Unit,
-    mostrarOrigen: Boolean,
-    onOrigenFocus: () -> Unit,
-    onDestinoFocus: () -> Unit,
-    adrecesSuggerides: List<Feature>,
-    onAdrecaSeleccionada: (Feature) -> Unit,
-    campActiu: textField
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-            .shadow(10.dp, RoundedCornerShape(24.dp), clip = false),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            TopPanelHeader()
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            AnimatedVisibility(visible = mostrarOrigen) {
-                OriginSearchSection(
-                    origen, onOrigenChange, onOrigenFocus,
-                    campActiu, adrecesSuggerides, onAdrecaSeleccionada
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-            }
-
-            SearchBarItem(
-                value = destino,
-                onValueChange = onDestinoChange,
-                placeholder = "Destí",
-                borderColor = Color(0xFFF2D8D4),
-                leadingIcon = { Icon(Icons.Default.LocationOn, null, tint = Color(0xFFFF8A80), modifier = Modifier.size(18.dp)) },
-                trailingIcon = {
-                    if (destino.isNotEmpty()) {
-                        IconButton(onClick = { onDestinoChange("") }) {
-                            Icon(Icons.Default.Clear, null, tint = Color.Gray)
-                        }
-                    }
-                },
-                onFocus = onDestinoFocus
-            )
-
-            if (campActiu == textField.DESTINY) {
-                DropdownSuggeriments(adrecesSuggerides, onAdrecaSeleccionada)
-            }
-        }
-    }
-}
-
-@Composable
-private fun RoutePriorityCompactOption(
-    title: String,
-    selected: Boolean,
-    icon: ImageVector,
-    activeColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val bgColor = if (selected) activeColor.copy(alpha = 0.15f) else Color.Transparent
-    val contentColor = if (selected) activeColor else Color(0xFF77837D)
-    val borderColor = if (selected) activeColor else Color(0xFFE7ECE8)
-
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(bgColor)
-            .border(width = if (selected) 2.dp else 1.dp, color = borderColor, shape = RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .padding(vertical = 12.dp, horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = contentColor,
-            modifier = Modifier.size(28.dp)
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = title,
-            color = contentColor,
-            fontWeight = FontWeight.SemiBold,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1
-        )
-    }
-}
-
-@Composable
-private fun RoutePriorityOption(
-    title: String,
-    subtitle: String,
-    selected: Boolean,
-    icon: ImageVector,
-    iconBackground: Color,
-    iconTint: Color,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = if (selected) 5.dp else 0.dp,
-                shape = RoundedCornerShape(22.dp),
-                clip = false
-            )
-            .clip(RoundedCornerShape(22.dp))
-            .background(Color.White)
-            .border(
-                width = 1.dp,
-                color = if (selected) Color(0xFF5D6F8A) else Color(0xFFE7ECE8),
-                shape = RoundedCornerShape(22.dp)
-            )
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = iconBackground
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    color = Color(0xFF23333A),
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    color = Color(0xFF77837D),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-
-            RadioButton(
-                selected = selected,
-                onClick = onClick,
-                colors = RadioButtonDefaults.colors(
-                    selectedColor = Color(0xFF3C577D),
-                    unselectedColor = Color(0xFFC3CDD0)
-                )
-            )
-        }
-    }
-}
-
-@Composable
-private fun RoutePlannerSheet(
-    modifier: Modifier = Modifier,
-    selectedPriority: RoutePriority,
-    onPrioritySelected: (RoutePriority) -> Unit,
-    distanceText: String,
-    durationText: String,
-    puntsInteres: List<com.safesteps.data.PuntInteres>,
-    onClose: () -> Unit,
-    onStartRoute: () -> Unit
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 14.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .width(44.dp)
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(Color(0xFFD8DDDA))
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Prioritats de Ruta",
-                    color = Color(0xFF1F2C3B),
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Surface(
-                    modifier = Modifier.size(36.dp),
-                    shape = CircleShape,
-                    color = Color(0xFFEAF9EF)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.DirectionsWalk,
-                            contentDescription = null,
-                            tint = Color(0xFF5CCF8A),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(6.dp))
-
-                IconButton(onClick = onClose) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Cerrar",
-                        tint = Color(0xFF6C7772)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                RoutePriorityCompactOption(
-                    title = "Seguretat",
-                    selected = selectedPriority == RoutePriority.SAFETY,
-                    icon = Icons.Default.Security,
-                    activeColor = Color(0xFF1F4A85),
-                    onClick = { onPrioritySelected(RoutePriority.SAFETY) },
-                    modifier = Modifier.weight(1f)
-                )
-
-                RoutePriorityCompactOption(
-                    title = "Confort",
-                    selected = selectedPriority == RoutePriority.ACCESSIBILITY,
-                    icon = Icons.Default.Accessible,
-                    activeColor = Color(0xFF7FD7AA),
-                    onClick = { onPrioritySelected(RoutePriority.ACCESSIBILITY) },
-                    modifier = Modifier.weight(1f)
-                )
-
-                RoutePriorityCompactOption(
-                    title = "Clima",
-                    selected = selectedPriority == RoutePriority.HEAT,
-                    icon = Icons.Default.WbSunny,
-                    activeColor = Color(0xFFFF7B42),
-                    onClick = { onPrioritySelected(RoutePriority.HEAT) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (puntsInteres.isNotEmpty()) {
-                val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
-                val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
-                val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    if (fonts > 0) Text("💧 $fonts Fonts", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
-                    if (bancs > 0) Text("🪑 $bancs Bancs", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
-                    if (comisaries > 0) Text("👮 $comisaries Comisaries", style = MaterialTheme.typography.labelLarge, color = Color(0xFF3D4A45))
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = Color(0xFF5E6763),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = distanceText,
-                    color = Color(0xFF5E6763),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "•",
-                    color = Color(0xFF88D1A6),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Icon(
-                    imageVector = Icons.Default.AccessTime,
-                    contentDescription = null,
-                    tint = Color(0xFF5E6763),
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = durationText,
-                    color = Color(0xFF5E6763),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = onStartRoute,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(22.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFC86A37),
-                    contentColor = Color.White
-                )
-            ) {
-                Text(
-                    text = "Iniciar Ruta",
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RouteActiveBottomBar(
-    durationText: String,
-    distanceText: String,
-    etaText: String,
-    onClose: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 14.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(44.dp),
-                shape = CircleShape,
-                color = Color(0xFFF2F4F3)
-            ) {
-                IconButton(onClick = onClose, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Cerrar",
-                        tint = Color(0xFF3D4A45)
-                    )
-                }
-            }
-
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = durationText,
-                        color = Color(0xFF202124),
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = distanceText,
-                            color = Color(0xFF5F6368),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "•",
-                            color = Color(0xFF5F6368),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = etaText,
-                            color = Color(0xFF5F6368),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.size(44.dp))
-        }
-    }
-}
+private data class NavigationTrackingState(
+    val locationGranted: Boolean,
+    val mapaListo: Boolean,
+    val modoRuta: Boolean,
+    val routeCompleted: Boolean,
+    val navigationCameraFollowing: Boolean,
+    val currentLocation: Location?
+)
 
 @Composable
 fun MapLibreScreen(
     modifier: Modifier = Modifier,
-    viewModel: MapViewModel = viewModel()
+    currentUser: UserInfo? = null,
+    currentLanguage: AppLanguage = AppLanguage.default,
+    onLoginClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val density = LocalDensity.current
-    val coroutineScope = rememberCoroutineScope()
+    val viewModel: MapViewModel = viewModel(
+        factory = MapViewModelFactory(context.applicationContext)
+    )
     val mapView = rememberMapViewWithLifecycle()
     val uiState by viewModel.uiState.collectAsState()
+    val strings = mapScreenStrings()
+    var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
 
-    var sheetHeightPx by remember { mutableStateOf(0f) }
-    var sheetOffsetPx by remember { mutableStateOf(0f) }
-    val visibleSheetHeightPx = with(density) { 150.dp.toPx() }
-    val collapsedSheetOffset = max(0f, sheetHeightPx - visibleSheetHeightPx)
+    var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
+    var topOverlayHeightPx by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
 
-    val dynamicBottomPadding by animateDpAsState(
-        targetValue = when {
-            uiState.modoRuta -> 110.dp
-            uiState.destinoSeleccionado != null -> {
-                val currentVisibleHeightPx = sheetHeightPx - sheetOffsetPx
-                val currentVisibleHeightDp = with(density) { currentVisibleHeightPx.toDp() }
-                currentVisibleHeightDp + 16.dp
-            }
-            else -> 16.dp
-        },
-        label = "buttonPadding"
+    val requestLocationPermissions = rememberLocationPermissionRequester(
+        context = context,
+        viewModel = viewModel,
+        locationPermissionRequiredMessage = strings.locationPermissionRequiredMessage
+    )
+    val resetToMainMenu = {
+        resetMapToMainMenu(
+            viewModel = viewModel,
+            mapView = mapView,
+            currentLocation = uiState.ultimaUbicacion
+        )
+    }
+    val onPrioritySelected: (RoutePriority) -> Unit = { priority ->
+        processPrioritySelection(
+            priority = priority,
+            uiState = uiState,
+            viewModel = viewModel,
+            context = context,
+            waitingGpsLocationMessage = strings.waitingGpsLocationMessage
+        )
+    }
+    val onAddressSelected: (Feature) -> Unit = { feature ->
+        processAddressSelection(
+            feature = feature,
+            uiState = uiState,
+            viewModel = viewModel,
+            mapView = mapView
+        )
+    }
+    val onCenterCurrentLocation = {
+        recenterOnCurrentLocation(
+            uiState = uiState,
+            viewModel = viewModel,
+            mapView = mapView,
+            context = context,
+            requestLocationPermissions = requestLocationPermissions,
+            navigationHeadingDegrees = navigationHeadingDegrees,
+            searchingGpsSignalMessage = strings.searchingGpsSignalMessage
+        )
+    }
+    val renderContext = MapRenderContext(
+        mapView = mapView,
+        context = context,
+        viewModel = viewModel,
+        navigationHeadingDegrees = navigationHeadingDegrees,
+        originLabel = strings.originLabel,
+        destinationLabel = strings.destinationLabel
     )
 
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-        val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        val granted = fine || coarse || hasLocationPermission(context)
-        viewModel.onLocationPermissionsResult(granted)
-        if (!granted) Toast.makeText(context, "Permís d'ubicació necessari.", Toast.LENGTH_SHORT).show()
+    LaunchedEffect(currentUser?.googleId) {
+        viewModel.onCurrentUserChanged(currentUser)
     }
 
-    val sheetDragState = rememberDraggableState { delta ->
-        if (uiState.destinoSeleccionado != null && !uiState.modoRuta) {
-            sheetOffsetPx = (sheetOffsetPx + delta).coerceIn(0f, collapsedSheetOffset)
+    MapScreenEffects(
+        currentLanguage = currentLanguage,
+        uiState = uiState,
+        renderContext = renderContext,
+        callbacks = MapScreenEffectCallbacks(
+            requestLocationPermissions = requestLocationPermissions,
+            onNavigationHeadingChanged = { navigationHeadingDegrees = it }
+        )
+    )
+
+    LaunchedEffect(uiState.modoRuta) {
+        if (uiState.modoRuta) {
+            topOverlayHeightPx = 0f
         }
     }
 
-    val resetToMainMenu = {
-        viewModel.clearRuta()
-        viewModel.limpiarOrigen()
-        sheetOffsetPx = 0f
-        mapView.getMapAsync { map ->
-            map.clear()
-            uiState.ultimaUbicacion?.let { loc ->
-                map.animateCamera(
-                    CameraUpdateFactory.newLatLngZoom(
-                        LatLng(loc.latitude, loc.longitude),
-                        15.0
-                    ),
-                    1000
-                )
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val navigationBarsBottomPadding = WindowInsets.navigationBars
+            .asPaddingValues()
+            .calculateBottomPadding()
+        val effectiveFloatingActionsBottomPadding = maxOf(
+            floatingActionsBottomPadding,
+            navigationBarsBottomPadding + 16.dp
+        )
+        val availableHeightPx = with(density) {
+            maxHeight.toPx() - effectiveFloatingActionsBottomPadding.toPx() - topOverlayHeightPx
+        }
+        val floatingActionsLayout = resolveFloatingActionsLayout(
+            freeHeightPx = availableHeightPx,
+            density = density,
+            hasPoiAction = uiState.puntsInteres.isNotEmpty()
+        )
+
+        MapViewSurface(
+            mapView = mapView,
+            uiState = uiState,
+            viewModel = viewModel
+        )
+
+        MainMapOverlay(
+            uiState = uiState,
+            accountActions = TopPanelAccountActions(
+                currentUser = currentUser,
+                onLoginClick = onLoginClick,
+                onProfileClick = onProfileClick
+            ),
+            callbacks = TopSearchPanelCallbacks(
+                onOrigenChange = { text ->
+                    viewModel.onTextoBuscadorModificado(text, textField.ORIGIN)
+                    if (text.isEmpty()) {
+                        viewModel.limpiarOrigen()
+                        viewModel.cancelarRutaVisual()
+                    }
+                },
+                onDestinoChange = { text ->
+                    viewModel.onTextoBuscadorModificado(text, textField.DESTINY)
+                    if (text.isEmpty()) {
+                        viewModel.limpiarDestino()
+                        viewModel.cancelarRutaVisual()
+                    }
+                },
+                onOrigenFocus = {
+                    viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN)
+                },
+                onDestinoFocus = {
+                    viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY)
+                },
+                onAdrecaSeleccionada = onAddressSelected,
+                onHeightChanged = { topOverlayHeightPx = it }
+            )
+        )
+
+        RouteExperienceOverlay(
+            uiState = uiState,
+            showProfilePreferences = !currentUser?.googleId.isNullOrBlank(),
+            onPrioritySelected = onPrioritySelected,
+            onStartRoute = {
+                when (viewModel.iniciarRuta()) {
+                    ActiveRouteMode.USER_LOCATION_NAVIGATION -> {
+                        uiState.ultimaUbicacion?.let { location ->
+                            enableNavigationCameraTracking(
+                                mapView = mapView,
+                                currentLocation = location,
+                                headingDegrees = navigationHeadingDegrees?.toDouble(),
+                                applyZoom = true
+                            )
+                        }
+                    }
+
+                    ActiveRouteMode.FIXED_OVERVIEW,
+                    ActiveRouteMode.NONE -> {
+                        disableNavigationCameraTracking(mapView)
+                    }
+                }
+            },
+            onClose = resetToMainMenu,
+            onBottomPaddingChange = { padding ->
+                floatingActionsBottomPadding = padding
             }
-        }
+        )
+
+        MapFloatingActions(
+            uiState = uiState,
+            state = FloatingActionsState(
+                bottomPadding = effectiveFloatingActionsBottomPadding,
+                compactMode = floatingActionsLayout.compactMode,
+                showPoiAction = floatingActionsLayout.showPoiAction,
+                showMapStyleAction = floatingActionsLayout.showMapStyleAction,
+                showMyLocationAction = floatingActionsLayout.showMyLocationAction
+            ),
+            labels = FloatingActionLabels(
+                hideExtraInfoLabel = strings.hideExtraInfoLabel,
+                showExtraInfoLabel = strings.showExtraInfoLabel,
+                standardMapStyleLabel = strings.standardMapStyleLabel,
+                satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
+                myLocationLabel = strings.myLocationLabel
+            ),
+            callbacks = FloatingActionCallbacks(
+                onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
+                onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
+                onMyLocationClick = onCenterCurrentLocation
+            )
+        )
+
+        CalculatingRouteOverlay(
+            visible = uiState.calculantRuta,
+            calculatingBestRouteLabel = strings.calculatingBestRouteLabel
+        )
+    }
+}
+
+@Composable
+private fun mapScreenStrings(): MapScreenStrings {
+    return MapScreenStrings(
+        locationPermissionRequiredMessage = appString(R.string.location_permission_required),
+        waitingGpsLocationMessage = appString(R.string.waiting_gps_location),
+        searchingGpsSignalMessage = appString(R.string.searching_gps_signal),
+        originLabel = appString(R.string.origin_label),
+        destinationLabel = appString(R.string.destination_label),
+        hideExtraInfoLabel = appString(R.string.hide_extra_info),
+        showExtraInfoLabel = appString(R.string.show_extra_info),
+        standardMapStyleLabel = appString(R.string.map_style_standard),
+        satelliteMapStyleLabel = appString(R.string.map_style_satellite),
+        myLocationLabel = appString(R.string.my_location),
+        calculatingBestRouteLabel = appString(R.string.calculating_best_route)
+    )
+}
+
+@Composable
+private fun rememberLocationPermissionRequester(
+    context: Context,
+    viewModel: MapViewModel,
+    locationPermissionRequiredMessage: String
+): () -> Unit {
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        processLocationPermissionResult(
+            context = context,
+            permissions = permissions,
+            viewModel = viewModel,
+            locationPermissionRequiredMessage = locationPermissionRequiredMessage
+        )
     }
 
-    LaunchedEffect(Unit) {
-        val yaTengoPermiso = hasLocationPermission(context)
-        viewModel.onLocationPermissionsResult(yaTengoPermiso)
+    return {
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+}
 
-        if (!yaTengoPermiso) {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
+@Composable
+private fun MapScreenEffects(
+    currentLanguage: AppLanguage,
+    uiState: MapUiState,
+    renderContext: MapRenderContext,
+    callbacks: MapScreenEffectCallbacks
+) {
+    PrepareMapSessionEffect(
+        mapView = renderContext.mapView,
+        viewModel = renderContext.viewModel
+    )
+    LanguageChangeEffect(
+        currentLanguage = currentLanguage,
+        viewModel = renderContext.viewModel
+    )
+    InitialLocationPermissionEffect(
+        context = renderContext.context,
+        viewModel = renderContext.viewModel,
+        requestLocationPermissions = callbacks.requestLocationPermissions
+    )
+    LocationComponentActivationEffect(
+        locationGranted = uiState.locationGranted,
+        mapaListo = uiState.mapaListo,
+        ultimaUbicacion = uiState.ultimaUbicacion,
+        mapView = renderContext.mapView
+    )
+    NavigationHeadingSensorEffect(
+        context = renderContext.context,
+        enabled = uiState.usesLiveNavigation && !uiState.routeCompleted && uiState.navigationCameraFollowing,
+        onHeadingChanged = callbacks.onNavigationHeadingChanged
+    )
+    NavigationCameraTrackingEffect(
+        trackingState = NavigationTrackingState(
+            locationGranted = uiState.locationGranted,
+            mapaListo = uiState.mapaListo,
+            modoRuta = uiState.usesLiveNavigation,
+            routeCompleted = uiState.routeCompleted,
+            navigationCameraFollowing = uiState.navigationCameraFollowing,
+            currentLocation = uiState.ultimaUbicacion
+        ),
+        mapView = renderContext.mapView,
+        headingDegrees = renderContext.navigationHeadingDegrees
+    )
+    NavigationCameraGestureDismissEffect(
+        mapView = renderContext.mapView,
+        uiState = uiState,
+        viewModel = renderContext.viewModel
+    )
+    RouteRecalculationEffect(
+        destinoSeleccionado = uiState.destinoSeleccionado,
+        origenSeleccionado = uiState.origenSeleccionado,
+        ultimaUbicacion = uiState.ultimaUbicacion,
+        viewModel = renderContext.viewModel
+    )
+    NavigationNoticeEffect(
+        navigationNotice = uiState.navigationNotice,
+        context = renderContext.context,
+        viewModel = renderContext.viewModel
+    )
+    MapStyleRenderingEffect(
+        uiState = uiState,
+        renderContext = renderContext
+    )
+    LocationUpdatesEffect(
+        locationGranted = uiState.locationGranted,
+        context = renderContext.context,
+        mapView = renderContext.mapView,
+        viewModel = renderContext.viewModel
+    )
+    InitialZoomEffect(
+        ultimaUbicacion = uiState.ultimaUbicacion,
+        mapaListo = uiState.mapaListo,
+        firstLocationZoomDone = uiState.firstLocationZoomDone,
+        mapView = renderContext.mapView,
+        viewModel = renderContext.viewModel
+    )
+}
+
+@Composable
+private fun PrepareMapSessionEffect(
+    mapView: MapView,
+    viewModel: MapViewModel
+) {
+    LaunchedEffect(mapView) {
+        viewModel.prepararNuevaSesionMapa()
+    }
+}
+
+@Composable
+private fun LanguageChangeEffect(
+    currentLanguage: AppLanguage,
+    viewModel: MapViewModel
+) {
+    LaunchedEffect(currentLanguage) {
+        viewModel.onLanguageChanged(currentLanguage)
+    }
+}
+
+@Composable
+private fun InitialLocationPermissionEffect(
+    context: Context,
+    viewModel: MapViewModel,
+    requestLocationPermissions: () -> Unit
+) {
+    LaunchedEffect(Unit) {
+        val hasPermission = hasLocationPermission(context)
+        viewModel.onLocationPermissionsResult(hasPermission)
+
+        if (hasPermission) {
+            getBestLastKnownLocation(context)?.let(viewModel::updateLocation)
+            return@LaunchedEffect
+        }
+
+        requestLocationPermissions()
+    }
+}
+
+@Composable
+private fun LocationComponentActivationEffect(
+    locationGranted: Boolean,
+    mapaListo: Boolean,
+    ultimaUbicacion: Location?,
+    mapView: MapView
+) {
+    LaunchedEffect(locationGranted, mapaListo, ultimaUbicacion != null) {
+        if (locationGranted && mapaListo) {
+            activateLocationComponent(
+                mapView = mapView,
+                initialLocation = ultimaUbicacion
             )
         }
     }
+}
 
-    LaunchedEffect(uiState.locationGranted, uiState.mapaListo) {
-        if (uiState.locationGranted && uiState.mapaListo) {
-            activateLocationComponent(mapView)
+@Composable
+private fun NavigationHeadingSensorEffect(
+    context: Context,
+    enabled: Boolean,
+    onHeadingChanged: (Float?) -> Unit
+) {
+    DisposableEffect(context, enabled) {
+        if (!enabled) {
+            onHeadingChanged(null)
+            return@DisposableEffect onDispose { }
+        }
+
+        val listener = startHeadingUpdates(context, onHeadingChanged)
+        onDispose {
+            stopHeadingUpdates(context, listener)
+            onHeadingChanged(null)
         }
     }
+}
 
-    LaunchedEffect(uiState.destinoSeleccionado, uiState.origenSeleccionado) {
-        val destination = uiState.destinoSeleccionado
-        if (destination != null) {
-            val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
-
-            if (origenPoint != null) {
-                viewModel.calcularRuta(
-                    origenLong = origenPoint.longitude,
-                    origenLat = origenPoint.latitude,
-                    destiLong = destination.longitude,
-                    destiLat = destination.latitude
-                )
-            }
-        }
+@Composable
+private fun RouteRecalculationEffect(
+    destinoSeleccionado: LatLng?,
+    origenSeleccionado: LatLng?,
+    ultimaUbicacion: Location?,
+    viewModel: MapViewModel
+) {
+    LaunchedEffect(destinoSeleccionado, origenSeleccionado) {
+        requestRouteCalculation(
+            viewModel = viewModel,
+            destination = destinoSeleccionado,
+            selectedOrigin = origenSeleccionado,
+            currentLocation = ultimaUbicacion
+        )
     }
+}
 
-    LaunchedEffect(
-        uiState.origenSeleccionado,
-        uiState.destinoSeleccionado,
-        uiState.modoRuta
-    ) {
-        if (uiState.modoRuta || uiState.rutaCoordenades.isNotEmpty()) return@LaunchedEffect
-
-        mapView.getMapAsync { map ->
-            if (map.style?.isFullyLoaded == true) {
-                map.clear()
-                uiState.origenSeleccionado?.let { ori ->
-                    map.addMarker(
-                        MarkerOptions()
-                            .position(ori)
-                            .title("Origen")
-                            .icon(crearIconaGrisa(context))
-                    )
-                }
-                uiState.destinoSeleccionado?.let { dest ->
-                    map.addMarker(
-                        MarkerOptions()
-                            .position(dest)
-                            .title("Destí")
-                    )
-                }
-            }
+@Composable
+private fun NavigationNoticeEffect(
+    navigationNotice: String?,
+    context: Context,
+    viewModel: MapViewModel
+) {
+    LaunchedEffect(navigationNotice) {
+        if (navigationNotice.isNullOrBlank()) {
+            return@LaunchedEffect
         }
-    }
 
-    // UNIFICADO: Este bloque gestiona TODO el dibujo en el mapa sin conflictos
+        Toast.makeText(context, navigationNotice, Toast.LENGTH_SHORT).show()
+        viewModel.onNavigationNoticeConsumed()
+    }
+}
+
+@Composable
+private fun MapStyleRenderingEffect(
+    uiState: MapUiState,
+    renderContext: MapRenderContext
+) {
     LaunchedEffect(
         uiState.estiloSatelite,
         uiState.modoRuta,
@@ -880,374 +535,652 @@ fun MapLibreScreen(
         uiState.origenSeleccionado,
         uiState.destinoSeleccionado
     ) {
-        mapView.getMapAsync { map ->
-            val styleUrl = if (uiState.estiloSatelite) {
-                "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
-            } else {
-                "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
-            }
-
-            // 1. Cargamos el estilo (Esto limpia el mapa automáticamente)
-            map.setStyle(styleUrl) {
-                viewModel.onMapaListo()
-                if (uiState.locationGranted) activateLocationComponent(mapView)
-
-                // 2. ¿Hay una ruta que dibujar?
-                if (uiState.rutaCoordenades.isNotEmpty()) {
-                    val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
-
-                    drawRoute(
-                        mapView = mapView,
-                        coordenades = uiState.rutaCoordenades,
-                        origen = origenPoint,
-                        desti = uiState.destinoSeleccionado,
-                        context = context
-                    )
-
-                    // 3. ¿Hay que mostrar los puntos extra (fuentes, bancos...)?
-                    if (uiState.mostrarPuntsInteres) {
-                        uiState.puntsInteres
-                            .filter { punt ->
-                                val tipus = punt.tipus.trim().uppercase()
-                                tipus == "FONT" || tipus == "COMISSARIA"
-                            }
-                            .forEach { punt ->
-                                val titulo = punt.nom ?: punt.tipus.lowercase().replaceFirstChar { it.uppercase() }
-                                map.addMarker(
-                                    MarkerOptions()
-                                        .position(LatLng(punt.latitud, punt.longitud))
-                                        .title(titulo)
-                                        .icon(crearIconaPoi(context, punt.tipus))
-                                )
-                            }
-                    }
-                } else {
-                    // 4. Si NO hay ruta, solo dibujamos los pines de Origen y Destino si existen
-                    uiState.origenSeleccionado?.let { ori ->
-                        map.addMarker(MarkerOptions().position(ori).title("Origen").icon(crearIconaGrisa(context)))
-                    }
-                    uiState.destinoSeleccionado?.let { dest ->
-                        map.addMarker(MarkerOptions().position(dest).title("Destí"))
-                    }
-                }
-            }
-        }
-    }
-    LaunchedEffect(uiState.destinoSeleccionado) {
-        val destination = uiState.destinoSeleccionado
-        if (destination != null) {
-            val origenPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
-
-            if (origenPoint != null) {
-                viewModel.calcularRuta(
-                    origenLong = origenPoint.longitude,
-                    origenLat = origenPoint.latitude,
-                    destiLong = destination.longitude,
-                    destiLat = destination.latitude
+        val targetStyleUrl = resolveMapStyleUrl(uiState.estiloSatelite)
+        renderContext.mapView.getMapAsync { map ->
+            val currentStyle = map.style
+            if (currentStyle?.isFullyLoaded == true && currentStyle.uri == targetStyleUrl) {
+                renderMapStateAfterStyleLoaded(
+                    map = map,
+                    uiState = uiState,
+                    renderContext = renderContext
                 )
+                return@getMapAsync
             }
-        }
-    }
 
-    DisposableEffect(uiState.locationGranted) {
-        var listener: LocationListener? = null
-        if (uiState.locationGranted) {
-            listener = startAndroidLocationUpdates(context, mapView) { loc ->
-                viewModel.updateLocation(loc)
-            }
-        }
-        onDispose { stopAndroidLocationUpdates(context, listener) }
-    }
-
-    LaunchedEffect(uiState.ultimaUbicacion, uiState.mapaListo) {
-        if (uiState.ultimaUbicacion != null && uiState.mapaListo && !uiState.firstLocationZoomDone) {
-            viewModel.marcarZoomInicialHecho()
-            delay(500)
-            mapView.getMapAsync { map ->
-                map.animateCamera(
-                    CameraUpdateFactory.newLatLngZoom(
-                        LatLng(uiState.ultimaUbicacion!!.latitude, uiState.ultimaUbicacion!!.longitude),
-                        15.0
-                    ),
-                    1500
+            map.setStyle(targetStyleUrl) {
+                renderMapStateAfterStyleLoaded(
+                    map = map,
+                    uiState = uiState,
+                    renderContext = renderContext
                 )
-            }
-        }
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        AndroidView(
-            factory = {
-                mapView.apply {
-                    getMapAsync { map ->
-                        map.uiSettings.isLogoEnabled = false
-                        map.uiSettings.isAttributionEnabled = false
-
-                        map.setOnMarkerClickListener { marker ->
-                            val puntPulsat = uiState.puntsInteres.find {
-                                it.latitud == marker.position.latitude && it.longitud == marker.position.longitude
-                            }
-                            viewModel.onPuntInteresSeleccionat(puntPulsat)
-
-                            false
-                        }
-
-                        map.addOnMapClickListener { point ->
-                            if (uiState.modoRuta) {
-                                true
-                            } else {
-                                viewModel.onMapClicked(point)
-                                map.animateCamera(CameraUpdateFactory.newLatLngZoom(point, 15.0), 1000)
-                                true
-                            }
-                        }
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-
-        AnimatedVisibility(visible = !uiState.modoRuta) {
-            TopSearchPanel(
-                origen = uiState.textoOrigen,
-                onOrigenChange = { text ->
-                    viewModel.onTextoBuscadorModificado(text, textField.ORIGIN)
-                    if (text.isEmpty()) {
-                        viewModel.limpiarOrigen()
-                        viewModel.cancelarRutaVisual()
-                    }
-                },
-                destino = uiState.textoDestino,
-                onDestinoChange = { text ->
-                    viewModel.onTextoBuscadorModificado(text, textField.DESTINY)
-                    if (text.isEmpty()) {
-                        viewModel.limpiarDestino()
-                        viewModel.cancelarRutaVisual()
-                    }
-                },
-                mostrarOrigen = uiState.mostrarOrigen,
-                onOrigenFocus = { viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN) },
-                onDestinoFocus = { viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY) },
-                adrecesSuggerides = uiState.adrecesSuggerides,
-                onAdrecaSeleccionada = { feature ->
-                    val estavemBuscantOrigen = uiState.campActiu == textField.ORIGIN
-                    viewModel.onAdrecaSeleccionada(feature)
-                    if (estavemBuscantOrigen) {
-                        val puntSeleccionat = LatLng(feature.geometry.latitud, feature.geometry.longitud)
-                        mapView.getMapAsync { map ->
-                            map.animateCamera(
-                                CameraUpdateFactory.newLatLngZoom(puntSeleccionat, 15.0),
-                                1500
-                            )
-                        }
-                    }
-                },
-                campActiu = uiState.campActiu
-            )
-        }
-
-        AnimatedVisibility(
-            visible = uiState.destinoSeleccionado != null && !uiState.modoRuta,
-            enter = slideInVertically(initialOffsetY = { it }),
-            exit = slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(horizontal = 10.dp)
-        ) {
-            RoutePlannerSheet(
-                modifier = Modifier
-                    .offset(y = with(density) { sheetOffsetPx.toDp() })
-                    .onGloballyPositioned {
-                        sheetHeightPx = it.size.height.toFloat()
-                        if (sheetOffsetPx > collapsedSheetOffset) sheetOffsetPx = collapsedSheetOffset
-                    }
-                    .draggable(
-                        orientation = Orientation.Vertical,
-                        state = sheetDragState,
-                        onDragStopped = {
-                            val target = if (sheetOffsetPx > collapsedSheetOffset / 2f) collapsedSheetOffset else 0f
-                            coroutineScope.launch {
-                                animate(initialValue = sheetOffsetPx, targetValue = target) { value, _ ->
-                                    sheetOffsetPx = value
-                                }
-                            }
-                        }
-                    ),
-                selectedPriority = uiState.prioridadSeleccionada,
-                onPrioritySelected = { priority ->
-                    viewModel.onPrioridadSeleccionada(priority)
-                    val destination = uiState.destinoSeleccionado
-                    val selectedOrigin = uiState.origenSeleccionado
-                    val currentLocation = uiState.ultimaUbicacion
-
-                    if (destination != null) {
-                        val origenLong = selectedOrigin?.longitude ?: currentLocation?.longitude
-                        val origenLat = selectedOrigin?.latitude ?: currentLocation?.latitude
-
-                        if (origenLong != null && origenLat != null) {
-                            viewModel.calcularRuta(
-                                origenLong = origenLong,
-                                origenLat = origenLat,
-                                destiLong = destination.longitude,
-                                destiLat = destination.latitude
-                            )
-                        } else {
-                            Toast.makeText(context, "Esperant ubicació GPS...", Toast.LENGTH_SHORT)
-                                .show()
-                        }
-                    }
-                },
-                distanceText = uiState.distanceText,
-                durationText = uiState.durationText,
-                onClose = resetToMainMenu,
-                puntsInteres = uiState.puntsInteres,
-                onStartRoute = {
-                    viewModel.iniciarNavegacio()
-                    /*
-                    val destination = uiState.destinoSeleccionado
-                    val selectedOrigin = uiState.origenSeleccionado
-                    val currentLocation = uiState.ultimaUbicacion
-
-                    if (destination == null) {
-                        Toast.makeText(context, "Selecciona un destí", Toast.LENGTH_SHORT).show()
-                    } else {
-                        val origenLong = selectedOrigin?.longitude ?: currentLocation?.longitude
-                        val origenLat = selectedOrigin?.latitude ?: currentLocation?.latitude
-
-                        if (origenLong == null || origenLat == null) {
-                            Toast.makeText(context, "No s'ha pogut obtenir l'origen", Toast.LENGTH_SHORT).show()
-                        } else {
-                            viewModel.calcularRuta(
-                                origenLong = origenLong,
-                                origenLat = origenLat,
-                                destiLong = destination.longitude,
-                                destiLat = destination.latitude
-                            )
-                        }
-                    }
-                    */
-                }
-            )
-        }
-
-        AnimatedVisibility(
-            visible = uiState.modoRuta,
-            enter = slideInVertically(initialOffsetY = { it }),
-            exit = slideOutVertically(targetOffsetY = { it }),
-            modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-            RouteActiveBottomBar(
-                durationText = uiState.durationText,
-                distanceText = uiState.distanceText,
-                etaText = uiState.etaText,
-                onClose = resetToMainMenu
-            )
-        }
-
-        AnimatedVisibility(
-            visible = true,
-            enter = slideInVertically(initialOffsetY = { it / 2 }),
-            exit = slideOutVertically(targetOffsetY = { it / 2 }),
-            modifier = Modifier.align(Alignment.BottomEnd)
-        ) {
-            Column(
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .padding(end = 16.dp, bottom = dynamicBottomPadding),
-                horizontalAlignment = Alignment.End
-            ) {
-                AnimatedVisibility(visible = uiState.puntsInteres.isNotEmpty() && !uiState.modoRuta) {
-                    ExtendedFloatingActionButton(
-                        onClick = { viewModel.togglePuntsInteres() },
-                        icon = { Icon(Icons.Default.LocationOn, contentDescription = null) },
-                        text = { Text(if (uiState.mostrarPuntsInteres) "Ocultar Info Extra" else "Mostrar Info Extra") },
-                        containerColor = Color.White,
-                        contentColor = Color(0xFFC86A37),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                }
-
-                ExtendedFloatingActionButton(
-                    onClick = { viewModel.toggleEstiloSatelite() },
-                    icon = { Icon(Icons.Default.Layers, contentDescription = "Canviar estil") },
-                    text = { Text(if (uiState.estiloSatelite) "Estàndard" else "Satèl·lit") },
-                    containerColor = if (uiState.estiloSatelite) Color(0xFF2F3B44) else Color.White,
-                    contentColor = if (uiState.estiloSatelite) Color.White else Color(0xFF3D4A45)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                FloatingActionButton(
-                    onClick = {
-                        if (uiState.locationGranted) {
-                            viewModel.limpiarOrigen()
-                            activateLocationComponent(mapView)
-
-                            if (uiState.ultimaUbicacion != null) {
-                                mapView.getMapAsync { map ->
-                                    map.animateCamera(
-                                        CameraUpdateFactory.newLatLngZoom(
-                                            LatLng(uiState.ultimaUbicacion!!.latitude, uiState.ultimaUbicacion!!.longitude),
-                                            15.0
-                                        ),
-                                        1000
-                                    )
-                                }
-                            } else {
-                                Toast.makeText(context, "Buscant senyal GPS...", Toast.LENGTH_SHORT).show()
-                            }
-                        } else {
-                            permissionLauncher.launch(
-                                arrayOf(
-                                    Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_COARSE_LOCATION
-                                )
-                            )
-                        }
-                    },
-                    containerColor = Color.White,
-                    contentColor = Color(0xFF49B97E)
-                ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "La meva ubicació")
-                }
-            }
-        }
-        if (uiState.calculantRuta) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.White.copy(alpha = 0.85f))
-                    .clickable(enabled = false, onClick = {}),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.traveler))
-                    val progress by animateLottieCompositionAsState(
-                        composition = composition,
-                        iterations = LottieConstants.IterateForever
-                    )
-
-                    LottieAnimation(
-                        composition = composition,
-                        progress = { progress },
-                        modifier = Modifier
-                            .size(200.dp)
-                            .graphicsLayer {
-                                colorFilter = ColorFilter.colorMatrix(
-                                    ColorMatrix().apply { setToSaturation(0f) }
-                                )
-                            }
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Calculant la millor ruta...",
-                        color = Color.DarkGray,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
             }
         }
     }
 }
+
+private fun resolveFloatingActionsLayout(
+    freeHeightPx: Float,
+    density: androidx.compose.ui.unit.Density,
+    hasPoiAction: Boolean
+): FloatingActionsLayout {
+    val safeFreeHeightPx = (freeHeightPx - with(density) { 24.dp.toPx() }).coerceAtLeast(0f)
+    val layoutCandidates = floatingActionsLayoutCandidates(hasPoiAction)
+
+    return layoutCandidates.firstOrNull { layout ->
+        safeFreeHeightPx >= with(density) { estimatedFloatingActionsHeight(layout).toPx() }
+    } ?: layoutCandidates.last()
+}
+
+private fun floatingActionsLayoutCandidates(hasPoiAction: Boolean): List<FloatingActionsLayout> {
+    return listOf(
+        FloatingActionsLayout(
+            compactMode = false,
+            showPoiAction = hasPoiAction,
+            showMapStyleAction = true,
+            showMyLocationAction = true
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = hasPoiAction,
+            showMapStyleAction = true,
+            showMyLocationAction = true
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = false,
+            showMapStyleAction = true,
+            showMyLocationAction = true
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = false,
+            showMapStyleAction = false,
+            showMyLocationAction = true
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = false,
+            showMapStyleAction = false,
+            showMyLocationAction = false
+        )
+    )
+}
+
+private fun estimatedFloatingActionsHeight(layout: FloatingActionsLayout): Dp {
+    val itemHeights = listOfNotNull(
+        floatingActionHeightOrNull(layout.showPoiAction, layout.compactMode, compactHeight = 34.dp, expandedHeight = 40.dp),
+        floatingActionHeightOrNull(layout.showMapStyleAction, layout.compactMode, compactHeight = 34.dp, expandedHeight = 40.dp),
+        floatingActionHeightOrNull(layout.showMyLocationAction, layout.compactMode, compactHeight = 46.dp, expandedHeight = 54.dp)
+    )
+
+    if (itemHeights.isEmpty()) {
+        return 0.dp
+    }
+
+    val spacing = if (layout.compactMode) 8.dp else 10.dp
+    return itemHeights.reduce { total, item -> total + item } + spacing * (itemHeights.size - 1)
+}
+
+private fun floatingActionHeightOrNull(
+    visible: Boolean,
+    compactMode: Boolean,
+    compactHeight: Dp,
+    expandedHeight: Dp
+): Dp? {
+    if (!visible) {
+        return null
+    }
+
+    return if (compactMode) compactHeight else expandedHeight
+}
+
+@Composable
+private fun LocationUpdatesEffect(
+    locationGranted: Boolean,
+    context: Context,
+    mapView: MapView,
+    viewModel: MapViewModel
+) {
+    DisposableEffect(locationGranted) {
+        val listener = startLocationListenerIfNeeded(
+            locationGranted = locationGranted,
+            context = context,
+            mapView = mapView,
+            viewModel = viewModel
+        )
+
+        onDispose {
+            stopAndroidLocationUpdates(context, listener)
+        }
+    }
+}
+
+@Composable
+private fun InitialZoomEffect(
+    ultimaUbicacion: Location?,
+    mapaListo: Boolean,
+    firstLocationZoomDone: Boolean,
+    mapView: MapView,
+    viewModel: MapViewModel
+) {
+    LaunchedEffect(ultimaUbicacion, mapaListo) {
+        if (ultimaUbicacion != null && mapaListo && !firstLocationZoomDone) {
+            centerMapOnLocation(
+                mapView = mapView,
+                location = ultimaUbicacion,
+                durationMs = 1500
+            )
+            viewModel.marcarZoomInicialHecho()
+        }
+    }
+}
+
+@Composable
+private fun NavigationCameraTrackingEffect(
+    trackingState: NavigationTrackingState,
+    mapView: MapView,
+    headingDegrees: Float?
+) {
+    LaunchedEffect(
+        trackingState.locationGranted,
+        trackingState.mapaListo,
+        trackingState.modoRuta,
+        trackingState.routeCompleted,
+        trackingState.navigationCameraFollowing,
+        trackingState.currentLocation?.latitude,
+        trackingState.currentLocation?.longitude,
+        trackingState.currentLocation?.bearing,
+        headingDegrees?.toInt()
+    ) {
+        if (!trackingState.locationGranted || !trackingState.mapaListo) {
+            return@LaunchedEffect
+        }
+
+        syncNavigationCameraTracking(
+            mapView = mapView,
+            modoRuta = trackingState.modoRuta,
+            routeCompleted = trackingState.routeCompleted,
+            navigationCameraFollowing = trackingState.navigationCameraFollowing,
+            currentLocation = trackingState.currentLocation,
+            headingDegrees = headingDegrees?.toDouble(),
+            applyZoom = false
+        )
+    }
+}
+
+@Composable
+private fun NavigationCameraGestureDismissEffect(
+    mapView: MapView,
+    uiState: MapUiState,
+    viewModel: MapViewModel
+) {
+    val latestUiState = rememberUpdatedState(uiState)
+
+    DisposableEffect(mapView, viewModel) {
+        var attachedMap: MapLibreMap? = null
+        var disposed = false
+        val listener = MapLibreMap.OnCameraMoveStartedListener { reason ->
+            val state = latestUiState.value
+            if (
+                reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE &&
+                state.modoRuta &&
+                !state.routeCompleted &&
+                state.navigationCameraFollowing
+            ) {
+                viewModel.onNavigationCameraDismissedByGesture()
+            }
+        }
+
+        mapView.getMapAsync { map ->
+            if (disposed) {
+                return@getMapAsync
+            }
+            attachedMap = map
+            map.addOnCameraMoveStartedListener(listener)
+        }
+
+        onDispose {
+            disposed = true
+            attachedMap?.removeOnCameraMoveStartedListener(listener)
+        }
+    }
+}
+
+@Composable
+private fun MapViewSurface(
+    mapView: MapView,
+    uiState: MapUiState,
+    viewModel: MapViewModel
+) {
+    val currentUiState by rememberUpdatedState(uiState)
+
+    AndroidView(
+        factory = {
+            mapView.apply {
+                getMapAsync { map ->
+                    configureMapUi(map)
+                    configurePoiSelection(map, viewModel) { currentUiState }
+                    configureMapClickHandling(map, viewModel) { currentUiState }
+                }
+            }
+        },
+        modifier = Modifier.fillMaxSize()
+    )
+}
+
+private fun configureMapUi(map: MapLibreMap) {
+    map.uiSettings.isCompassEnabled = false
+    map.uiSettings.isLogoEnabled = false
+    map.uiSettings.isAttributionEnabled = false
+}
+
+private fun configurePoiSelection(
+    map: MapLibreMap,
+    viewModel: MapViewModel,
+    uiStateProvider: () -> MapUiState
+) {
+    setLegacyMarkerClickListener(map) { markerPosition ->
+        val selectedPoi = findSelectedPoi(
+            puntsInteres = uiStateProvider().puntsInteres,
+            markerPosition = markerPosition
+        )
+        viewModel.onPuntInteresSeleccionat(selectedPoi)
+        false
+    }
+}
+
+private fun configureMapClickHandling(
+    map: MapLibreMap,
+    viewModel: MapViewModel,
+    uiStateProvider: () -> MapUiState
+) {
+    map.addOnMapClickListener { point ->
+        handleMapClick(
+            map = map,
+            point = point,
+            uiState = uiStateProvider(),
+            viewModel = viewModel
+        )
+        true
+    }
+}
+
+private fun handleMapClick(
+    map: MapLibreMap,
+    point: LatLng,
+    uiState: MapUiState,
+    viewModel: MapViewModel
+){
+    if (uiState.modoRuta) {
+        return
+    }
+
+    viewModel.onMapClicked(point)
+    map.animateCamera(
+        CameraUpdateFactory.newLatLngZoom(point, 15.0),
+        1000
+    )
+}
+
+private fun processLocationPermissionResult(
+    context: Context,
+    permissions: Map<String, Boolean>,
+    viewModel: MapViewModel,
+    locationPermissionRequiredMessage: String
+) {
+    val fine = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+    val coarse = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+    val granted = fine || coarse || hasLocationPermission(context)
+    viewModel.onLocationPermissionsResult(granted)
+
+    if (granted) {
+        getBestLastKnownLocation(context)?.let(viewModel::updateLocation)
+        return
+    }
+
+    Toast.makeText(context, locationPermissionRequiredMessage, Toast.LENGTH_SHORT).show()
+}
+
+private fun resetMapToMainMenu(
+    viewModel: MapViewModel,
+    mapView: MapView,
+    currentLocation: Location?
+) {
+    viewModel.clearRuta()
+    viewModel.limpiarOrigen()
+    disableNavigationCameraTracking(mapView)
+    mapView.getMapAsync { map ->
+        clearLegacyAnnotations(map)
+    }
+    currentLocation?.let { location ->
+        centerMapOnLocation(mapView, location)
+    }
+}
+
+private fun processPrioritySelection(
+    priority: RoutePriority,
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    context: Context,
+    waitingGpsLocationMessage: String
+) {
+    viewModel.onPrioritySelected(priority)
+
+    val destination = uiState.destinoSeleccionado ?: return
+    val originPoint = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.toLatLng()
+    if (originPoint == null) {
+        Toast.makeText(context, waitingGpsLocationMessage, Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    viewModel.calcularRuta(
+        origenLong = originPoint.longitude,
+        origenLat = originPoint.latitude,
+        destiLong = destination.longitude,
+        destiLat = destination.latitude
+    )
+}
+
+private fun processAddressSelection(
+    feature: Feature,
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    mapView: MapView
+) {
+    val selectingOrigin = uiState.campActiu == textField.ORIGIN
+    viewModel.onAdrecaSeleccionada(feature)
+
+    if (!selectingOrigin) {
+        return
+    }
+
+    animateMapToPoint(
+        mapView = mapView,
+        point = LatLng(feature.geometry.latitud, feature.geometry.longitud)
+    )
+}
+
+private fun recenterOnCurrentLocation(
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    mapView: MapView,
+    context: Context,
+    requestLocationPermissions: () -> Unit,
+    navigationHeadingDegrees: Float?,
+    searchingGpsSignalMessage: String
+) {
+    if (!uiState.locationGranted) {
+        requestLocationPermissions()
+        return
+    }
+
+    val currentLocation = uiState.ultimaUbicacion
+
+    if (uiState.modoRuta) {
+        if (uiState.usesLiveNavigation && !uiState.routeCompleted) {
+            viewModel.resumeNavigationCameraTracking()
+            enableNavigationCameraTracking(
+                mapView = mapView,
+                currentLocation = currentLocation,
+                headingDegrees = navigationHeadingDegrees?.toDouble(),
+                applyZoom = true
+            )
+        } else {
+            activateLocationComponent(
+                mapView = mapView,
+                initialLocation = currentLocation
+            )
+        }
+
+        if (currentLocation == null) {
+            Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
+        } else if (!uiState.usesLiveNavigation || uiState.routeCompleted) {
+            centerMapOnLocation(mapView, currentLocation)
+        }
+        return
+    }
+
+    viewModel.limpiarOrigen()
+    activateLocationComponent(
+        mapView = mapView,
+        initialLocation = currentLocation
+    )
+
+    if (currentLocation == null) {
+        Toast.makeText(context, searchingGpsSignalMessage, Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    centerMapOnLocation(mapView, currentLocation)
+}
+
+private fun requestRouteCalculation(
+    viewModel: MapViewModel,
+    destination: LatLng?,
+    selectedOrigin: LatLng?,
+    currentLocation: Location?
+) {
+    val safeDestination = destination ?: return
+    val originPoint = selectedOrigin ?: currentLocation?.toLatLng() ?: return
+
+    viewModel.calcularRuta(
+        origenLong = originPoint.longitude,
+        origenLat = originPoint.latitude,
+        destiLong = safeDestination.longitude,
+        destiLat = safeDestination.latitude
+    )
+}
+
+private fun renderMapStateAfterStyleLoaded(
+    map: MapLibreMap,
+    uiState: MapUiState,
+    renderContext: MapRenderContext
+) {
+    renderContext.viewModel.onMapaListo()
+    enableLocationOnMapIfNeeded(
+        locationGranted = uiState.locationGranted,
+        mapView = renderContext.mapView,
+        currentLocation = uiState.ultimaUbicacion
+    )
+    syncNavigationCameraTracking(
+        mapView = renderContext.mapView,
+        modoRuta = uiState.modoRuta,
+        routeCompleted = uiState.routeCompleted,
+        navigationCameraFollowing = uiState.navigationCameraFollowing,
+        currentLocation = uiState.ultimaUbicacion,
+        headingDegrees = renderContext.navigationHeadingDegrees?.toDouble(),
+        applyZoom = false
+    )
+
+    if (uiState.rutaCoordenades.isNotEmpty()) {
+        drawCurrentRoute(
+            mapView = renderContext.mapView,
+            uiState = uiState,
+            context = renderContext.context,
+            originLabel = renderContext.originLabel,
+            destinationLabel = renderContext.destinationLabel
+        )
+        addPoiMarkersIfVisible(
+            map = map,
+            mostrarPuntsInteres = uiState.mostrarPuntsInteres,
+            puntsInteres = uiState.puntsInteres,
+            context = renderContext.context
+        )
+        return
+    }
+
+    addSelectionMarkers(
+        map = map,
+        context = renderContext.context,
+        origin = uiState.origenSeleccionado,
+        destination = uiState.destinoSeleccionado,
+        originLabel = renderContext.originLabel,
+        destinationLabel = renderContext.destinationLabel
+    )
+}
+
+private fun enableLocationOnMapIfNeeded(
+    locationGranted: Boolean,
+    mapView: MapView,
+    currentLocation: Location?
+) {
+    if (locationGranted) {
+        activateLocationComponent(
+            mapView = mapView,
+            initialLocation = currentLocation
+        )
+    }
+}
+
+private fun syncNavigationCameraTracking(
+    mapView: MapView,
+    modoRuta: Boolean,
+    routeCompleted: Boolean,
+    navigationCameraFollowing: Boolean,
+    currentLocation: Location?,
+    headingDegrees: Double?,
+    applyZoom: Boolean
+) {
+    if (modoRuta && !routeCompleted && navigationCameraFollowing) {
+        enableNavigationCameraTracking(
+            mapView = mapView,
+            currentLocation = currentLocation,
+            headingDegrees = headingDegrees,
+            applyZoom = applyZoom
+        )
+    } else {
+        disableNavigationCameraTracking(mapView)
+    }
+}
+
+private fun drawCurrentRoute(
+    mapView: MapView,
+    uiState: MapUiState,
+    context: Context,
+    originLabel: String,
+    destinationLabel: String
+) {
+    val routeOrigin = if (uiState.usesLiveNavigation) {
+        uiState.ultimaUbicacion?.toLatLng() ?: uiState.origenSeleccionado
+    } else {
+        uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.toLatLng()
+    }
+
+    drawRoute(
+        mapView = mapView,
+        coordenades = uiState.rutaCoordenades,
+        origen = routeOrigin,
+        desti = uiState.destinoSeleccionado,
+        context = context,
+        originTitle = originLabel,
+        destinationTitle = destinationLabel,
+        animateCamera = !uiState.usesLiveNavigation,
+        routeColor = uiState.routeColor
+    )
+}
+
+private fun addPoiMarkersIfVisible(
+    map: MapLibreMap,
+    mostrarPuntsInteres: Boolean,
+    puntsInteres: List<PuntInteres>,
+    context: Context
+) {
+    if (!mostrarPuntsInteres) {
+        return
+    }
+
+    puntsInteres
+        .filter(::isVisiblePoi)
+        .forEach { punt ->
+            addLegacyMarker(
+                map = map,
+                position = LatLng(punt.latitud, punt.longitud),
+                title = poiTitle(punt),
+                icon = crearIconaPoi(context, punt.tipus)
+            )
+        }
+}
+
+private fun isVisiblePoi(punt: PuntInteres): Boolean {
+    val tipus = punt.tipus.trim().uppercase()
+    return tipus == "FONT" || tipus == "COMISSARIA"
+}
+
+private fun poiTitle(punt: PuntInteres): String {
+    return punt.nom ?: punt.tipus.lowercase().replaceFirstChar { char ->
+        char.uppercase()
+    }
+}
+
+private fun addSelectionMarkers(
+    map: MapLibreMap,
+    context: Context,
+    origin: LatLng?,
+    destination: LatLng?,
+    originLabel: String,
+    destinationLabel: String
+) {
+    origin?.let {
+        addLegacyMarker(
+            map = map,
+            position = it,
+            title = originLabel,
+            icon = crearIconaGrisa(context)
+        )
+    }
+
+    destination?.let {
+        addLegacyMarker(
+            map = map,
+            position = it,
+            title = destinationLabel
+        )
+    }
+}
+
+private fun startLocationListenerIfNeeded(
+    locationGranted: Boolean,
+    context: Context,
+    mapView: MapView,
+    viewModel: MapViewModel
+): LocationListener? {
+    if (!locationGranted) {
+        return null
+    }
+
+    return startAndroidLocationUpdates(context, mapView) { location ->
+        viewModel.updateLocation(location)
+    }
+}
+
+private fun findSelectedPoi(
+    puntsInteres: List<PuntInteres>,
+    markerPosition: LatLng
+): PuntInteres? {
+    return puntsInteres.find { punt ->
+        punt.latitud == markerPosition.latitude &&
+            punt.longitud == markerPosition.longitude
+    }
+}
+
+private fun animateMapToPoint(
+    mapView: MapView,
+    point: LatLng
+) {
+    mapView.getMapAsync { map ->
+        map.animateCamera(
+            CameraUpdateFactory.newLatLngZoom(point, 15.0),
+            1500
+        )
+    }
+}
+
+private fun resolveMapStyleUrl(estiloSatelite: Boolean): String {
+    return if (estiloSatelite) {
+        "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+    } else {
+        "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+    }
+}
+
+private fun Location.toLatLng(): LatLng = LatLng(latitude, longitude)

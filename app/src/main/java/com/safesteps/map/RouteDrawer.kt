@@ -1,15 +1,17 @@
+@file:Suppress("DEPRECATION")
+
 package com.safesteps.map
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.toColorInt
 import com.safesteps.data.Coordenada
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
-import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.annotations.PolylineOptions
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -22,73 +24,120 @@ fun drawRoute(
     coordenades: List<Coordenada>,
     origen: LatLng?,
     desti: LatLng?,
-    context: Context
+    context: Context,
+    originTitle: String,
+    destinationTitle: String,
+    animateCamera: Boolean = true,
+    routeColor: String? = null // FEATURE RECUPERADA
 ) {
     if (coordenades.isEmpty()) return
 
     mapView.getMapAsync { map ->
         if (map.style?.isFullyLoaded != true) return@getMapAsync
 
-        val locationComponent = map.locationComponent
-        if (locationComponent.isLocationComponentActivated) {
-            locationComponent.cameraMode = CameraMode.NONE
-        }
-
-        map.clear()
-
-        val puntsRuta = coordenades.map { LatLng(it.lat, it.lon) }.toMutableList()
-
-        origen?.let {
-            if (puntsRuta.isNotEmpty() && (it.latitude != puntsRuta.first().latitude || it.longitude != puntsRuta.first().longitude)) {
-                puntsRuta.add(0, it)
-            }
-        }
-        desti?.let {
-            if (puntsRuta.isNotEmpty() && (it.latitude != puntsRuta.last().latitude || it.longitude != puntsRuta.last().longitude)) {
-                puntsRuta.add(it)
-            }
-        }
-
-        map.addPolyline(
-            PolylineOptions()
-                .addAll(puntsRuta)
-                .color(Color.parseColor("#1E88E5"))
-                .width(6f)
-        )
-
-        origen?.let {
-            map.addMarker(MarkerOptions()
-                .position(it)
-                .title("Origen")
-                .icon(crearIconaGrisa(context)))
-        }
-
-        desti?.let {
-            map.addMarker(MarkerOptions()
-                .position(it)
-                .title("Destí"))
-        }
-
-        if (puntsRuta.size > 1) {
-            val boundsBuilder = LatLngBounds.Builder()
-            puntsRuta.forEach { boundsBuilder.include(it) }
-
-            val bounds = boundsBuilder.build()
-            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 350), 1000)
+        disableLocationCamera(map)
+        clearLegacyAnnotations(map)
+        val puntsRuta = buildRoutePoints(coordenades, origen, desti)
+        // FEATURE RECUPERADA: Pasamos el color a la polyline
+        drawRoutePolyline(map, puntsRuta, routeColor)
+        addRouteMarkers(map, origen, desti, context, originTitle, destinationTitle)
+        if (animateCamera) {
+            animateCameraToRoute(map, puntsRuta)
         }
     }
+}
+
+private fun disableLocationCamera(map: org.maplibre.android.maps.MapLibreMap) {
+    val locationComponent = map.locationComponent
+    if (locationComponent.isLocationComponentActivated) {
+        locationComponent.cameraMode = CameraMode.NONE
+    }
+}
+
+private fun buildRoutePoints(
+    coordenades: List<Coordenada>,
+    origen: LatLng?,
+    desti: LatLng?
+): List<LatLng> {
+    val puntsRuta = coordenades.map { LatLng(it.lat, it.lon) }.toMutableList()
+    addOriginIfNeeded(puntsRuta, origen)
+    addDestinationIfNeeded(puntsRuta, desti)
+    return puntsRuta
+}
+
+private fun addOriginIfNeeded(puntsRuta: MutableList<LatLng>, origen: LatLng?) {
+    if (origen == null || puntsRuta.isEmpty()) return
+    if (!hasSameCoordinates(origen, puntsRuta.first())) {
+        puntsRuta.add(0, origen)
+    }
+}
+
+private fun addDestinationIfNeeded(puntsRuta: MutableList<LatLng>, desti: LatLng?) {
+    if (desti == null || puntsRuta.isEmpty()) return
+    if (!hasSameCoordinates(desti, puntsRuta.last())) {
+        puntsRuta.add(desti)
+    }
+}
+
+private fun hasSameCoordinates(first: LatLng, second: LatLng): Boolean {
+    return first.latitude == second.latitude && first.longitude == second.longitude
+}
+
+// FEATURE RECUPERADA: Añadido el parámetro routeColor y lógica de fallback al azul por defecto
+private fun drawRoutePolyline(map: org.maplibre.android.maps.MapLibreMap, puntsRuta: List<LatLng>, routeColor: String? = null) {
+    map.addPolyline(
+        PolylineOptions()
+            .addAll(puntsRuta)
+            .color((routeColor ?: "#1E88E5").toColorInt())
+            .width(6f)
+    )
+}
+
+private fun addRouteMarkers(
+    map: org.maplibre.android.maps.MapLibreMap,
+    origen: LatLng?,
+    desti: LatLng?,
+    context: Context,
+    originTitle: String,
+    destinationTitle: String
+) {
+    origen?.let {
+        addLegacyMarker(
+            map = map,
+            position = it,
+            title = originTitle,
+            icon = crearIconaGrisa(context)
+        )
+    }
+
+    desti?.let {
+        addLegacyMarker(
+            map = map,
+            position = it,
+            title = destinationTitle
+        )
+    }
+}
+
+private fun animateCameraToRoute(map: org.maplibre.android.maps.MapLibreMap, puntsRuta: List<LatLng>) {
+    if (puntsRuta.size <= 1) return
+
+    val boundsBuilder = LatLngBounds.Builder()
+    puntsRuta.forEach(boundsBuilder::include)
+    val bounds = boundsBuilder.build()
+    map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 350), 1000)
 }
 
 fun crearIconaPoi(context: Context, tipus: String): Icon {
     val normalizedType = tipus.trim().uppercase()
     val (emoji, bgColor) = when (normalizedType) {
-        "FONT" -> "💧" to Color.parseColor("#3DA5F4")
-        "COMISSARIA" -> "👮" to Color.parseColor("#355C7D")
-        else -> "📍" to Color.parseColor("#C86A37")
+        "FONT" -> "\uD83D\uDCA7" to "#3DA5F4".toColorInt()
+        "COMISSARIA" -> "\uD83D\uDC6E" to "#355C7D".toColorInt()
+        else -> "\uD83D\uDCCD" to "#C86A37".toColorInt()
     }
 
     val size = 96
-    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val bitmap = createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
     val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -97,14 +146,14 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     }
 
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
+        color = android.graphics.Color.WHITE
         textAlign = Paint.Align.CENTER
         textSize = 42f
         typeface = Typeface.DEFAULT_BOLD
     }
 
     val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(55, 0, 0, 0)
+        color = android.graphics.Color.argb(55, 0, 0, 0)
         style = Paint.Style.FILL
     }
 

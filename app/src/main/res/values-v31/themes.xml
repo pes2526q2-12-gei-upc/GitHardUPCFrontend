@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.SafeSteps" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.SafeSteps" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:windowSplashScreenBackground">@color/safesteps_launchapp_background</item>
 
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/safesteps_launchapp</item>

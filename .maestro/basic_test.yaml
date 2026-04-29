@@ -1,4 +1,118 @@
 appId: com.safesteps
+name: Sanity Test
 ---
-- launchApp
-- assertVisible: ".*" # Aquesta expressió regular simplement comprova que l'app s'ha obert i hi ha text o elements a la pantalla
+- launchApp:
+    clearState: true
+    permissions:
+      location: allow
+
+# 1. PANTALLA INICIAL
+- extendedWaitUntil:
+    visible: ".*SafeSteps.*"
+    timeout: 30000
+
+# 2. CONFIGURACIÓ DE RUTA
+- extendedWaitUntil:
+    visible:
+      id: "input_desti"
+    timeout: 10000
+
+- tapOn:
+    id: "input_desti"
+- inputText: "Sagrada Familia, Barcelona"
+- tapOn:
+    text: "Sagrada Familia.*"
+    index: 1
+
+- back
+
+# Modificar Origen
+- extendedWaitUntil:
+    visible:
+      id: "input_origen"
+    timeout: 10000
+
+- tapOn:
+    id: "input_origen"
+- inputText: "Cosmocaixa, Barcelona"
+- tapOn:
+    text: "CosmoCaixa.*"
+    index: 1
+
+- back
+
+# 3. CÀLCUL DE RUTA I INFO
+
+- extendedWaitUntil:
+    visible: ".*km|.*m"
+    timeout: 10000
+
+# 4. CANVI DE MODES DE RUTA
+
+- extendedWaitUntil:
+    visible:
+      id: "btn_safety"
+    timeout: 10000
+
+- tapOn:
+    id: "btn_safety"
+- tapOn:
+    id: "btn_clima"
+- tapOn:
+    id: "btn_accessibility"
+
+
+- extendedWaitUntil:
+    visible:
+      id: "btn_places"
+    timeout: 10000
+
+- tapOn:
+    id: "btn_places"
+
+# 6. INICIAR RUTA
+
+- extendedWaitUntil:
+    visible:
+      id: "btn_start_route"
+    timeout: 10000
+
+- tapOn:
+    id: "btn_start_route"
+
+# 7. VALIDAR PANTALLA DE RUTA ACTIVA
+
+- extendedWaitUntil:
+    visible:
+      id: "btn_close_route"
+    timeout: 10000
+
+- assertVisible:
+    id: "active_route_duration"
+
+- assertVisible:
+    id: "active_route_distance"
+
+- assertVisible:
+    id: "active_route_eta"
+
+- tapOn:
+    id: "btn_close_route"
+
+# 5. INTERACCIONS DEL MAPA
+
+- extendedWaitUntil:
+    visible:
+      id: "btn_satellit"
+    timeout: 10000
+
+- tapOn:
+    id: "btn_satellit"
+
+- extendedWaitUntil:
+    visible:
+      id: "btn_ubicacio_actual"
+    timeout: 10000
+
+- tapOn:
+    id: "btn_ubicacio_actual"

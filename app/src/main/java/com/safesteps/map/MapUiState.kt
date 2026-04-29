@@ -13,6 +13,17 @@ enum class textField {
     DESTINY
 }
 
+enum class ActiveRouteMode {
+    NONE,
+    USER_LOCATION_NAVIGATION,
+    FIXED_OVERVIEW
+}
+
+data class RouteCompletionSummary(
+    val distanceText: String,
+    val durationText: String
+)
+
 data class MapUiState(
     val destinoSeleccionado: LatLng? = null,
     val textoOrigen: String = "",
@@ -32,9 +43,22 @@ data class MapUiState(
     val firstLocationZoomDone: Boolean = false,
     val campActiu: textField = textField.NONE,
     val rutaCoordenades: List<Coordenada> = emptyList(),
+    val activeRouteMode: ActiveRouteMode = ActiveRouteMode.NONE,
     val modoRuta: Boolean = false,
+    val navigationCameraFollowing: Boolean = false,
+    val routeCompleted: Boolean = false,
+    val routeCompletionSummary: RouteCompletionSummary? = null,
+    val activeNavigationInstruction: ActiveNavigationInstruction? = null,
+    val navigationNotice: String? = null,
     val calculantRuta: Boolean = false,
+    val routeColor: String? = null,
     val puntsInteres: List<PuntInteres> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
     val puntInteresSeleccionat: PuntInteres? = null
 )
+
+val MapUiState.usesLiveNavigation: Boolean
+    get() = modoRuta && activeRouteMode == ActiveRouteMode.USER_LOCATION_NAVIGATION
+
+val MapUiState.showsFixedRouteSummary: Boolean
+    get() = modoRuta && activeRouteMode == ActiveRouteMode.FIXED_OVERVIEW
