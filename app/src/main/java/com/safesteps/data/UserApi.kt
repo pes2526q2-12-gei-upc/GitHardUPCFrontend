@@ -30,6 +30,14 @@ data class UserSyncOutcome(
     val languageTag: String
 )
 
+data class RouteCompletionResponse(
+    val level: Long? = null,
+    val levelUpdated: Boolean? = null,
+    val pointsAdded: Long? = null,
+    val totalPoints: Long? = null,
+    val recompenses: Long? = null
+)
+
 data class UserFilters(
     val comissaries: Double = 0.5,
     val fetsPenals: Double = 0.5,
@@ -125,6 +133,12 @@ private interface UserApiService {
     suspend fun deleteUser(
         @Path("googleId") googleId: String
     ): Response<Unit>
+
+    @GET("$USERS_PATH/{googleId}/complete-route")
+    suspend fun completeRoute(
+        @Path("googleId") googleId: String,
+        @Query("meters") meters: Double
+    ): Response<RouteCompletionResponse>
 }
 
 private object UserBackend {
@@ -389,4 +403,20 @@ private fun <T> ensureSuccess(
     if (!response.isSuccessful) {
         throw IOException("Error $action: ${response.code()} ${response.message()}")
     }
+}
+
+suspend fun completarRutaEnBackend(googleId: String, distanceMeters: Double): RouteCompletionResponse? {
+    if (googleId.isBlank()) {
+        Log.e("USER_API", "Falta el googleId para guardar la ruta en el backend")
+        return null
+    }
+
+    val response = UserBackend.service.completeRoute(googleId, distanceMeters)
+
+    if (response.isSuccessful) {
+        return response.body()
+    }
+
+    Log.e("USER_API", "Error al completar ruta: ${response.code()} ${response.message()}")
+    return null
 }

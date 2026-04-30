@@ -596,6 +596,7 @@ class MapViewModel(
         val totalDurationMinutes = routeSummary?.totalDurationMinutes ?: 0
         lastNavigationProgressMeters = navigationRoute?.totalDistanceMeters ?: progress.progressMeters
 
+        // 1. Actualizamos la UI para mostrar que la ruta ha terminado
         _uiState.update {
             it.copy(
                 navigationCameraFollowing = false,
@@ -612,6 +613,18 @@ class MapViewModel(
                 durationText = formatDuration(0),
                 etaText = DEFAULT_ETA_TEXT
             )
+        }
+
+        // 2. ENVIAMOS LOS DATOS AL BACKEND
+        val googleId = currentGoogleId
+        if (!googleId.isNullOrBlank() && totalDistanceMeters > 0.0) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    com.safesteps.data.completarRutaEnBackend(googleId, totalDistanceMeters)
+                } catch (e: Exception) {
+                    Log.e("ROUTE_VM", "Error de red al enviar la ruta completada", e)
+                }
+            }
         }
     }
 
