@@ -17,7 +17,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40384/"
+private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40381/"
 private const val USERS_PATH = "api/v1/users"
 
 enum class UserSyncResult {
@@ -159,7 +159,7 @@ suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncOutcome {
     )
 
     return when (createResponse.code()) {
-        200 -> {
+        201 -> {
             UserSyncOutcome(
                 result = UserSyncResult.NEW_USER_CREATED,
                 languageTag = createResponse.body()
@@ -268,8 +268,6 @@ suspend fun cargarFiltrosUsuario(googleId: String): UserFilters {
 
     Log.d("USER_API", "Cargando filtros del usuario: googleId=$googleId")
 
-    // El backend actual solo expone PUT /filters. Enviando un body vacio
-    // se obtienen los valores persistidos sin modificar ninguno.
     val response = UserBackend.service.updateFilters(googleId, FilterRequest())
     if (response.isSuccessful) {
         return response.body()?.toUserFilters() ?: UserFilters()
