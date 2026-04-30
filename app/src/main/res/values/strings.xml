@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="server_client_id" translatable="false">48435478487-tupu01hq8mjcjgvrm1ckh32ak4heff8q.apps.googleusercontent.com</string>
     <string name="change_language">Change language</string>
@@ -137,4 +137,5 @@
         <item quantity="one">%d filter</item>
         <item quantity="other">%d filters</item>
     </plurals>
+    <string name="route_completed_points">Congratulations! You have earned %1$d points.</string>
 </resources>

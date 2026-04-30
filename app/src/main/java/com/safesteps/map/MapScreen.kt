@@ -32,6 +32,7 @@ import com.safesteps.R
 import com.safesteps.auth.UserInfo
 import com.safesteps.data.Feature
 import com.safesteps.data.PuntInteres
+import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
@@ -94,13 +95,29 @@ fun MapLibreScreen(
     currentLanguage: AppLanguage = AppLanguage.default,
     onLoginClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    onRouteCompleted: (RouteCompletionResponse) -> Unit = {}
 ) {
+
     val context = LocalContext.current
     val viewModel: MapViewModel = viewModel(
         factory = MapViewModelFactory(context.applicationContext)
     )
     val mapView = rememberMapViewWithLifecycle()
     val uiState by viewModel.uiState.collectAsState()
+    val routeCompletionResult = viewModel.routeResult
+    var showLevelUpOverlay by remember { mutableStateOf(false) }
+    var levelUpLevel by remember { mutableStateOf(1L) }
+
+    LaunchedEffect(routeCompletionResult) {
+        if (routeCompletionResult != null) {
+            onRouteCompleted(routeCompletionResult)
+            if (routeCompletionResult.levelUpdated == true) {
+                levelUpLevel = routeCompletionResult.level ?: 1
+                showLevelUpOverlay = true
+            }
+            viewModel.dismissRouteResult()
+        }
+    }
     val strings = mapScreenStrings()
     var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
 
@@ -290,6 +307,13 @@ fun MapLibreScreen(
         CalculatingRouteOverlay(
             visible = uiState.calculantRuta,
             calculatingBestRouteLabel = strings.calculatingBestRouteLabel
+        )
+    }
+
+    if (showLevelUpOverlay) {
+        com.safesteps.profile.LevelUpAnimationOverlay(
+            level = levelUpLevel,
+            onDismiss = { showLevelUpOverlay = false }
         )
     }
 }

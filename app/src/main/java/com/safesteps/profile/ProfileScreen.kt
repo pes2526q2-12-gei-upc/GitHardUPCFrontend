@@ -32,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -78,15 +79,279 @@ private val filterLevelDescriptionResIds = listOf(
     R.string.filter_level_required_description
 )
 
+data class ProfileGamificationState(
+    val level: Long,
+    val points: Long,
+    val recompenses: Long,
+    val isLoading: Boolean,
+    val showLevelUpAnimation: Boolean,
+    val showPrizeAnimation: Boolean,
+    val lastOpenedPrize: com.safesteps.data.PremiResponse?
+)
+
+data class ProfileGamificationCallbacks(
+    val onOpenPrize: () -> Unit,
+    val onDismissLevelUp: () -> Unit,
+    val onDismissPrize: () -> Unit
+)
+
+data class ProfileFilterState(
+    val values: List<Int>,
+    val isLoading: Boolean,
+    val areEnabled: Boolean
+)
+
+
+@Composable
+private fun ProfileTopBar(
+    currentLanguage: AppLanguage,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    onBack: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.width(60.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = Color.White,
+                shadowElevation = 4.dp
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = appString(R.string.back),
+                        tint = Color(0xFF33413B)
+                    )
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = appString(R.string.profile_title),
+                color = Color(0xFF23333A),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        Box(
+            modifier = Modifier.width(60.dp),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            LanguageSelector(
+                currentLanguage = currentLanguage,
+                onLanguageSelected = onLanguageSelected
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileContentCard(
+    user: UserInfo,
+    gamification: ProfileGamificationState,
+    gamificationCallbacks: ProfileGamificationCallbacks,
+    filterState: ProfileFilterState,
+    onFilterValueChange: (Int, Int) -> Unit,
+    isFiltersSectionExpanded: Boolean,
+    onFiltersSectionExpandedChange: () -> Unit,
+    expandedGroups: List<Boolean>,
+    onExpandedGroupToggle: (Int) -> Unit,
+    onCustomizeClick: () -> Unit,
+    onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    showDeleteBanner: Boolean,
+    onShowDeleteBanner: () -> Unit,
+    onDismissDeleteBanner: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ProfileHeaderSection(
+                user = user,
+                gamification = gamification,
+                gamificationCallbacks = gamificationCallbacks
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = onCustomizeClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFFE5ECE7)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color(0xFFF9FBFA),
+                    contentColor = Color(0xFF23333A)
+                )
+            ) {
+                Text(
+                    text = appString(R.string.profile_customize),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            ProfileFiltersSection(
+                filterValues = filterState.values,
+                expanded = isFiltersSectionExpanded,
+                expandedGroups = expandedGroups,
+                isLoadingFilters = filterState.isLoading,
+                areFiltersEnabled = filterState.areEnabled,
+                onExpandedChange = onFiltersSectionExpandedChange,
+                onExpandedGroupToggle = onExpandedGroupToggle,
+                onFilterValueChange = onFilterValueChange
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            ProfileAccountActions(
+                onLogout = onLogout,
+                onDeleteAccount = onDeleteAccount,
+                showDeleteBanner = showDeleteBanner,
+                onShowDeleteBanner = onShowDeleteBanner,
+                onDismissDeleteBanner = onDismissDeleteBanner
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileHeaderSection(
+    user: UserInfo,
+    gamification: ProfileGamificationState,
+    gamificationCallbacks: ProfileGamificationCallbacks
+) {
+    if (gamification.isLoading) {
+        CircularProgressIndicator(color = Color(0xFF5E9F7A))
+    } else {
+        ProfileHeader(
+            user = user,
+            level = gamification.level,
+            points = gamification.points
+        )
+    }
+
+    if (gamification.recompenses > 0) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = gamificationCallbacks.onOpenPrize,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF5E9F7A),
+                contentColor = Color.White
+            )
+        ) {
+            Text(
+                text = "🎁 Open reward (${gamification.recompenses} available)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileAccountActions(
+    onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    showDeleteBanner: Boolean,
+    onShowDeleteBanner: () -> Unit,
+    onDismissDeleteBanner: () -> Unit
+) {
+    Button(
+        onClick = {
+            onDismissDeleteBanner()
+            onLogout()
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFFC86A37),
+            contentColor = Color.White
+        )
+    ) {
+        Text(
+            text = appString(R.string.log_out),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+
+    Spacer(modifier = Modifier.height(10.dp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End
+    ) {
+        OutlinedButton(
+            onClick = onShowDeleteBanner,
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, Color(0xFFD58A63)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White,
+                contentColor = Color(0xFFB76435)
+            ),
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = appString(R.string.delete_account_short),
+                color = Color(0xFFB76435),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.End
+            )
+        }
+    }
+
+    if (showDeleteBanner) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        DeleteAccountBanner(
+            onDismiss = onDismissDeleteBanner,
+            onConfirm = {
+                onDismissDeleteBanner()
+                onDeleteAccount()
+            }
+        )
+    }
+}
 @Composable
 fun ProfileScreen(
     user: UserInfo,
+    gamification: ProfileGamificationState,
+    gamificationCallbacks: ProfileGamificationCallbacks,
+    filterState: ProfileFilterState,
+    onFilterValueChange: (Int, Int) -> Unit,
     currentLanguage: AppLanguage,
     onLanguageSelected: (AppLanguage) -> Unit,
-    filterValues: List<Int>,
-    onFilterValueChange: (Int, Int) -> Unit,
-    isLoadingFilters: Boolean,
-    areFiltersEnabled: Boolean,
     onBack: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit,
@@ -99,177 +364,60 @@ fun ProfileScreen(
     var isFiltersSectionExpanded by rememberSaveable { mutableStateOf(false) }
     var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFFF4F7F5))
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF4F7F5))
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
-            Box(
-                modifier = Modifier.width(60.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = CircleShape,
-                    color = Color.White,
-                    shadowElevation = 4.dp
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = appString(R.string.back),
-                            tint = Color(0xFF33413B)
-                        )
+            ProfileTopBar(
+                currentLanguage = currentLanguage,
+                onLanguageSelected = onLanguageSelected,
+                onBack = onBack
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            ProfileContentCard(
+                user = user,
+                gamification = gamification,
+                gamificationCallbacks = gamificationCallbacks,
+                filterState = filterState,
+                onFilterValueChange = onFilterValueChange,
+                isFiltersSectionExpanded = isFiltersSectionExpanded,
+                onFiltersSectionExpandedChange = { isFiltersSectionExpanded = !isFiltersSectionExpanded },
+                expandedGroups = expandedGroups,
+                onExpandedGroupToggle = { groupIndex ->
+                    expandedGroups = expandedGroups.toMutableList().also { groups ->
+                        groups[groupIndex] = !groups[groupIndex]
                     }
-                }
-            }
-
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = appString(R.string.profile_title),
-                    color = Color(0xFF23333A),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Box(
-                modifier = Modifier.width(60.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                LanguageSelector(
-                    currentLanguage = currentLanguage,
-                    onLanguageSelected = onLanguageSelected
-                )
-            }
+                },
+                onCustomizeClick = onCustomizeClick,
+                onLogout = onLogout,
+                onDeleteAccount = onDeleteAccount,
+                showDeleteBanner = showDeleteBanner,
+                onShowDeleteBanner = { showDeleteBanner = true },
+                onDismissDeleteBanner = { showDeleteBanner = false }
+            )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        // Animaciones overlay
+        if (gamification.showLevelUpAnimation) {
+            LevelUpAnimationOverlay(
+                level = gamification.level,
+                onDismiss = gamificationCallbacks.onDismissLevelUp
+            )
+        }
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                ProfileHeader(user = user)
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedButton(
-                    onClick = onCustomizeClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color(0xFFE5ECE7)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color(0xFFF9FBFA),
-                        contentColor = Color(0xFF23333A)
-                    )
-                ) {
-                    Text(
-                        text = appString(R.string.profile_customize),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                ProfileFiltersSection(
-                    filterValues = filterValues,
-                    expanded = isFiltersSectionExpanded,
-                    expandedGroups = expandedGroups,
-                    isLoadingFilters = isLoadingFilters,
-                    areFiltersEnabled = areFiltersEnabled,
-                    onExpandedChange = {
-                        isFiltersSectionExpanded = !isFiltersSectionExpanded
-                    },
-                    onExpandedGroupToggle = { groupIndex ->
-                        expandedGroups = expandedGroups.toMutableList().also { groups ->
-                            groups[groupIndex] = !groups[groupIndex]
-                        }
-                    },
-                    onFilterValueChange = onFilterValueChange
-                )
-
-                Spacer(modifier = Modifier.height(28.dp))
-
-                Button(
-                    onClick = {
-                        showDeleteBanner = false
-                        onLogout()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFC86A37),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text(
-                        text = appString(R.string.log_out),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    OutlinedButton(
-                        onClick = { showDeleteBanner = true },
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, Color(0xFFD58A63)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.White,
-                            contentColor = Color(0xFFB76435)
-                        ),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = appString(R.string.delete_account_short),
-                            color = Color(0xFFB76435),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.End
-                        )
-                    }
-                }
-
-                if (showDeleteBanner) {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    DeleteAccountBanner(
-                        onDismiss = { showDeleteBanner = false },
-                        onConfirm = {
-                            showDeleteBanner = false
-                            onDeleteAccount()
-                        }
-                    )
-                }
-            }
+        if (gamification.showPrizeAnimation && gamification.lastOpenedPrize != null) {
+            PrizeAnimationOverlay(
+                prize = gamification.lastOpenedPrize,
+                onDismiss = gamificationCallbacks.onDismissPrize
+            )
         }
     }
 }
@@ -415,14 +563,19 @@ private fun FilterGroupsList(
 }
 
 @Composable
-private fun ProfileHeader(user: UserInfo) {
-    val points = 1045
-    val pointsPerLevel = 100
-    val maxLevel = 20
-
-    val currentLevel = (points / pointsPerLevel + 1).coerceAtMost(maxLevel)
-    val pointsInCurrentLevel = points % pointsPerLevel
-    val progress = if (currentLevel == maxLevel) 1f else pointsInCurrentLevel.toFloat() / pointsPerLevel
+private fun ProfileHeader(
+    user: UserInfo,
+    level: Long,
+    points: Long
+) {
+    val currentLevel = level.toInt()
+    val pointsForCurrentLevel = ((currentLevel - 1).toLong() * 10L).let { it * it }
+    val pointsForNextLevel = (currentLevel.toLong() * 10L).let { it * it }
+    val pointsInCurrentLevel = (points - pointsForCurrentLevel).coerceAtLeast(0)
+    val pointsNeededForNext = pointsForNextLevel - pointsForCurrentLevel
+    val progress = if (pointsNeededForNext > 0) {
+        (pointsInCurrentLevel.toFloat() / pointsNeededForNext.toFloat()).coerceIn(0f, 1f)
+    } else 1f
 
     val tier = ((currentLevel - 1) / 5).coerceIn(0, 3)
     val tierColor = when (tier) {
@@ -505,7 +658,7 @@ private fun ProfileHeader(user: UserInfo) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = appString(R.string.profile_points, pointsInCurrentLevel, pointsPerLevel),
+                    text = appString(R.string.profile_points, pointsInCurrentLevel.toInt(), pointsNeededForNext.toInt()),
                     color = Color(0xFF77837D),
                     style = MaterialTheme.typography.labelSmall
                 )

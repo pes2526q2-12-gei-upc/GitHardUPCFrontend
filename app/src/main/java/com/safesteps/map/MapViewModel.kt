@@ -1,7 +1,12 @@
-package com.safesteps.map
+﻿package com.safesteps.map
+
+import com.safesteps.ui.notifications.ScreenNotificationManager
 
 import android.location.Location
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.auth.UserInfo
@@ -9,6 +14,7 @@ import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
 import com.safesteps.data.PhotonApi
 import com.safesteps.data.PuntInteres
+import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.data.RouteCoordinatesRequest
 import com.safesteps.data.RouteType
 import com.safesteps.data.obtenirCoordenadesRuta
@@ -47,6 +53,13 @@ class MapViewModel(
     private var lastNavigationProgressMeters: Double = 0.0
     private var lastAutomaticRecalculationAtMs: Long = 0L
     private var currentGoogleId: String? = null
+
+    var routeResult by mutableStateOf<RouteCompletionResponse?>(null)
+        private set
+
+    fun dismissRouteResult() {
+        routeResult = null
+    }
 
     fun onLanguageChanged(language: AppLanguage) {
         currentLanguage = language
@@ -167,7 +180,7 @@ class MapViewModel(
                         state.copy(adrecesSuggerides = resultatsNets)
                     }
                 } catch (e: Exception) {
-                    Log.e("PhotonAPI", "Error en la petició: ${e.message}")
+                    Log.e("PhotonAPI", "Error en la peticiÃ³: ${e.message}")
                     _uiState.update { it.copy(adrecesSuggerides = emptyList()) }
                 }
             }
@@ -617,10 +630,22 @@ class MapViewModel(
 
         // 2. ENVIAMOS LOS DATOS AL BACKEND
         val googleId = currentGoogleId
+        Log.d("ROUTE_VM", "googleId=$currentGoogleId, totalDistanceMeters=$totalDistanceMeters")
         if (!googleId.isNullOrBlank() && totalDistanceMeters > 0.0) {
             viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 try {
-                    com.safesteps.data.completarRutaEnBackend(googleId, totalDistanceMeters)
+                    val result = com.safesteps.data.completarRutaEnBackend(googleId, totalDistanceMeters)
+                    if (result != null && result.pointsAdded != null && result.pointsAdded > 0) {
+                        ScreenNotificationManager.showNotification(
+                            notificationName = textProvider.notificationTitleMap(currentLanguage),
+                            text = textProvider.routeCompletedPoints(currentLanguage, result.pointsAdded)
+                        )
+                    }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        routeResult = result
+                        Log.d("ROUTE_VM", "Backend response: levelUpdated=${result?.levelUpdated}, level=${result?.level}, recompenses=${result?.recompenses}, pointsAdded=${result?.pointsAdded}")
+
+                    }
                 } catch (e: Exception) {
                     Log.e("ROUTE_VM", "Error de red al enviar la ruta completada", e)
                 }

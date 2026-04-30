@@ -20,6 +20,7 @@ import com.safesteps.auth.AuthViewModel
 import com.safesteps.auth.UserInfo
 import com.safesteps.auth.rememberGoogleSignOutAction
 import com.safesteps.auth.rememberGoogleSignInAction
+import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.LanguagePreferencesRepository
 import com.safesteps.i18n.LanguageViewModel
@@ -27,7 +28,11 @@ import com.safesteps.i18n.LanguageViewModelFactory
 import com.safesteps.i18n.ProvideLocalizedStrings
 import com.safesteps.i18n.appString
 import com.safesteps.map.MapLibreScreen
+import com.safesteps.profile.ProfileFilterState
+import com.safesteps.profile.ProfileGamificationCallbacks
+import com.safesteps.profile.ProfileGamificationState
 import com.safesteps.profile.ProfileScreen
+import com.safesteps.profile.ProfileUiState
 import com.safesteps.profile.ProfileViewModel
 import com.safesteps.ui.notifications.ScreenNotificationManager
 
@@ -86,6 +91,11 @@ fun SafeStepsApp(
         currentDestination = currentDestination,
         onProfileOpened = profileViewModel::onFiltersScreenOpened
     )
+    HandleProfileDataRefreshEffect(
+        currentUser = authUiState.currentUser,
+        currentDestination = currentDestination,
+        onProfileOpened = profileViewModel::onProfileScreenOpened
+    )
     val onLanguageSelected: (AppLanguage) -> Unit = remember(languageViewModel, authViewModel) {
         { language ->
             languageViewModel.onLanguageSelected(
@@ -117,10 +127,27 @@ fun SafeStepsApp(
         onLoginClick = onLoginClick,
         onNavigateToMap = { currentDestination = SafeStepsDestination.MAP },
         onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE },
-        onNavigateToCustomize = { currentDestination = SafeStepsDestination.CUSTOMIZE } // FEATURE RECUPERADA
+        onNavigateToCustomize = { currentDestination = SafeStepsDestination.CUSTOMIZE },
+        onRouteCompleted = { response -> profileViewModel.onRouteCompleted(response) },
+        onOpenPrize = profileViewModel::openPrize,
+        onDismissLevelUp = profileViewModel::dismissLevelUpAnimation,
+        onDismissPrize = profileViewModel::dismissPrizeAnimation
     )
 }
 
+
+@Composable
+private fun HandleProfileDataRefreshEffect(
+    currentUser: UserInfo?,
+    currentDestination: SafeStepsDestination,
+    onProfileOpened: () -> Unit
+) {
+    LaunchedEffect(currentDestination, currentUser?.googleId) {
+        if (isProfileDestination(currentDestination) && currentUser != null) {
+            onProfileOpened()
+        }
+    }
+}
 @Composable
 private fun HandleProfileRedirectEffect(
     currentUser: UserInfo?,
@@ -183,7 +210,11 @@ private fun SafeStepsLocalizedContent(
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToCustomize: () -> Unit // FEATURE RECUPERADA
+    onNavigateToCustomize: () -> Unit,
+    onRouteCompleted: (com.safesteps.data.RouteCompletionResponse) -> Unit,
+    onOpenPrize: () -> Unit,
+    onDismissLevelUp: () -> Unit,
+    onDismissPrize: () -> Unit
 ) {
     ProvideLocalizedStrings(currentLanguage) {
         HandleAuthNoticeEffect(
@@ -215,13 +246,17 @@ private fun SafeStepsLocalizedContent(
             onLoginClick = onLoginClick,
             onNavigateToMap = { onNavigateToMap() },
             onNavigateToProfile = { onNavigateToProfile() },
-            onNavigateToCustomize = { onNavigateToCustomize() }, // FEATURE RECUPERADA
+            onNavigateToCustomize = { onNavigateToCustomize() },
             onLogout = rememberLogoutToMapAction(
                 authViewModel = authViewModel,
                 onNavigateToMap = onNavigateToMap
             ),
             onDeleteAccount = authViewModel::onDeleteAccountRequested,
-            onUpdateUserProfile = authViewModel::onUpdateUserProfile // FEATURE RECUPERADA
+            onUpdateUserProfile = authViewModel::onUpdateUserProfile,
+            onRouteCompleted = onRouteCompleted,
+            onOpenPrize = onOpenPrize,
+            onDismissLevelUp = onDismissLevelUp,
+            onDismissPrize = onDismissPrize
         )
     }
 }
@@ -255,17 +290,21 @@ private fun SafeStepsBody(
     authUiState: AuthUiState,
     currentLanguage: AppLanguage,
     currentDestination: SafeStepsDestination,
-    profileUiState: com.safesteps.profile.ProfileUiState,
+    profileUiState: ProfileUiState,
     onLanguageSelected: (AppLanguage) -> Unit,
     onFilterValueChange: (Int, Int) -> Unit,
     onFilterEnabledChange: (Int, Boolean) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToCustomize: () -> Unit, // FEATURE RECUPERADA
+    onNavigateToCustomize: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: (UserInfo) -> Unit,
-    onUpdateUserProfile: (UserInfo) -> Unit // FEATURE RECUPERADA
+    onUpdateUserProfile: (UserInfo) -> Unit,
+    onRouteCompleted: (RouteCompletionResponse) -> Unit,
+    onOpenPrize: () -> Unit,
+    onDismissLevelUp: () -> Unit,
+    onDismissPrize: () -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         val currentUser = authUiState.currentUser
@@ -277,12 +316,28 @@ private fun SafeStepsBody(
                     ProfileScreen(
                         modifier = Modifier.fillMaxSize(),
                         user = currentUser,
+                        gamification = ProfileGamificationState(
+                            level = profileUiState.level,
+                            points = profileUiState.points,
+                            recompenses = profileUiState.recompenses,
+                            isLoading = profileUiState.isLoadingProfile,
+                            showLevelUpAnimation = profileUiState.showLevelUpAnimation,
+                            showPrizeAnimation = profileUiState.showPrizeAnimation,
+                            lastOpenedPrize = profileUiState.lastOpenedPrize
+                        ),
+                        gamificationCallbacks = ProfileGamificationCallbacks(
+                            onOpenPrize = onOpenPrize,
+                            onDismissLevelUp = onDismissLevelUp,
+                            onDismissPrize = onDismissPrize
+                        ),
+                        filterState = ProfileFilterState(
+                            values = profileUiState.filterValues,
+                            isLoading = profileUiState.isLoadingFilters,
+                            areEnabled = !profileUiState.isLoadingFilters
+                        ),
+                        onFilterValueChange = onFilterValueChange,
                         currentLanguage = currentLanguage,
                         onLanguageSelected = onLanguageSelected,
-                        filterValues = profileUiState.filterValues,
-                        onFilterValueChange = onFilterValueChange,
-                        isLoadingFilters = profileUiState.isLoadingFilters,
-                        areFiltersEnabled = !profileUiState.isLoadingFilters,
                         onBack = onNavigateToMap,
                         onLogout = onLogout,
                         onDeleteAccount = { onDeleteAccount(currentUser) },
@@ -293,6 +348,7 @@ private fun SafeStepsBody(
                     com.safesteps.profile.ProfileCustomizationScreen(
                         user = currentUser,
                         onBack = onNavigateToProfile,
+                        unlockedPremis = profileUiState.premis,
                         onSave = onUpdateUserProfile,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -303,7 +359,9 @@ private fun SafeStepsBody(
                         currentUser = currentUser,
                         currentLanguage = currentLanguage,
                         onLoginClick = onLoginClick,
-                        onProfileClick = onNavigateToProfile
+                        onProfileClick = onNavigateToProfile,
+                        onRouteCompleted = onRouteCompleted
+
                     )
                 }
             }
@@ -317,7 +375,8 @@ private fun SafeStepsBody(
                     if (currentUser != null) {
                         onNavigateToProfile()
                     }
-                }
+                },
+                onRouteCompleted = onRouteCompleted
             )
         }
     }

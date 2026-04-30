@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="change_language">Cambiar idioma</string>
     <string name="log_in">Iniciar sesi&#243;n</string>
@@ -139,4 +139,5 @@
         <item quantity="many">%d filtros</item>
         <item quantity="other">%d filtros</item>
     </plurals>
+    <string name="route_completed_points">¡Enhorabuena! Has conseguido %1$d puntos.</string>
 </resources>

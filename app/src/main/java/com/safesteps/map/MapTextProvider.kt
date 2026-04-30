@@ -1,4 +1,4 @@
-package com.safesteps.map
+﻿package com.safesteps.map
 
 import android.content.Context
 import com.safesteps.R
@@ -24,6 +24,16 @@ class MapTextProvider(
         )
     }
 
+        fun routeCompletedPoints(language: AppLanguage, points: Long): String {
+        return context.localizedContext(language).getString(
+            R.string.route_completed_points,
+            points
+        )
+    }
+
+    fun notificationTitleMap(language: AppLanguage): String {
+        return context.localizedContext(language).getString(R.string.notification_title_map)
+    }
     fun photonLanguage(language: AppLanguage): String {
         return when (language.languageTag.substring(0, 2).lowercase(Locale.ROOT)) {
             "de" -> "de"

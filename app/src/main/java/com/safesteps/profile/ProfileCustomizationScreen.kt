@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.*
@@ -35,6 +36,7 @@ import com.safesteps.i18n.appString
 @Composable
 fun ProfileCustomizationScreen(
     user: UserInfo,
+    unlockedPremis: List<com.safesteps.data.PremiResponse>,
     onBack: () -> Unit,
     onSave: (UserInfo) -> Unit,
     modifier: Modifier = Modifier
@@ -73,6 +75,7 @@ fun ProfileCustomizationScreen(
 
             ColorSelectionSection(
                 selectedColor = selectedRouteColor,
+                unlockedPremis = unlockedPremis,
                 onColorSelected = { selectedRouteColor = it }
             )
 
@@ -289,11 +292,21 @@ private fun PhotoItem(photoUrl: String?, isSelected: Boolean, onClick: () -> Uni
 @Composable
 private fun ColorSelectionSection(
     selectedColor: Color,
+    unlockedPremis: List<com.safesteps.data.PremiResponse>,
     onColorSelected: (Color) -> Unit
 ) {
-    val availableRouteColors = listOf(
-        Color(0xFF4CAF50), Color(0xFF2196F3), Color(0xFFFF9800),
-        Color(0xFFE91E63), Color(0xFF9C27B0), Color(0xFF333333)
+    val defaultColor = Color(0xFF2196F3) // Azul por defecto
+
+    val unlockedColors = unlockedPremis.mapNotNull { premi ->
+        parseColorFromPremiId(premi.id)
+    }
+
+    // Todos los colores posibles de la tabla prizes
+    val allPrizeColors = listOf(
+        Color(0x00, 0xFF, 0x00),   // R001 - verde
+        Color(0xFF, 0xC0, 0xCB),   // R002 - rosa
+        Color(0xC8, 0xA2, 0xC8),   // R003 - lila
+        Color(0xFF, 0x00, 0x00)    // R004 - rojo
     )
 
     CustomizationSection(title = appString(R.string.customize_route_color)) {
@@ -301,11 +314,23 @@ private fun ColorSelectionSection(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(horizontal = 4.dp)
         ) {
-            items(availableRouteColors) { color ->
+            // Azul siempre disponible
+            item {
                 ColorItem(
-                    color = color,
-                    isSelected = selectedColor == color,
-                    onClick = { onColorSelected(color) }
+                    color = defaultColor,
+                    isSelected = selectedColor == defaultColor,
+                    isLocked = false,
+                    onClick = { onColorSelected(defaultColor) }
+                )
+            }
+            // Colores de premios
+            items(allPrizeColors) { prizeColor ->
+                val isUnlocked = unlockedColors.any { isSameColor(it, prizeColor) }
+                ColorItem(
+                    color = prizeColor,
+                    isSelected = isSameColor(selectedColor, prizeColor),
+                    isLocked = !isUnlocked,
+                    onClick = { if (isUnlocked) onColorSelected(prizeColor) }
                 )
             }
         }
@@ -313,13 +338,18 @@ private fun ColorSelectionSection(
 }
 
 @Composable
-private fun ColorItem(color: Color, isSelected: Boolean, onClick: () -> Unit) {
+private fun ColorItem(
+    color: Color,
+    isSelected: Boolean,
+    isLocked: Boolean = false,
+    onClick: () -> Unit
+) {
     Box(
         modifier = Modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(color)
-            .clickable(onClick = onClick)
+            .background(if (isLocked) color.copy(alpha = 0.3f) else color)
+            .clickable(enabled = !isLocked, onClick = onClick)
             .border(
                 width = if (isSelected) 3.dp else 0.dp,
                 color = if (isSelected) Color.White else Color.Transparent,
@@ -332,6 +362,14 @@ private fun ColorItem(color: Color, isSelected: Boolean, onClick: () -> Unit) {
                 imageVector = Icons.Default.Check,
                 contentDescription = null,
                 tint = Color.White
+            )
+        }
+        if (isLocked) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -456,4 +494,20 @@ private fun getNameStyleString(fontWeight: FontWeight): String {
         FontWeight.ExtraBold -> "ExtraBold"
         else -> "SemiBold"
     }
+}
+
+private fun parseColorFromPremiId(id: String?): Color? {
+    if (id == null) return null
+    val regex = Regex("R(\\d+)G(\\d+)B(\\d+)")
+    val match = regex.find(id) ?: return null
+    val r = match.groupValues[1].toIntOrNull() ?: return null
+    val g = match.groupValues[2].toIntOrNull() ?: return null
+    val b = match.groupValues[3].toIntOrNull() ?: return null
+    return Color(r, g, b)
+}
+
+private fun isSameColor(a: Color, b: Color): Boolean {
+    return (a.red - b.red).let { it * it } +
+            (a.green - b.green).let { it * it } +
+            (a.blue - b.blue).let { it * it } < 0.01f
 }

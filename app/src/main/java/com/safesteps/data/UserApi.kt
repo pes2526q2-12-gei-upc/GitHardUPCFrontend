@@ -17,7 +17,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40384/"
+private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40381/"
 private const val USERS_PATH = "api/v1/users"
 
 enum class UserSyncResult {
@@ -25,6 +25,10 @@ enum class UserSyncResult {
     NEW_USER_CREATED
 }
 
+data class PremiResponse(
+    val id: String? = null,
+    val url: String? = null
+)
 data class UserSyncOutcome(
     val result: UserSyncResult,
     val languageTag: String
@@ -61,14 +65,20 @@ private data class UserRequest(
     val isAnonymous: Boolean
 )
 
-private data class UserResponse(
+data class UserResponse(
     val id: Long? = null,
     val email: String? = null,
     val username: String? = null,
     val googleId: String? = null,
     val pictureUrl: String? = null,
     val language: String? = null,
-    val isAnonymous: Boolean? = null
+    val isAnonymous: Boolean? = null,
+    val points: Long? = null,
+    val level: Long? = null,
+    val reputacio: Double? = null,
+    val createdAt: String? = null,
+    val recompenses: Long? = null,
+    val premis: List<PremiResponse>? = null
 )
 
 private data class FilterRequest(
@@ -139,6 +149,11 @@ private interface UserApiService {
         @Path("googleId") googleId: String,
         @Query("meters") meters: Double
     ): Response<RouteCompletionResponse>
+
+    @GET("$USERS_PATH/{googleId}/open-prize")
+    suspend fun openPrize(
+        @Path("googleId") googleId: String
+    ): Response<PremiResponse>
 }
 
 private object UserBackend {
@@ -418,5 +433,30 @@ suspend fun completarRutaEnBackend(googleId: String, distanceMeters: Double): Ro
     }
 
     Log.e("USER_API", "Error al completar ruta: ${response.code()} ${response.message()}")
+    return null
+}
+
+suspend fun cargarPerfilDeUsuario(googleId: String): UserResponse? {
+    val response = UserBackend.service.getUserByGoogleId(googleId)
+    if (response.isSuccessful) {
+        return response.body()
+    }
+    return null
+}
+
+suspend fun abrirPremioEnBackend(googleId: String): PremiResponse? {
+    if (googleId.isBlank()) {
+        Log.e("USER_API", "Falta el googleId para abrir premio")
+        return null
+    }
+
+    Log.d("USER_API", "Abriendo premio: googleId=$googleId")
+    val response = UserBackend.service.openPrize(googleId)
+
+    if (response.isSuccessful) {
+        return response.body()
+    }
+
+    Log.e("USER_API", "Error al abrir premio: ${response.code()} ${response.message()}")
     return null
 }
