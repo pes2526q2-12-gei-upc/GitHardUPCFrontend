@@ -1,11 +1,10 @@
-package com.safesteps.map
+﻿package com.safesteps.map
 
 import android.Manifest
 import android.content.Context
 import android.graphics.drawable.Icon
 import android.location.Location
 import android.location.LocationListener
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,12 +26,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.toColorInt
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
+import com.safesteps.data.Coord
 import com.safesteps.data.Feature
+import com.safesteps.data.IssueApiType
 import com.safesteps.data.PuntInteres
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
@@ -42,6 +42,21 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import androidx.core.graphics.createBitmap
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import com.safesteps.data.IssueResponseDTO
 
 private data class MapScreenStrings(
     val locationPermissionRequiredMessage: String,
@@ -55,7 +70,11 @@ private data class MapScreenStrings(
     val satelliteMapStyleLabel: String,
     val myLocationLabel: String,
     val calculatingBestRouteLabel: String,
-    val reportIssueLabel: String
+    val reportIssueLabel: String,
+    val reportIssueOutsideBarcelonaMessage: String,
+    val issueLoadingAddressLabel: String,
+    val issueLocationFallbackLabel: String,
+    val mapLocationSelectionRestrictedMessage: String
 )
 
 @Composable
@@ -63,6 +82,7 @@ fun MapLibreScreen(
     modifier: Modifier = Modifier,
     currentUser: UserInfo? = null,
     currentLanguage: AppLanguage = AppLanguage.default,
+    issuesRefreshTrigger: Int = 0,
     onLoginClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
 ) {
@@ -122,6 +142,10 @@ fun MapLibreScreen(
         viewModel.onCurrentUserChanged(currentUser)
     }
 
+    LaunchedEffect(issuesRefreshTrigger) {
+        viewModel.loadIssuesMap()
+    }
+
     MapScreenEffects(
         mapView = mapView,
         currentLanguage = currentLanguage,
@@ -139,7 +163,8 @@ fun MapLibreScreen(
         MapViewSurface(
             mapView = mapView,
             uiState = uiState,
-            viewModel = viewModel
+            viewModel = viewModel,
+            restrictedLocationMessage = strings.mapLocationSelectionRestrictedMessage
         )
 
         MainMapOverlay(
@@ -221,7 +246,18 @@ fun MapLibreScreen(
             onDismiss = {
                 viewModel.toggleMenuIncidencies(false)
             },
-            onConfirm = { tipus, ubicacio, descripcio ->
+            onConfirm = { tipus, ubicacio, descripcio, coord ->
+                if (ubicacio == textMevaUbicacio) {
+                    val loc = uiState.ultimaUbicacion
+                    if (loc == null || !viewModel.isInsideBarcelonaArea(loc.latitude, loc.longitude)) {
+                        Toast.makeText(
+                            context,
+                            strings.reportIssueOutsideBarcelonaMessage,
+                            Toast.LENGTH_LONG
+                        ).show()
+                        return@ReportIssueDialog
+                    }
+                }
                 viewModel.reportIssue(
                     tipus = tipus,
                     adrecaText = ubicacio,
@@ -236,10 +272,75 @@ fun MapLibreScreen(
             properties = DialogProperties(
                 usePlatformDefaultWidth = false
             ),
+            initialCoord = Coord(0.0, 0.0),
             modifier = Modifier
                 .fillMaxWidth(0.95f)
                 .padding(horizontal = 16.dp)
         )
+
+        uiState.incidenciaSeleccionada?.let { incidencia ->
+            val isOwner = currentUser?.username == incidencia.authorName
+            val miVot = uiState.userVotes[incidencia.id]
+            showIssueDialog(
+                incidencia = incidencia,
+                isOwner = isOwner,
+                miVot = miVot,
+                onDismiss = { viewModel.selectIssue(null) },
+                userVote = uiState.userVotes[incidencia.id],
+                onConfirmar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, true, it) } },
+                onRebutjar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, false, it) } },
+                onEditar = { viewModel.iniciarEdicio(incidencia) },
+                onEsborrar = { viewModel.esborrarIncidencia(incidencia.id) },
+                onDesferVot = { currentUser?.googleId?.let { viewModel.desferVot(incidencia.id, it) } }
+            )
+        }
+
+        uiState.incidenciaEnEdicio?.let { incidencia ->
+            var adrecaTransformada by remember(incidencia) { mutableStateOf(strings.issueLoadingAddressLabel) }
+
+            LaunchedEffect(incidencia) {
+                try {
+                    val response = com.safesteps.data.PhotonApi.service.reverseGeocode(
+                        lat = incidencia.coordinates.lat,
+                        lon = incidencia.coordinates.lon
+                    )
+
+                    val feature = response.features.firstOrNull()
+                    if (feature != null) {
+                        val adreca = feature.properties.getAddress()
+                        adrecaTransformada = adreca.ifBlank { strings.issueLocationFallbackLabel }
+                    } else {
+                        adrecaTransformada = strings.issueLocationFallbackLabel
+                    }
+                } catch (_: Exception) {
+                    adrecaTransformada = strings.issueLocationFallbackLabel
+                }
+            }
+
+            ReportIssueDialog(
+                visible = true,
+                isLoggedIn = currentUser != null,
+                isEditMode = true,
+                defaultLocationText = adrecaTransformada,
+                initialType = try { IssueType.valueOf(incidencia.type.name) } catch (e: Exception) { IssueType.OBRES },
+                initialDescription = incidencia.description ?: "",
+                initialCoord = incidencia.coordinates,
+                onDismiss = { viewModel.cancelarEdicio() },
+                onConfirm = { tipus, _, descripcio, _ ->
+                    currentUser?.googleId?.let { googleId ->
+                        val apiType = IssueApiType.valueOf(tipus.name)
+                        viewModel.guardarEdicio(
+                            incidenciaId = incidencia.id,
+                            nouTipus = apiType,
+                            novaDescripcio = descripcio,
+                            coordenades = incidencia.coordinates,
+                            googleId = googleId
+                        )
+                    }
+                },
+                onNavigateToLogin = onLoginClick
+            )
+        }
     }
 }
 
@@ -257,7 +358,11 @@ private fun mapScreenStrings(): MapScreenStrings {
         satelliteMapStyleLabel = appString(R.string.map_style_satellite),
         myLocationLabel = appString(R.string.my_location),
         calculatingBestRouteLabel = appString(R.string.calculating_best_route),
-        reportIssueLabel = appString(R.string.report_issue)
+        reportIssueLabel = appString(R.string.report_issue),
+        reportIssueOutsideBarcelonaMessage = appString(R.string.issue_report_outside_barcelona),
+        issueLoadingAddressLabel = appString(R.string.issue_loading_address),
+        issueLocationFallbackLabel = appString(R.string.issue_location_fallback),
+        mapLocationSelectionRestrictedMessage = appString(R.string.map_location_selection_restricted)
     )
 }
 
@@ -519,13 +624,15 @@ private fun MapStyleRenderingEffect(
             }
 
             map.getStyle { _ ->
+                map.clear()
+
                 uiState.issues.forEach { issue ->
                     val position = LatLng(issue.coordinates.lat, issue.coordinates.lon)
                     addLegacyMarker(
                         map = map,
                         position = position,
                         title = issue.type.name,
-                        icon = createIssueIcon(context)
+                        icon = createIssueIcon(context, issue.type)
                     )
                 }
             }
@@ -654,9 +761,11 @@ private fun NavigationCameraGestureDismissEffect(
 private fun MapViewSurface(
     mapView: MapView,
     uiState: MapUiState,
-    viewModel: MapViewModel
+    viewModel: MapViewModel,
+    restrictedLocationMessage: String
 ) {
     val currentUiState by rememberUpdatedState(uiState)
+    val context = LocalContext.current
 
     AndroidView(
         factory = {
@@ -664,7 +773,13 @@ private fun MapViewSurface(
                 getMapAsync { map ->
                     configureMapUi(map)
                     configurePoiSelection(map, viewModel) { currentUiState }
-                    configureMapClickHandling(map, viewModel) { currentUiState }
+                    configureMapClickHandling(
+                        map = map,
+                        viewModel = viewModel,
+                        uiStateProvider = { currentUiState },
+                        context = context,
+                        restrictedLocationMessage = restrictedLocationMessage
+                    )
                 }
             }
         },
@@ -684,11 +799,24 @@ private fun configurePoiSelection(
     uiStateProvider: () -> MapUiState
 ) {
     setLegacyMarkerClickListener(map) { markerPosition ->
+        val uiState = uiStateProvider()
+
+        val clickedIssue = uiState.issues.find {
+            it.coordinates.lat == markerPosition.latitude &&
+                    it.coordinates.lon == markerPosition.longitude
+        }
+
+        if (clickedIssue != null) {
+            viewModel.selectIssue(clickedIssue)
+            return@setLegacyMarkerClickListener true
+        }
+
         val selectedPoi = findSelectedPoi(
-            puntsInteres = uiStateProvider().puntsInteres,
+            puntsInteres = uiState.puntsInteres,
             markerPosition = markerPosition
         )
         viewModel.onPuntInteresSeleccionat(selectedPoi)
+
         false
     }
 }
@@ -696,15 +824,29 @@ private fun configurePoiSelection(
 private fun configureMapClickHandling(
     map: MapLibreMap,
     viewModel: MapViewModel,
-    uiStateProvider: () -> MapUiState
+    uiStateProvider: () -> MapUiState,
+    context: Context,
+    restrictedLocationMessage: String
 ) {
     map.addOnMapClickListener { point ->
-        handleMapClick(
-            map = map,
-            point = point,
-            uiState = uiStateProvider(),
-            viewModel = viewModel
-        )
+        if (viewModel.isInsideBarcelonaArea(point.latitude, point.longitude)){
+
+            handleMapClick(
+                map = map,
+                point = point,
+                uiState = uiStateProvider(),
+                viewModel = viewModel,
+                context = context
+            )
+        } else {
+            Toast.makeText(
+                context,
+                restrictedLocationMessage,
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        true
+
     }
 }
 
@@ -712,10 +854,25 @@ private fun handleMapClick(
     map: MapLibreMap,
     point: LatLng,
     uiState: MapUiState,
-    viewModel: MapViewModel
+    viewModel: MapViewModel,
+    context: Context
 ): Boolean {
     if (uiState.modoRuta) {
         return true
+    }
+
+    if (uiState.campActiu == textField.ORIGIN) {
+        if (!viewModel.isInsideBarcelonaArea(point.latitude, point.longitude)) {
+            Toast.makeText(context, "Aquest punt d'origen Ã©s fora de Barcelona", Toast.LENGTH_SHORT).show()
+            return true
+        }
+    } else if (uiState.campActiu == textField.DESTINY || uiState.campActiu == textField.NONE) {
+        val origen = uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.let { LatLng(it.latitude, it.longitude) }
+
+        if (origen != null && !viewModel.isInsideBarcelonaArea(origen.latitude, origen.longitude)) {
+            Toast.makeText(context, "No pots triar destÃ­ perquÃ¨ el punt de sortida Ã©s fora de Barcelona", Toast.LENGTH_SHORT).show()
+            return true
+        }
     }
 
     viewModel.onMapClicked(point)
@@ -791,12 +948,37 @@ private fun processAddressSelection(
     viewModel: MapViewModel,
     mapView: MapView
 ) {
-    val selectingOrigin = uiState.campActiu == textField.ORIGIN
+    val isSelectingOrigin = uiState.campActiu == textField.ORIGIN
+    val context = mapView.context
+
+    if (isSelectingOrigin) {
+        if (!viewModel.isInsideBarcelonaArea(feature.geometry.latitud, feature.geometry.longitud)) {
+            Toast.makeText(context, "L'adreÃ§a d'origen ha d'estar dins de Barcelona", Toast.LENGTH_LONG).show()
+            return
+        }
+    } else {
+
+        val latSortida: Double?
+        val lonSortida: Double?
+
+        if (uiState.origenSeleccionado != null) {
+            latSortida = uiState.origenSeleccionado.latitude
+            lonSortida = uiState.origenSeleccionado.longitude
+        } else {
+            latSortida = uiState.ultimaUbicacion?.latitude
+            lonSortida = uiState.ultimaUbicacion?.longitude
+        }
+
+        if (latSortida != null && lonSortida != null) {
+            if (!viewModel.isInsideBarcelonaArea(latSortida, lonSortida)) {
+                Toast.makeText(context, "El punt de sortida actual estÃ  fora de Barcelona", Toast.LENGTH_LONG).show()
+                return
+            }
+        }
+    }
+
     viewModel.onAdrecaSeleccionada(feature)
 
-    if (!selectingOrigin) {
-        return
-    }
 
     animateMapToPoint(
         mapView = mapView,
@@ -1092,13 +1274,53 @@ private fun resolveMapStyleUrl(estiloSatelite: Boolean): String {
 
 private fun Location.toLatLng(): LatLng = LatLng(latitude, longitude)
 
-private fun createIssueIcon(context: Context): org.maplibre.android.annotations.Icon? {
-    val drawable = ContextCompat.getDrawable(context, R.drawable.ic_warning_map)
-    val bitmap = drawable?.toBitmap()
 
-    return if (bitmap != null) {
-        org.maplibre.android.annotations.IconFactory.getInstance(context).fromBitmap(bitmap)
-    } else {
-        null
+
+fun createIssueIcon(context: Context, tipus: IssueApiType): org.maplibre.android.annotations.Icon? {
+    val (emoji, bgColor) = when (tipus) {
+        IssueApiType.OBRES -> "🚧" to "#E67E22".toColorInt()
+        IssueApiType.ACCESSIBILITAT -> "♿" to "#2B63D4".toColorInt()
+        IssueApiType.SEGURETAT -> "🚨" to "#E74C3C".toColorInt()
+        IssueApiType.ALTRES -> "⚠️" to "#F1C40F".toColorInt()
     }
+
+    val size = 96
+    val bitmap = createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bgColor
+        style = Paint.Style.FILL
+    }
+
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        textAlign = Paint.Align.CENTER
+        textSize = 42f
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
+    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(55, 0, 0, 0)
+        style = Paint.Style.FILL
+    }
+
+    canvas.drawCircle(size / 2f, size / 2f + 4f, size / 2.7f, shadowPaint)
+
+    canvas.drawCircle(size / 2f, size / 2f, size / 2.8f, circlePaint)
+
+    val y = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
+    canvas.drawText(emoji, size / 2f, y, textPaint)
+
+    return IconFactory.getInstance(context).fromBitmap(bitmap)
 }
+
+
+
+
+
+
+
+
+
+

@@ -58,5 +58,8 @@ data class MapUiState(
     val issues: List<IssueResponseDTO> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
     val puntInteresSeleccionat: PuntInteres? = null,
-    val mostrarIncidencies: Boolean = false
+    val mostrarIncidencies: Boolean = false,
+    val incidenciaSeleccionada: IssueResponseDTO? = null,
+    val incidenciaEnEdicio: IssueResponseDTO? = null,
+    val userVotes: Map<Long, Int> = emptyMap(),
 )

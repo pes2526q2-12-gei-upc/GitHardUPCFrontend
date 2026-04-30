@@ -58,6 +58,9 @@ fun SafeStepsApp(
     var currentDestination by rememberSaveable {
         mutableStateOf(SafeStepsDestination.MAP)
     }
+    var issuesRefreshTrigger by rememberSaveable {
+        mutableStateOf(0)
+    }
     val onLoginClick = rememberGoogleSignInAction(
         onUserLoggedIn = authViewModel::onUserLoggedIn,
         onSessionRestored = authViewModel::restoreLoggedUser
@@ -74,6 +77,7 @@ fun SafeStepsApp(
     )
 
     BackHandler(enabled = isProfileDestination(currentDestination)) {
+        issuesRefreshTrigger += 1
         currentDestination = SafeStepsDestination.MAP
     }
 
@@ -83,9 +87,13 @@ fun SafeStepsApp(
         currentLanguage = languageUiState.currentLanguage,
         authViewModel = authViewModel,
         currentDestination = currentDestination,
+        issuesRefreshTrigger = issuesRefreshTrigger,
         onLanguageSelected = languageViewModel::onLanguageSelected,
         onLoginClick = onLoginClick,
-        onNavigateToMap = { currentDestination = SafeStepsDestination.MAP },
+        onNavigateToMap = {
+            issuesRefreshTrigger += 1
+            currentDestination = SafeStepsDestination.MAP
+        },
         onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE }
     )
 }
@@ -120,6 +128,7 @@ private fun SafeStepsLocalizedContent(
     currentLanguage: AppLanguage,
     authViewModel: AuthViewModel,
     currentDestination: SafeStepsDestination,
+    issuesRefreshTrigger: Int,
     onLanguageSelected: (AppLanguage) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
@@ -147,6 +156,7 @@ private fun SafeStepsLocalizedContent(
             authUiState = authUiState,
             currentLanguage = currentLanguage,
             currentDestination = currentDestination,
+            issuesRefreshTrigger = issuesRefreshTrigger,
             onLanguageSelected = onLanguageSelected,
             onLoginClick = onLoginClick,
             onNavigateToMap = onNavigateToMap,
@@ -192,6 +202,7 @@ private fun SafeStepsBody(
     authUiState: AuthUiState,
     currentLanguage: AppLanguage,
     currentDestination: SafeStepsDestination,
+    issuesRefreshTrigger: Int,
     onLanguageSelected: (AppLanguage) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
@@ -217,6 +228,7 @@ private fun SafeStepsBody(
                 modifier = Modifier.fillMaxSize(),
                 currentUser = currentUser,
                 currentLanguage = currentLanguage,
+                issuesRefreshTrigger = issuesRefreshTrigger,
                 onLoginClick = onLoginClick,
                 onProfileClick = {
                     if (currentUser != null) {
