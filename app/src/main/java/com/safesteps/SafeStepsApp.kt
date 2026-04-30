@@ -41,6 +41,7 @@ private data class AuthNoticeTexts(
     val title: String,
     val loginSuccess: String,
     val registerSuccess: String,
+    val accessDenied: String,
     val serverError: String,
     val deleteAccountSuccess: String,
     val deleteAccountError: String
@@ -192,6 +193,7 @@ private fun SafeStepsLocalizedContent(
                 title = appString(R.string.notification_title_auth),
                 loginSuccess = appString(R.string.auth_banner_login_success),
                 registerSuccess = appString(R.string.auth_banner_register_success),
+                accessDenied = appString(R.string.auth_banner_access_denied),
                 serverError = appString(R.string.auth_banner_server_error),
                 deleteAccountSuccess = appString(R.string.delete_account_success),
                 deleteAccountError = appString(R.string.delete_account_error)
@@ -233,7 +235,11 @@ private fun HandleAuthNoticeEffect(
     onLogout: () -> Unit,
     onClearAuthNotice: (Long) -> Unit
 ) {
-    LaunchedEffect(authUiState.authNotice?.id, authUiState.pendingDeleteAccountSignOut) {
+    LaunchedEffect(
+        authUiState.authNotice?.id,
+        authUiState.pendingDeleteAccountSignOut,
+        authUiState.pendingAccessDeniedSignOut
+    ) {
         val notice = authUiState.authNotice ?: return@LaunchedEffect
 
         ScreenNotificationManager.showNotification(
@@ -241,7 +247,7 @@ private fun HandleAuthNoticeEffect(
             text = resolveAuthNoticeMessage(notice.message, noticeTexts)
         )
 
-        if (authUiState.pendingDeleteAccountSignOut) {
+        if (authUiState.pendingDeleteAccountSignOut || authUiState.pendingAccessDeniedSignOut) {
             onLogout()
         } else {
             onClearAuthNotice(notice.id)
@@ -313,11 +319,7 @@ private fun SafeStepsBody(
                 currentUser = currentUser,
                 currentLanguage = currentLanguage,
                 onLoginClick = onLoginClick,
-                onProfileClick = {
-                    if (currentUser != null) {
-                        onNavigateToProfile()
-                    }
-                }
+                onProfileClick = {}
             )
         }
     }
@@ -341,6 +343,7 @@ private fun resolveAuthNoticeMessage(
     return when (message) {
         AuthNoticeMessage.LOGIN_SUCCESS -> noticeTexts.loginSuccess
         AuthNoticeMessage.REGISTER_SUCCESS -> noticeTexts.registerSuccess
+        AuthNoticeMessage.ACCESS_DENIED -> noticeTexts.accessDenied
         AuthNoticeMessage.SERVER_ERROR -> noticeTexts.serverError
         AuthNoticeMessage.DELETE_ACCOUNT_SUCCESS -> noticeTexts.deleteAccountSuccess
         AuthNoticeMessage.DELETE_ACCOUNT_ERROR -> noticeTexts.deleteAccountError

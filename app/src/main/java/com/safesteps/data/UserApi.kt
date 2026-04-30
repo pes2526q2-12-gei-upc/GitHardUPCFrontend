@@ -21,13 +21,14 @@ private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40384/"
 private const val USERS_PATH = "api/v1/users"
 
 enum class UserSyncResult {
-    EXISTING_USER_UPDATED,
-    NEW_USER_CREATED
+    EXISTING_USER_LOGGED_IN,
+    NEW_USER_CREATED,
+    ACCESS_DENIED
 }
 
 data class UserSyncOutcome(
     val result: UserSyncResult,
-    val languageTag: String
+    val languageTag: String? = null
 )
 
 data class UserFilters(
@@ -142,53 +143,47 @@ private object UserBackend {
 
 suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncOutcome {
     validarDatosUsuario(user)
+    val resolvedLanguageTag = defaultLanguage()
+    val createRequest = buildUserRequest(
+        user = user,
+        language = resolvedLanguageTag,
+        isAnonymous = false
+    )
 
-    val existingUserResponse = UserBackend.service.getUserByGoogleId(user.googleId)
+    Log.d("USER_API", "Sincronizando inicio de sesion para googleId=${user.googleId}")
 
-    when {
-        existingUserResponse.isSuccessful -> {
-            val existingUser = existingUserResponse.body()
-                ?: throw IOException("La respuesta del backend no contiene el usuario esperado")
-            val resolvedLanguageTag = existingUser.language
-                ?.takeIf { it.isNotBlank() }
-                ?: defaultLanguage()
+    val createResponse = UserBackend.service.createUser(createRequest)
+    Log.d(
+        "USER_API",
+        "Respuesta HTTP al iniciar sesion: code=${createResponse.code()} success=${createResponse.isSuccessful}"
+    )
 
-            Log.d("USER_API", "Usuario existente encontrado, actualizando datos")
-
-            val updateRequest = buildUserRequest(
-                user = user,
-                language = resolvedLanguageTag,
-                isAnonymous = existingUser.isAnonymous ?: false
-            )
-
-            val updateResponse = UserBackend.service.updateUser(user.googleId, updateRequest)
-            ensureSuccess(updateResponse, "actualizando el usuario")
-            return UserSyncOutcome(
-                result = UserSyncResult.EXISTING_USER_UPDATED,
-                languageTag = resolvedLanguageTag
+    return when (createResponse.code()) {
+        200 -> {
+            UserSyncOutcome(
+                result = UserSyncResult.NEW_USER_CREATED,
+                languageTag = createResponse.body()
+                    ?.language
+                    ?.takeIf { it.isNotBlank() }
+                    ?: resolvedLanguageTag
             )
         }
 
-        existingUserResponse.code() == 404 -> {
-            Log.d("USER_API", "Usuario no encontrado, creando registro")
-            val resolvedLanguageTag = defaultLanguage()
-
-            val createRequest = buildUserRequest(
-                user = user,
-                language = resolvedLanguageTag,
-                isAnonymous = false
+        400 -> {
+            UserSyncOutcome(
+                result = UserSyncResult.EXISTING_USER_LOGGED_IN
             )
-            val createResponse = UserBackend.service.createUser(createRequest)
-            ensureSuccess(createResponse, "creando el usuario")
-            return UserSyncOutcome(
-                result = UserSyncResult.NEW_USER_CREATED,
-                languageTag = resolvedLanguageTag
+        }
+
+        403 -> {
+            UserSyncOutcome(
+                result = UserSyncResult.ACCESS_DENIED
             )
         }
 
         else -> {
             throw IOException(
-                "Error consultando el usuario: ${existingUserResponse.code()} ${existingUserResponse.message()}"
+                "Error iniciando sesion: ${createResponse.code()} ${createResponse.message()}"
             )
         }
     }

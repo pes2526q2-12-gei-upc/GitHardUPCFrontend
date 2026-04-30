@@ -100,6 +100,7 @@
     <string name="sign_in_failed">No se ha podido iniciar sesi&#243;n. Int&#233;ntalo de nuevo.</string>
     <string name="auth_banner_login_success">Inicio de sesi&#243;n correcto.</string>
     <string name="auth_banner_register_success">Usuario registrado correctamente.</string>
+    <string name="auth_banner_access_denied">No se puede acceder a esta cuenta porque est&#225; baneada o suspendida.</string>
     <string name="auth_banner_server_error">Error del servidor. No se ha podido iniciar sesi&#243;n.</string>
     <string name="delete_account_success">Cuenta eliminada correctamente.</string>
     <string name="delete_account_error">Error del servidor. No se ha podido eliminar la cuenta.</string>
