@@ -101,7 +101,8 @@
     <string name="sign_in_failed">Sign in failed, please try again.</string>
     <string name="auth_banner_login_success">Sign-in completed successfully.</string>
     <string name="auth_banner_register_success">User registered successfully.</string>
-    <string name="auth_banner_access_denied">This account cannot be accessed because it is banned or suspended.</string>
+    <string name="auth_banner_account_banned">This account cannot be accessed because it is banned.</string>
+    <string name="auth_banner_account_suspended">This account cannot be accessed because it is suspended.</string>
     <string name="auth_banner_server_error">Server error. Sign-in could not be completed.</string>
     <string name="delete_account_success">Account deleted successfully.</string>
     <string name="delete_account_error">Server error. The account could not be deleted.</string>

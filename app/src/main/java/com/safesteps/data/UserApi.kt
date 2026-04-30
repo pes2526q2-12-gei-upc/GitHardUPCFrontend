@@ -23,7 +23,8 @@ private const val USERS_PATH = "api/v1/users"
 enum class UserSyncResult {
     EXISTING_USER_LOGGED_IN,
     NEW_USER_CREATED,
-    ACCESS_DENIED
+    ACCOUNT_SUSPENDED,
+    ACCOUNT_BANNED
 }
 
 data class UserSyncOutcome(
@@ -175,9 +176,15 @@ suspend fun sincronizarUsuarioConBackend(user: UserInfo): UserSyncOutcome {
             )
         }
 
+        402 -> {
+            UserSyncOutcome(
+                result = UserSyncResult.ACCOUNT_SUSPENDED
+            )
+        }
+
         403 -> {
             UserSyncOutcome(
-                result = UserSyncResult.ACCESS_DENIED
+                result = UserSyncResult.ACCOUNT_BANNED
             )
         }
 

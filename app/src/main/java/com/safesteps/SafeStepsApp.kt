@@ -41,7 +41,8 @@ private data class AuthNoticeTexts(
     val title: String,
     val loginSuccess: String,
     val registerSuccess: String,
-    val accessDenied: String,
+    val accountBanned: String,
+    val accountSuspended: String,
     val serverError: String,
     val deleteAccountSuccess: String,
     val deleteAccountError: String
@@ -193,7 +194,8 @@ private fun SafeStepsLocalizedContent(
                 title = appString(R.string.notification_title_auth),
                 loginSuccess = appString(R.string.auth_banner_login_success),
                 registerSuccess = appString(R.string.auth_banner_register_success),
-                accessDenied = appString(R.string.auth_banner_access_denied),
+                accountBanned = appString(R.string.auth_banner_account_banned),
+                accountSuspended = appString(R.string.auth_banner_account_suspended),
                 serverError = appString(R.string.auth_banner_server_error),
                 deleteAccountSuccess = appString(R.string.delete_account_success),
                 deleteAccountError = appString(R.string.delete_account_error)
@@ -343,7 +345,8 @@ private fun resolveAuthNoticeMessage(
     return when (message) {
         AuthNoticeMessage.LOGIN_SUCCESS -> noticeTexts.loginSuccess
         AuthNoticeMessage.REGISTER_SUCCESS -> noticeTexts.registerSuccess
-        AuthNoticeMessage.ACCESS_DENIED -> noticeTexts.accessDenied
+        AuthNoticeMessage.ACCOUNT_BANNED -> noticeTexts.accountBanned
+        AuthNoticeMessage.ACCOUNT_SUSPENDED -> noticeTexts.accountSuspended
         AuthNoticeMessage.SERVER_ERROR -> noticeTexts.serverError
         AuthNoticeMessage.DELETE_ACCOUNT_SUCCESS -> noticeTexts.deleteAccountSuccess
         AuthNoticeMessage.DELETE_ACCOUNT_ERROR -> noticeTexts.deleteAccountError

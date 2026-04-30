@@ -108,7 +108,10 @@ class AuthViewModel(
                 }
             }.onSuccess { result ->
                 syncingGoogleUserId = null
-                if (result.result == UserSyncResult.ACCESS_DENIED) {
+                if (
+                    result.result == UserSyncResult.ACCOUNT_BANNED ||
+                    result.result == UserSyncResult.ACCOUNT_SUSPENDED
+                ) {
                     blockedRestoreGoogleUserId = syncKey
                     _uiState.update {
                         it.copy(
@@ -224,8 +227,12 @@ class AuthViewModel(
                 createNotice(AuthNoticeMessage.REGISTER_SUCCESS)
             }
 
-            UserSyncResult.ACCESS_DENIED -> {
-                createNotice(AuthNoticeMessage.ACCESS_DENIED)
+            UserSyncResult.ACCOUNT_SUSPENDED -> {
+                createNotice(AuthNoticeMessage.ACCOUNT_SUSPENDED)
+            }
+
+            UserSyncResult.ACCOUNT_BANNED -> {
+                createNotice(AuthNoticeMessage.ACCOUNT_BANNED)
             }
         }
     }

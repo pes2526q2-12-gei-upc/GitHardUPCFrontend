@@ -100,7 +100,8 @@
     <string name="sign_in_failed">No s\'ha pogut iniciar la sessi&#243;. Torna-ho a provar.</string>
     <string name="auth_banner_login_success">Inici de sessi&#243; correcte.</string>
     <string name="auth_banner_register_success">Usuari registrat correctament.</string>
-    <string name="auth_banner_access_denied">No es pot accedir a aquest compte perqu&#232; est&#224; banejat o susp&#232;s.</string>
+    <string name="auth_banner_account_banned">No es pot accedir a aquest compte perqu&#232; est&#224; banejat.</string>
+    <string name="auth_banner_account_suspended">No es pot accedir a aquest compte perqu&#232; est&#224; susp&#232;s.</string>
     <string name="auth_banner_server_error">Error del servidor. No s\'ha pogut iniciar la sessi&#243;.</string>
     <string name="delete_account_success">Compte eliminat correctament.</string>
     <string name="delete_account_error">Error del servidor. No s\'ha pogut eliminar el compte.</string>
