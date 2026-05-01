@@ -105,20 +105,11 @@ name: Sanity Test
 
 # 7. VALIDAR PANTALLA DE RUTA ACTIVA
 
-    #- extendedWaitUntil:
-      #visible:
-    #id: "btn_close_route"
-    #timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "btn_close_route"
+    timeout: 30000
 
-    #- assertVisible:
-    #id: "active_route_duration"
-
-    #- assertVisible:
-    #id: "active_route_distance"
-
-    #- assertVisible:
-    #id: "active_route_eta"
-
-    #- tapOn:
-    #id: "btn_close_route"
+- tapOn:
+    id: "btn_close_route"
 

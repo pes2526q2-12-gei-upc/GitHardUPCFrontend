@@ -295,6 +295,7 @@ fun ProfileScreen(
         mutableStateOf(List(profileFilterGroups.size) { false })
     }
     var isFiltersSectionExpanded by rememberSaveable { mutableStateOf(false) }
+    var isIssuesSectionExpanded by rememberSaveable { mutableStateOf(false) }
     var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
 
     val issuesState = rememberProfileIssuesState(userGoogleId = user.googleId)
@@ -325,6 +326,8 @@ fun ProfileScreen(
                 onFilterValueChange = onFilterValueChange,
                 isFiltersSectionExpanded = isFiltersSectionExpanded,
                 onFiltersSectionExpandedChange = { isFiltersSectionExpanded = !isFiltersSectionExpanded },
+                isIssuesSectionExpanded = isIssuesSectionExpanded,
+                onIssuesSectionExpandedChange = { isIssuesSectionExpanded = !isIssuesSectionExpanded },
                 expandedGroups = expandedGroups,
                 onExpandedGroupToggle = { groupIndex ->
                     expandedGroups = expandedGroups.toMutableList().also { groups ->
@@ -418,6 +421,8 @@ private fun ProfileContentCard(
     onFilterValueChange: (Int, Int) -> Unit,
     isFiltersSectionExpanded: Boolean,
     onFiltersSectionExpandedChange: () -> Unit,
+    isIssuesSectionExpanded: Boolean,
+    onIssuesSectionExpandedChange: () -> Unit,
     expandedGroups: List<Boolean>,
     onExpandedGroupToggle: (Int) -> Unit,
     onCustomizeClick: () -> Unit,
@@ -453,14 +458,6 @@ private fun ProfileContentCard(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            ProfileIssuesSection(
-                issues = issues,
-                isLoading = isLoadingIssues,
-                loadFailed = issueLoadFailed,
-                onRetry = onRetryIssues,
-                onEdit = onEditIssue,
-                onDelete = onDeleteIssue
-            )
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -492,6 +489,19 @@ private fun ProfileContentCard(
                 onExpandedChange = onFiltersSectionExpandedChange,
                 onExpandedGroupToggle = onExpandedGroupToggle,
                 onFilterValueChange = onFilterValueChange
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            ProfileIssuesSection(
+                issues = issues,
+                isLoading = isLoadingIssues,
+                loadFailed = issueLoadFailed,
+                expanded = isIssuesSectionExpanded,
+                onExpandedChange = onIssuesSectionExpandedChange,
+                onRetry = onRetryIssues,
+                onEdit = onEditIssue,
+                onDelete = onDeleteIssue
             )
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -668,6 +678,8 @@ private fun ProfileIssuesSection(
     issues: List<IssueResponseDTO>,
     isLoading: Boolean,
     loadFailed: Boolean,
+    expanded: Boolean,
+    onExpandedChange: () -> Unit,
     onRetry: () -> Unit,
     onEdit: (IssueResponseDTO) -> Unit,
     onDelete: (IssueResponseDTO) -> Unit
@@ -675,6 +687,7 @@ private fun ProfileIssuesSection(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .animateContentSize()
             .border(1.dp, Color(0xFFE5ECE7), RoundedCornerShape(22.dp)),
         shape = RoundedCornerShape(22.dp),
         color = Color(0xFFF9FBFA)
@@ -684,87 +697,125 @@ private fun ProfileIssuesSection(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
-            Text(
-                text = appString(R.string.profile_my_issues_title),
-                color = Color(0xFF23333A),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = appString(R.string.profile_my_issues_subtitle),
-                color = Color(0xFF77837D),
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            when {
-                isLoading -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = Color(0xFFC86A37)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = appString(R.string.profile_my_issues_loading),
-                            color = Color(0xFF5C6A64),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-
-                loadFailed -> {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = appString(R.string.profile_my_issues_error),
-                            color = Color(0xFF8F3D1B),
-                            style = MaterialTheme.typography.bodyMedium,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedButton(
-                            onClick = onRetry,
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, Color(0xFFE0B6A3)),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Color(0xFF8F3D1B)
-                            )
-                        ) {
-                            Text(
-                                text = appString(R.string.retry_action),
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
-
-                issues.isEmpty() -> {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onExpandedChange)
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = appString(R.string.profile_my_issues_empty),
+                        text = appString(R.string.profile_my_issues_title),
+                        color = Color(0xFF23333A),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = appString(R.string.profile_my_issues_subtitle),
                         color = Color(0xFF77837D),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
 
-                else -> {
-                    issues.forEachIndexed { index, issue ->
-                        ProfileIssueCard(
-                            issue = issue,
-                            onEdit = { onEdit(issue) },
-                            onDelete = { onDelete(issue) }
-                        )
+                Spacer(modifier = Modifier.width(10.dp))
 
-                        if (index < issues.lastIndex) {
+                if (!isLoading && !loadFailed && issues.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = Color(0xFFC86A37).copy(alpha = 0.14f)
+                    ) {
+                        Text(
+                            text = issues.size.toString(),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            color = Color(0xFFB76435),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = Color(0xFF5C6A64)
+                )
+            }
+
+            if (expanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                when {
+                    isLoading -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = Color(0xFFC86A37)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = appString(R.string.profile_my_issues_loading),
+                                color = Color(0xFF5C6A64),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+
+                    loadFailed -> {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = appString(R.string.profile_my_issues_error),
+                                color = Color(0xFF8F3D1B),
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center
+                            )
                             Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = onRetry,
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, Color(0xFFE0B6A3)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = Color(0xFF8F3D1B)
+                                )
+                            ) {
+                                Text(
+                                    text = appString(R.string.retry_action),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    issues.isEmpty() -> {
+                        Text(
+                            text = appString(R.string.profile_my_issues_empty),
+                            color = Color(0xFF77837D),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    else -> {
+                        issues.forEachIndexed { index, issue ->
+                            ProfileIssueCard(
+                                issue = issue,
+                                onEdit = { onEdit(issue) },
+                                onDelete = { onDelete(issue) }
+                            )
+
+                            if (index < issues.lastIndex) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
                         }
                     }
                 }

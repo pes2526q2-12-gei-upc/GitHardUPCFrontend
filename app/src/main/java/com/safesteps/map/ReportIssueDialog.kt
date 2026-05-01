@@ -49,6 +49,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import com.safesteps.data.Coord
 
+private val DIALOG_ACCENT_ORANGE = Color(0xFFF57C00)
+
 enum class LocationWrapperState {
     MY_LOCATION,
     CUSTOM_ADDRESS,
@@ -61,8 +63,8 @@ private fun LocationSearchField(
     onValueChange: (String) -> Unit,
     onClear: () -> Unit,
 ) {
-    val borderColor = Color(0xFFF57C00)
-    val colorText   = Color(0xFFF57C00)
+    val borderColor = DIALOG_ACCENT_ORANGE
+    val colorText   = DIALOG_ACCENT_ORANGE
     val icona       = Icons.Default.LocationOn
 
     Box(
@@ -100,23 +102,18 @@ private fun LocationSearchField(
                     value = value,
                     onValueChange = onValueChange,
                     singleLine = true,
-                    enabled = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color(0xFF3D4A45)),
-                    cursorBrush = SolidColor(Color(0xFF5AC98B)),
+                    cursorBrush = SolidColor(colorText),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.Black),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            if (value.isNotEmpty()) {
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(
-                    onClick = onClear,
-                    modifier = Modifier.size(32.dp)
-                ) {
+            if (value.isNotBlank()) {
+                IconButton(onClick = onClear, modifier = Modifier.size(20.dp)) {
                     Icon(
-                        Icons.Default.Clear,
-                        contentDescription = "Clear",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(18.dp)
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = appString(R.string.delete_action),
+                        tint = colorText,
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -127,45 +124,46 @@ private fun LocationSearchField(
 @Composable
 private fun LocationSuggestions(
     suggestions: List<Feature>,
-    onSelect: (Feature) -> Unit
+    onSelect: (Feature) -> Unit,
 ) {
     AnimatedVisibility(visible = suggestions.isNotEmpty()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp, bottom = 8.dp)
-                .shadow(4.dp, RoundedCornerShape(16.dp))
-                .background(Color.White, RoundedCornerShape(16.dp))
-                .border(1.dp, Color(0xFFE4ECE8), RoundedCornerShape(16.dp))
+                .padding(top = 8.dp)
+                .shadow(elevation = 4.dp, shape = RoundedCornerShape(20.dp))
+                .background(Color.White, RoundedCornerShape(20.dp))
+                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(20.dp))
+                .padding(vertical = 8.dp)
         ) {
-            suggestions.forEach { feature ->
-                val textAdreca = feature.properties.getAddress()
+            suggestions.forEachIndexed { index, feat ->
                 Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onSelect(feature) }
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .clickable { onSelect(feat) }
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = null,
-                        tint = Color(0xFF9AA7A0),
-                        modifier = Modifier.size(16.dp)
+                        tint = Color(0xFFF57C00),
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = textAdreca,
-                        color = Color(0xFF3D4A45),
-                        style = MaterialTheme.typography.bodyMedium
+                        text = feat.properties.getAddress(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 2
                     )
                 }
-                if (feature != suggestions.last()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(Color(0xFFF4F6F5))
+                if (index != suggestions.lastIndex) {
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = Color(0xFFEEEEEE),
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
                 }
             }
@@ -177,42 +175,48 @@ private fun LocationSuggestions(
 private fun MyLocationRow(
     defaultLocationText: String,
     onSelect: () -> Unit,
-    isEditMode: Boolean = false
+    isEditMode: Boolean
 ) {
-    val colorText = if (isEditMode) Color(0xFFF57C00) else Color(0xFF1A73E8)
-    val icona = if (isEditMode) Icons.Default.LocationOn else Icons.Default.MyLocation
-
-    Column(
+    if (isEditMode) return
+    Surface(
+        color = Color(0xFFE8F0FE),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, Color(0xFFB9D4FB)),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp, bottom = 8.dp)
-            .shadow(4.dp, RoundedCornerShape(16.dp))
-            .background(Color.White, RoundedCornerShape(16.dp))
-            .border(1.dp, Color(0xFFE4ECE8), RoundedCornerShape(16.dp))
+            .padding(top = 8.dp)
+            .clickable { onSelect() }
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onSelect)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
         ) {
             Icon(
-                imageVector = icona,
+                Icons.Default.MyLocation,
                 contentDescription = null,
-                tint = colorText,
-                modifier = Modifier.size(16.dp)
+                tint = Color(0xFF1A73E8)
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = defaultLocationText,
-                color = colorText,
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = appString(R.string.my_location),
+                    color = Color(0xFF1A73E8),
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = defaultLocationText,
+                    color = Color(0xFF1A73E8),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
+
 
 @Composable
 fun ReportIssueDialog(
@@ -233,65 +237,6 @@ fun ReportIssueDialog(
 ) {
     if (!visible) return
 
-    val temaTaronja = Color(0xFFF57C00)
-    var currentCoord by remember { mutableStateOf(initialCoord) }
-
-    var tipusSeleccionat by remember(initialType) { mutableStateOf(initialType) }
-    var descripcioText by remember(initialDescription) { mutableStateOf(initialDescription) }
-
-    var errorMsgRes by remember { mutableStateOf<Int?>(null) }
-
-    var ubicacioText by remember { mutableStateOf(defaultLocationText) }
-
-    var wrapperState by remember {
-        mutableStateOf(
-            if (isEditMode) LocationWrapperState.CUSTOM_ADDRESS
-            else LocationWrapperState.MY_LOCATION
-        )
-    }
-
-    var userHasModifiedLocation by remember { mutableStateOf(false) }
-
-    LaunchedEffect(defaultLocationText) {
-        if (!userHasModifiedLocation) {
-            ubicacioText = defaultLocationText
-        }
-    }
-
-    val effectiveMyLocationText = myLocationText ?: defaultLocationText
-    val effectiveMyLocationCoord = myLocationCoord ?: initialCoord
-
-    var localSuggestions by remember { mutableStateOf<List<Feature>>(emptyList()) }
-    val scope = rememberCoroutineScope()
-    var searchJob by remember { mutableStateOf<Job?>(null) }
-
-    fun searchPhoton(query: String) {
-        searchJob?.cancel()
-        if (query.length < 3) {
-            localSuggestions = emptyList()
-            return
-        }
-        searchJob = scope.launch {
-            delay(300)
-            try {
-                val queryFormatada = query.replace(Regex("(?<=[a-zA-Z])\\s+(?=\\d+)"), ", ")
-                val resposta = PhotonApi.service.findAddress(query = queryFormatada)
-                localSuggestions = resposta.features
-                    .filter { !it.properties.street.isNullOrBlank() || !it.properties.name.isNullOrBlank() }
-                    .distinctBy { it.properties.getAddress().lowercase() }
-                    .take(5)
-            } catch (_: Exception) {
-                localSuggestions = emptyList()
-            }
-        }
-    }
-
-    fun clearSearch() {
-        searchJob?.cancel()
-        ubicacioText = ""
-        localSuggestions = emptyList()
-    }
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = properties
@@ -309,265 +254,492 @@ fun ReportIssueDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 if (!isLoggedIn) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Warning, contentDescription = null, tint = temaTaronja)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = appString(R.string.report_issue_failed_label),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = temaTaronja
-                        )
-                    }
-                    Text(
-                        text = appString(R.string.report_issue_failed_text),
-                        color = Color.DarkGray,
-                        style = MaterialTheme.typography.bodyLarge
+                    NotLoggedInDialogContent(
+                        onDismiss = onDismiss,
+                        onNavigateToLogin = onNavigateToLogin
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        TextButton(onClick = onDismiss) {
-                            Text(appString(R.string.cancel_action), color = Color.Gray)
-                        }
-                        Button(
-                            onClick = { onDismiss(); onNavigateToLogin() },
-                            colors = ButtonDefaults.buttonColors(containerColor = temaTaronja)
-                        ) {
-                            Text(appString(R.string.log_in), color = Color.White)
-                        }
-                    }
                 } else {
-                    Text(
-                        text = appString(R.string.report_issue_title),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                    LoggedInReportDialogContent(
+                        defaultLocationText = defaultLocationText,
+                        onDismiss = onDismiss,
+                        onConfirm = onConfirm,
+                        initialType = initialType,
+                        initialDescription = initialDescription,
+                        isEditMode = isEditMode,
+                        initialCoord = initialCoord,
+                        myLocationText = myLocationText,
+                        myLocationCoord = myLocationCoord
                     )
-
-                    Text(
-                        appString(R.string.report_type_label),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Black
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        IssueType.entries.forEach { type ->
-                            FilterChip(
-                                selected = tipusSeleccionat == type,
-                                onClick = { tipusSeleccionat = type },
-                                label = { Text(appString(type.labelRes)) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    labelColor = Color.DarkGray,
-                                    selectedLabelColor = Color.White,
-                                    selectedContainerColor = temaTaronja
-                                )
-                            )
-                        }
-                    }
-
-                    Text(
-                        appString(R.string.report_location_label),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Black
-                    )
-                    if (isEditMode) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = Color(0xFFFFF3E0),
-                            border = BorderStroke(1.dp, Color(0xFFFFCC80)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.Default.LocationOn,
-                                        contentDescription = null,
-                                        tint = temaTaronja
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = ubicacioText,
-                                        color = temaTaronja,
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Icon(
-                                        Icons.Default.Lock,
-                                        contentDescription = null,
-                                        tint = Color(0xFF8B6E4F),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = appString(R.string.issue_location_locked_message),
-                                    color = Color(0xFF8B6E4F),
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                    } else {
-                        when (wrapperState) {
-                            LocationWrapperState.MY_LOCATION,
-                            LocationWrapperState.CUSTOM_ADDRESS -> {
-                            val isMyLocation = wrapperState == LocationWrapperState.MY_LOCATION
-                            val bgColor      = if (isMyLocation) Color(0xFFE8F0FE) else Color(0xFFFFF3E0)
-                            val borderColor  = if (isMyLocation) Color(0xFFB9D4FB) else Color(0xFFFFCC80)
-                            val contentColor = if (isMyLocation) Color(0xFF1A73E8) else temaTaronja
-                            val iconVec      = if (isMyLocation) Icons.Default.MyLocation else Icons.Default.LocationOn
-
-                            Surface(
-                                color = bgColor,
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, borderColor),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        userHasModifiedLocation = true
-                                        wrapperState = LocationWrapperState.TYPING
-                                        clearSearch()
-                                    }
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
-                                ) {
-                                    Icon(iconVec, contentDescription = null, tint = contentColor)
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = ubicacioText,
-                                        color = contentColor,
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    IconButton(
-                                        onClick = {
-                                            userHasModifiedLocation = true
-                                            wrapperState = LocationWrapperState.TYPING
-                                            clearSearch()
-                                        },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(Icons.Default.Clear, contentDescription = appString(R.string.delete_action), tint = contentColor)
-                                    }
-                                }
-                            }
-                        }
-
-                            LocationWrapperState.TYPING -> {
-                            Column {
-                                LocationSearchField(
-                                    value = ubicacioText,
-                                    onValueChange = { nouText ->
-                                        userHasModifiedLocation = true
-                                        ubicacioText = nouText
-                                        errorMsgRes = null
-                                        searchPhoton(nouText)
-                                    },
-                                    onClear = { clearSearch() },
-                                )
-
-                                MyLocationRow(
-                                    defaultLocationText = effectiveMyLocationText,
-                                    onSelect = {
-                                        userHasModifiedLocation = true
-                                        ubicacioText = effectiveMyLocationText
-                                        currentCoord = effectiveMyLocationCoord
-                                        wrapperState = LocationWrapperState.MY_LOCATION
-                                        searchJob?.cancel()
-                                        localSuggestions = emptyList()
-                                    },
-                                    isEditMode = false
-                                )
-                                LocationSuggestions(
-                                    suggestions = localSuggestions,
-                                    onSelect = { feature ->
-                                        userHasModifiedLocation = true
-                                        ubicacioText = feature.properties.getAddress()
-                                        currentCoord = Coord(feature.geometry.latitud, feature.geometry.longitud)
-                                        wrapperState = LocationWrapperState.CUSTOM_ADDRESS
-                                        searchJob?.cancel()
-                                        localSuggestions = emptyList()
-                                    }
-                                )
-                            }
-                        }
-                        }
-                    }
-
-                    Text(
-                        appString(R.string.report_description_label),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Black
-                    )
-                    OutlinedTextField(
-                        value = descripcioText,
-                        onValueChange = { descripcioText = it; errorMsgRes = null },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp),
-                        placeholder = {
-                            Text(
-                                appString(R.string.report_description_placeholder),
-                                color = Color.Gray
-                            )
-                        },
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.Black),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = temaTaronja,
-                            unfocusedBorderColor = Color.Gray,
-                            cursorColor = Color.Black
-                        )
-                    )
-
-                    if (errorMsgRes != null) {
-                        Text(
-                            text = appString(errorMsgRes!!),
-                            color = temaTaronja,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        TextButton(onClick = onDismiss) {
-                            Text(text = appString(R.string.cancel_action), color = Color.DarkGray)
-                        }
-                        Button(
-                            onClick = {
-                                if (wrapperState == LocationWrapperState.TYPING || ubicacioText.isBlank() || descripcioText.isBlank()) {
-                                    errorMsgRes = R.string.report_error_msg_text
-                                } else {
-                                    onConfirm(tipusSeleccionat, ubicacioText, descripcioText, currentCoord)
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = temaTaronja)
-                        ) {
-                            Text(text = appString(R.string.confirm_action), color = Color.White)
-                        }
-                    }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun NotLoggedInDialogContent(
+    onDismiss: () -> Unit,
+    onNavigateToLogin: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Warning, contentDescription = null, tint = DIALOG_ACCENT_ORANGE)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = appString(R.string.report_issue_failed_label),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = DIALOG_ACCENT_ORANGE
+        )
+    }
+    Text(
+        text = appString(R.string.report_issue_failed_text),
+        color = Color.DarkGray,
+        style = MaterialTheme.typography.bodyLarge
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        TextButton(onClick = onDismiss) {
+            Text(appString(R.string.cancel_action), color = Color.Gray)
+        }
+        Button(
+            onClick = { onDismiss(); onNavigateToLogin() },
+            colors = ButtonDefaults.buttonColors(containerColor = DIALOG_ACCENT_ORANGE)
+        ) {
+            Text(appString(R.string.log_in), color = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun LoggedInReportDialogContent(
+    defaultLocationText: String,
+    onDismiss: () -> Unit,
+    onConfirm: (IssueType, String, String, Coord) -> Unit,
+    initialType: IssueType,
+    initialDescription: String,
+    isEditMode: Boolean,
+    initialCoord: Coord,
+    myLocationText: String?,
+    myLocationCoord: Coord?
+) {
+    var currentCoord by remember { mutableStateOf(initialCoord) }
+    var tipusSeleccionat by remember(initialType) { mutableStateOf(initialType) }
+    var descripcioText by remember(initialDescription) { mutableStateOf(initialDescription) }
+    var errorMsgRes by remember { mutableStateOf<Int?>(null) }
+    var ubicacioText by remember { mutableStateOf(defaultLocationText) }
+    var wrapperState by remember {
+        mutableStateOf(initialWrapperState(isEditMode))
+    }
+    var userHasModifiedLocation by remember { mutableStateOf(false) }
+
+    LaunchedEffect(defaultLocationText) {
+        if (!userHasModifiedLocation) {
+            ubicacioText = defaultLocationText
+        }
+    }
+
+    val effectiveMyLocationText = myLocationText ?: defaultLocationText
+    val effectiveMyLocationCoord = myLocationCoord ?: initialCoord
+
+    Text(
+        text = appString(R.string.report_issue_title),
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.Bold,
+        color = Color.Black
+    )
+    Text(
+        appString(R.string.report_type_label),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = Color.Black
+    )
+    IssueTypeSelector(
+        selectedType = tipusSeleccionat,
+        onSelect = { tipusSeleccionat = it }
+    )
+
+    Text(
+        appString(R.string.report_location_label),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = Color.Black
+    )
+    if (isEditMode) {
+        LockedLocationCard(text = ubicacioText)
+    } else {
+        EditableLocationSection(
+            wrapperState = wrapperState,
+            ubicacioText = ubicacioText,
+            effectiveMyLocationText = effectiveMyLocationText,
+            effectiveMyLocationCoord = effectiveMyLocationCoord,
+            onWrapperStateChange = { wrapperState = it },
+            onUbicacioTextChange = { ubicacioText = it },
+            onUserModified = { userHasModifiedLocation = true },
+            onCoordChange = { currentCoord = it },
+            onErrorReset = { errorMsgRes = null }
+        )
+    }
+
+    Text(
+        appString(R.string.report_description_label),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = Color.Black
+    )
+    OutlinedTextField(
+        value = descripcioText,
+        onValueChange = { descripcioText = it; errorMsgRes = null },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp),
+        placeholder = {
+            Text(
+                appString(R.string.report_description_placeholder),
+                color = Color.Gray
+            )
+        },
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.Black),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = DIALOG_ACCENT_ORANGE,
+            unfocusedBorderColor = Color.Gray,
+            cursorColor = Color.Black
+        )
+    )
+
+    errorMsgRes?.let { resId ->
+        Text(
+            text = appString(resId),
+            color = DIALOG_ACCENT_ORANGE,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold
+        )
+    }
+
+    DialogActionRow(
+        onCancel = onDismiss,
+        onConfirm = {
+            errorMsgRes = validateAndSubmit(
+                wrapperState = wrapperState,
+                ubicacioText = ubicacioText,
+                descripcioText = descripcioText,
+                tipusSeleccionat = tipusSeleccionat,
+                currentCoord = currentCoord,
+                onConfirm = onConfirm
+            )
+        }
+    )
+}
+
+private fun initialWrapperState(isEditMode: Boolean): LocationWrapperState =
+    if (isEditMode) LocationWrapperState.CUSTOM_ADDRESS else LocationWrapperState.MY_LOCATION
+
+private fun validateAndSubmit(
+    wrapperState: LocationWrapperState,
+    ubicacioText: String,
+    descripcioText: String,
+    tipusSeleccionat: IssueType,
+    currentCoord: Coord,
+    onConfirm: (IssueType, String, String, Coord) -> Unit
+): Int? {
+    val invalid = wrapperState == LocationWrapperState.TYPING ||
+            ubicacioText.isBlank() ||
+            descripcioText.isBlank()
+    if (invalid) {
+        return R.string.report_error_msg_text
+    }
+    onConfirm(tipusSeleccionat, ubicacioText, descripcioText, currentCoord)
+    return null
+}
+
+@Composable
+private fun IssueTypeSelector(
+    selectedType: IssueType,
+    onSelect: (IssueType) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        IssueType.entries.forEach { type ->
+            FilterChip(
+                selected = selectedType == type,
+                onClick = { onSelect(type) },
+                label = { Text(appString(type.labelRes)) },
+                colors = FilterChipDefaults.filterChipColors(
+                    labelColor = Color.DarkGray,
+                    selectedLabelColor = Color.White,
+                    selectedContainerColor = DIALOG_ACCENT_ORANGE
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun LockedLocationCard(text: String) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFFFF3E0),
+        border = BorderStroke(1.dp, Color(0xFFFFCC80)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = DIALOG_ACCENT_ORANGE
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = text,
+                    color = DIALOG_ACCENT_ORANGE,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                Icon(
+                    Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = Color(0xFF8B6E4F),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = appString(R.string.issue_location_locked_message),
+                color = Color(0xFF8B6E4F),
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditableLocationSection(
+    wrapperState: LocationWrapperState,
+    ubicacioText: String,
+    effectiveMyLocationText: String,
+    effectiveMyLocationCoord: Coord,
+    onWrapperStateChange: (LocationWrapperState) -> Unit,
+    onUbicacioTextChange: (String) -> Unit,
+    onUserModified: () -> Unit,
+    onCoordChange: (Coord) -> Unit,
+    onErrorReset: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    var localSuggestions by remember { mutableStateOf<List<Feature>>(emptyList()) }
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+
+    val performSearch: (String) -> Unit = { query ->
+        searchJob?.cancel()
+        if (query.length < 3) {
+            localSuggestions = emptyList()
+        } else {
+            searchJob = scope.launch {
+                localSuggestions = fetchLocationSuggestions(query)
+            }
+        }
+    }
+    val resetSearch: () -> Unit = {
+        searchJob?.cancel()
+        onUbicacioTextChange("")
+        localSuggestions = emptyList()
+    }
+
+    when (wrapperState) {
+        LocationWrapperState.MY_LOCATION,
+        LocationWrapperState.CUSTOM_ADDRESS -> {
+            SelectedLocationCard(
+                wrapperState = wrapperState,
+                ubicacioText = ubicacioText,
+                onClick = {
+                    onUserModified()
+                    onWrapperStateChange(LocationWrapperState.TYPING)
+                    resetSearch()
+                }
+            )
+        }
+        LocationWrapperState.TYPING -> {
+            LocationTypingSection(
+                ubicacioText = ubicacioText,
+                effectiveMyLocationText = effectiveMyLocationText,
+                suggestions = localSuggestions,
+                onUbicacioTextChange = { nouText ->
+                    onUserModified()
+                    onUbicacioTextChange(nouText)
+                    onErrorReset()
+                    performSearch(nouText)
+                },
+                onClear = resetSearch,
+                onMyLocationSelected = {
+                    onUserModified()
+                    onUbicacioTextChange(effectiveMyLocationText)
+                    onCoordChange(effectiveMyLocationCoord)
+                    onWrapperStateChange(LocationWrapperState.MY_LOCATION)
+                    searchJob?.cancel()
+                    localSuggestions = emptyList()
+                },
+                onSuggestionSelected = { feature ->
+                    onUserModified()
+                    onUbicacioTextChange(feature.properties.getAddress())
+                    onCoordChange(Coord(feature.geometry.latitud, feature.geometry.longitud))
+                    onWrapperStateChange(LocationWrapperState.CUSTOM_ADDRESS)
+                    searchJob?.cancel()
+                    localSuggestions = emptyList()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocationTypingSection(
+    ubicacioText: String,
+    effectiveMyLocationText: String,
+    suggestions: List<Feature>,
+    onUbicacioTextChange: (String) -> Unit,
+    onClear: () -> Unit,
+    onMyLocationSelected: () -> Unit,
+    onSuggestionSelected: (Feature) -> Unit
+) {
+    Column {
+        LocationSearchField(
+            value = ubicacioText,
+            onValueChange = onUbicacioTextChange,
+            onClear = onClear
+        )
+        MyLocationRow(
+            defaultLocationText = effectiveMyLocationText,
+            onSelect = onMyLocationSelected,
+            isEditMode = false
+        )
+        LocationSuggestions(
+            suggestions = suggestions,
+            onSelect = onSuggestionSelected
+        )
+    }
+}
+
+private suspend fun fetchLocationSuggestions(query: String): List<Feature> {
+    return try {
+        delay(300)
+        val queryFormatada = query.replace(Regex("(?<=[a-zA-Z])\\s+(?=\\d+)"), ", ")
+        val resposta = PhotonApi.service.findAddress(query = queryFormatada)
+        resposta.features
+            .filter { hasUsefulProperty(it) }
+            .distinctBy { it.properties.getAddress().lowercase() }
+            .take(5)
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun hasUsefulProperty(feature: Feature): Boolean {
+    val hasStreet = !feature.properties.street.isNullOrBlank()
+    val hasName = !feature.properties.name.isNullOrBlank()
+    return hasStreet || hasName
+}
+
+@Composable
+private fun SelectedLocationCard(
+    wrapperState: LocationWrapperState,
+    ubicacioText: String,
+    onClick: () -> Unit
+) {
+    val isMyLocation = wrapperState == LocationWrapperState.MY_LOCATION
+    val style = locationCardStyle(isMyLocation)
+
+    Surface(
+        color = style.bgColor,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, style.borderColor),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            Icon(style.iconVec, contentDescription = null, tint = style.contentColor)
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = ubicacioText,
+                color = style.contentColor,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(
+                onClick = onClick,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    Icons.Default.Clear,
+                    contentDescription = appString(R.string.delete_action),
+                    tint = style.contentColor
+                )
+            }
+        }
+    }
+}
+
+private data class LocationCardStyle(
+    val bgColor: Color,
+    val borderColor: Color,
+    val contentColor: Color,
+    val iconVec: ImageVector
+)
+
+private fun locationCardStyle(isMyLocation: Boolean): LocationCardStyle {
+    return if (isMyLocation) {
+        LocationCardStyle(
+            bgColor = Color(0xFFE8F0FE),
+            borderColor = Color(0xFFB9D4FB),
+            contentColor = Color(0xFF1A73E8),
+            iconVec = Icons.Default.MyLocation
+        )
+    } else {
+        LocationCardStyle(
+            bgColor = Color(0xFFFFF3E0),
+            borderColor = Color(0xFFFFCC80),
+            contentColor = DIALOG_ACCENT_ORANGE,
+            iconVec = Icons.Default.LocationOn
+        )
+    }
+}
+
+@Composable
+private fun DialogActionRow(
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        TextButton(onClick = onCancel) {
+            Text(text = appString(R.string.cancel_action), color = Color.DarkGray)
+        }
+        Button(
+            onClick = onConfirm,
+            colors = ButtonDefaults.buttonColors(containerColor = DIALOG_ACCENT_ORANGE)
+        ) {
+            Text(text = appString(R.string.confirm_action), color = Color.White)
+        }
+    }
+}
+
+// ============================================================================
+// showIssueDialog (entry point)
+// ============================================================================
 
 @Composable
 fun showIssueDialog(
@@ -581,57 +753,15 @@ fun showIssueDialog(
     onEsborrar: () -> Unit,
     onDesferVot: () -> Unit = {}
 ) {
-    val loadingAddressLabel = appString(R.string.issue_loading_address)
-    val coordinatesFallbackLabel = appString(
-        R.string.issue_coordinates_fallback,
-        incidencia.coordinates.lat,
-        incidencia.coordinates.lon
-    )
-    var adrecaText by remember { mutableStateOf(loadingAddressLabel) }
-    val issueTypeLabel = appString(R.string.issue_type_card_label)
-    val issueTypeValue = when (incidencia.type) {
-        com.safesteps.data.IssueApiType.OBRES -> appString(R.string.issue_type_worksite)
-        com.safesteps.data.IssueApiType.ACCESSIBILITAT -> appString(R.string.issue_type_accessibility)
-        com.safesteps.data.IssueApiType.SEGURETAT -> appString(R.string.issue_type_security)
-        com.safesteps.data.IssueApiType.ALTRES -> appString(R.string.issue_type_others)
-    }
-    val issueStatusLabel = appString(R.string.issue_status_card_label)
-    val issueStatusAccepted = appString(R.string.issue_status_accepted)
-    val issueStatusPending = appString(R.string.issue_status_pending)
-    val issueLocationLabel = appString(R.string.issue_location_card_label)
-    val positiveVotesLabel = appString(R.string.issue_positive_votes_label)
-    val negativeVotesLabel = appString(R.string.issue_negative_votes_label)
-    val descriptionLabel = appString(R.string.issue_description_title)
-    val emptyDescriptionLabel = appString(R.string.issue_description_empty)
-    val anonymousUserLabel = appString(R.string.issue_anonymous_user)
-    val undoLabel = appString(R.string.issue_undo_action)
-    val confirmedVoteLabel = appString(R.string.issue_vote_confirmed)
-    val falseReportVoteLabel = appString(R.string.issue_vote_reported_false)
-    val issueDetailsLabel = appString(R.string.issue_details_title)
-    val unknownAddressLabel = appString(R.string.issue_unknown_address)
-    val editLabel = appString(R.string.edit_action)
-    val deleteLabel = appString(R.string.delete_action)
-    val reportFalseLabel = appString(R.string.issue_report_false_action)
-    val closeLabel = appString(R.string.close)
+    val labels = rememberShowIssueDialogLabels(incidencia)
+    var adrecaText by remember { mutableStateOf(labels.loadingAddressLabel) }
 
     LaunchedEffect(incidencia.coordinates) {
-        try {
-            val response = withContext(Dispatchers.IO) {
-                PhotonApi.service.reverseGeocode(
-                    lat = incidencia.coordinates.lat,
-                    lon = incidencia.coordinates.lon
-                )
-            }
-            adrecaText = response.features.firstOrNull()?.properties?.getAddress() ?: unknownAddressLabel
-        } catch (_: Exception) {
-            adrecaText = coordinatesFallbackLabel
-        }
-    }
-
-    val dataAMostrar = if (!incidencia.updatedAt.isNullOrBlank()) {
-        incidencia.updatedAt.substringBefore("T")
-    } else {
-        incidencia.createdAt.substringBefore("T")
+        adrecaText = resolveIssueDisplayAddress(
+            incidencia = incidencia,
+            unknownAddressLabel = labels.unknownAddressLabel,
+            coordinatesFallbackLabel = labels.coordinatesFallbackLabel
+        )
     }
 
     AlertDialog(
@@ -642,212 +772,483 @@ fun showIssueDialog(
         modifier = Modifier.fillMaxWidth(0.92f).padding(16.dp),
         title = {
             Text(
-                text = issueDetailsLabel,
+                text = labels.issueDetailsLabel,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color(0xFF1A1C1E)
             )
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    InfoCard(
-                        modifier = Modifier.weight(1f),
-                        label = issueTypeLabel,
-                        value = issueTypeValue,
-                        icon = Icons.Filled.Label,
-                        contentColor = Color(0xFF1976D2),
-                        backgroundColor = Color(0xFFE3F2FD)
-                    )
-                    val isAccepted = incidencia.status.lowercase() == "accepted"
-                    InfoCard(
-                        modifier = Modifier.weight(1f),
-                        label = issueStatusLabel,
-                        value = if (isAccepted) issueStatusAccepted else issueStatusPending,
-                        icon = if (isAccepted) Icons.Filled.CheckCircle else Icons.Filled.HelpOutline,
-                        contentColor = if (isAccepted) Color(0xFF2E7D32) else Color(0xFFEF6C00),
-                        backgroundColor = if (isAccepted) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = Color(0xFFF5F6F7),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(40.dp),
-                            shape = CircleShape,
-                            color = Color(0xFFE3E5E8)
-                        ) {
-                            Icon(
-                                Icons.Filled.Place,
-                                contentDescription = null,
-                                tint = Color(0xFF444746),
-                                modifier = Modifier.padding(9.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = issueLocationLabel,
-                                fontSize = 11.sp,
-                                color = Color(0xFF6B7280),
-                                fontWeight = FontWeight.Medium,
-                                letterSpacing = 0.4.sp
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = adrecaText,
-                                color = Color(0xFF1A1C1E),
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                lineHeight = 19.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-                HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray)
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    VoteIndicator(count = incidencia.positiveVotes, icon = Icons.Filled.ThumbUp, color = Color(0xFF4CAF50), label = positiveVotesLabel)
-                    VoteIndicator(count = incidencia.negativeVotes, icon = Icons.Filled.ThumbDown, color = Color(0xFFF44336), label = negativeVotesLabel)
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(text = descriptionLabel, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.Black)
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = incidencia.description ?: emptyDescriptionLabel,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF444746),
-                    lineHeight = 20.sp
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(color = Color(0xFFF8F9FA), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Color(0xFFE9ECEF))) {
-                            Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Surface(modifier = Modifier.size(36.dp), shape = RoundedCornerShape(8.dp), color = Color(0xFFCED4DA)) {
-                                    Icon(Icons.Default.Person, contentDescription = null, tint = Color.White, modifier = Modifier.padding(6.dp))
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    val nomUsuari = incidencia.authorName ?: anonymousUserLabel
-                                    Text(text = nomUsuari, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-
-                                    if (incidencia.authorName != null) {
-                                        Text(text = appString(R.string.issue_user_level, incidencia.authorLevel), fontSize = 12.sp, color = Color.Gray)
-                                    }
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(text = appString(R.string.issue_last_update, dataAMostrar), style = MaterialTheme.typography.labelSmall, color = Color.LightGray)
-                    }
-                }
-
-                if (!isOwner && miVot != null) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Surface(
-                        color = if (miVot == 1) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = if (miVot == 1) confirmedVoteLabel else falseReportVoteLabel,
-                                color = if (miVot == 1) Color(0xFF2E7D32) else Color(0xFFD32F2F),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = undoLabel,
-                                modifier = Modifier.clickable { onDesferVot() },
-                                color = Color.Gray,
-                                textDecoration = TextDecoration.Underline,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
+            IssueDialogBody(
+                incidencia = incidencia,
+                isOwner = isOwner,
+                miVot = miVot,
+                adrecaText = adrecaText,
+                labels = labels,
+                onDesferVot = onDesferVot
+            )
         },
         confirmButton = {
-            if (isOwner) {
-                Button(
-                    onClick = onEditar,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
-                    shape = RoundedCornerShape(12.dp)
-                ) { Text("Editar", fontWeight = FontWeight.Bold, color = Color.White) }
-            } else {
-                val jaConfirmat = miVot == 1
-                Button(
-                    onClick = onConfirmar,
-                    enabled = miVot == null,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF2E7D32),
-                        disabledContainerColor = if (jaConfirmat) Color(0xFF2E7D32) else Color(0xFFBDBDBD)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        if (jaConfirmat) "Confirmada ✓" else "Confirmar",
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            }
+            ConfirmActionButton(
+                isOwner = isOwner,
+                miVot = miVot,
+                onEditar = onEditar,
+                onConfirmar = onConfirmar
+            )
         },
         dismissButton = {
-            if (isOwner) {
-                Button(
-                    onClick = onEsborrar,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
-                    shape = RoundedCornerShape(12.dp)
-                ) { Text(deleteLabel, fontWeight = FontWeight.Bold, color = Color.White) }
-            } else {
-                val jaRebutjat = miVot == -1
-                Button(
-                    onClick = onRebutjar,
-                    enabled = miVot == null,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).height(48.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFD32F2F),
-                        disabledContainerColor = if (jaRebutjat) Color(0xFFD32F2F) else Color(0xFFBDBDBD)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        if (jaRebutjat) "Reportada ✓" else "Reportar com a fals",
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            }
+            DismissActionButton(
+                isOwner = isOwner,
+                miVot = miVot,
+                deleteLabel = labels.deleteLabel,
+                onEsborrar = onEsborrar,
+                onRebutjar = onRebutjar
+            )
         }
     )
+}
+
+private data class ShowIssueDialogLabels(
+    val loadingAddressLabel: String,
+    val coordinatesFallbackLabel: String,
+    val issueTypeLabel: String,
+    val issueTypeValue: String,
+    val issueStatusLabel: String,
+    val issueStatusAccepted: String,
+    val issueStatusPending: String,
+    val issueLocationLabel: String,
+    val positiveVotesLabel: String,
+    val negativeVotesLabel: String,
+    val descriptionLabel: String,
+    val emptyDescriptionLabel: String,
+    val anonymousUserLabel: String,
+    val undoLabel: String,
+    val confirmedVoteLabel: String,
+    val falseReportVoteLabel: String,
+    val issueDetailsLabel: String,
+    val unknownAddressLabel: String,
+    val deleteLabel: String
+)
+
+@Composable
+private fun rememberShowIssueDialogLabels(
+    incidencia: IssueResponseDTO
+): ShowIssueDialogLabels {
+    return ShowIssueDialogLabels(
+        loadingAddressLabel = appString(R.string.issue_loading_address),
+        coordinatesFallbackLabel = appString(
+            R.string.issue_coordinates_fallback,
+            incidencia.coordinates.lat,
+            incidencia.coordinates.lon
+        ),
+        issueTypeLabel = appString(R.string.issue_type_card_label),
+        issueTypeValue = issueTypeValueLabel(incidencia.type),
+        issueStatusLabel = appString(R.string.issue_status_card_label),
+        issueStatusAccepted = appString(R.string.issue_status_accepted),
+        issueStatusPending = appString(R.string.issue_status_pending),
+        issueLocationLabel = appString(R.string.issue_location_card_label),
+        positiveVotesLabel = appString(R.string.issue_positive_votes_label),
+        negativeVotesLabel = appString(R.string.issue_negative_votes_label),
+        descriptionLabel = appString(R.string.issue_description_title),
+        emptyDescriptionLabel = appString(R.string.issue_description_empty),
+        anonymousUserLabel = appString(R.string.issue_anonymous_user),
+        undoLabel = appString(R.string.issue_undo_action),
+        confirmedVoteLabel = appString(R.string.issue_vote_confirmed),
+        falseReportVoteLabel = appString(R.string.issue_vote_reported_false),
+        issueDetailsLabel = appString(R.string.issue_details_title),
+        unknownAddressLabel = appString(R.string.issue_unknown_address),
+        deleteLabel = appString(R.string.delete_action)
+    )
+}
+
+@Composable
+private fun issueTypeValueLabel(type: com.safesteps.data.IssueApiType): String {
+    return when (type) {
+        com.safesteps.data.IssueApiType.OBRES -> appString(R.string.issue_type_worksite)
+        com.safesteps.data.IssueApiType.ACCESSIBILITAT -> appString(R.string.issue_type_accessibility)
+        com.safesteps.data.IssueApiType.SEGURETAT -> appString(R.string.issue_type_security)
+        com.safesteps.data.IssueApiType.ALTRES -> appString(R.string.issue_type_others)
+    }
+}
+
+private suspend fun resolveIssueDisplayAddress(
+    incidencia: IssueResponseDTO,
+    unknownAddressLabel: String,
+    coordinatesFallbackLabel: String
+): String {
+    return try {
+        val response = withContext(Dispatchers.IO) {
+            PhotonApi.service.reverseGeocode(
+                lat = incidencia.coordinates.lat,
+                lon = incidencia.coordinates.lon
+            )
+        }
+        response.features.firstOrNull()?.properties?.getAddress() ?: unknownAddressLabel
+    } catch (_: Exception) {
+        coordinatesFallbackLabel
+    }
+}
+
+private fun extractIssueDate(incidencia: IssueResponseDTO): String {
+    val source = incidencia.updatedAt.takeIf { !it.isNullOrBlank() } ?: incidencia.createdAt
+    return source.substringBefore("T")
+}
+
+@Composable
+private fun IssueDialogBody(
+    incidencia: IssueResponseDTO,
+    isOwner: Boolean,
+    miVot: Int?,
+    adrecaText: String,
+    labels: ShowIssueDialogLabels,
+    onDesferVot: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+        IssueOverviewCards(incidencia = incidencia, labels = labels)
+        Spacer(modifier = Modifier.height(14.dp))
+        IssueLocationCard(adreca = adrecaText, locationLabel = labels.issueLocationLabel)
+        Spacer(modifier = Modifier.height(20.dp))
+        HorizontalDivider(thickness = 0.5.dp, color = Color.LightGray)
+        Spacer(modifier = Modifier.height(20.dp))
+        IssueVoteIndicators(
+            positiveVotes = incidencia.positiveVotes,
+            negativeVotes = incidencia.negativeVotes,
+            positiveLabel = labels.positiveVotesLabel,
+            negativeLabel = labels.negativeVotesLabel
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        IssueDescriptionSection(
+            description = incidencia.description,
+            descriptionLabel = labels.descriptionLabel,
+            emptyDescriptionLabel = labels.emptyDescriptionLabel
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        IssueAuthorCard(
+            authorName = incidencia.authorName,
+            authorLevel = incidencia.authorLevel,
+            anonymousLabel = labels.anonymousUserLabel,
+            lastUpdateText = appString(R.string.issue_last_update, extractIssueDate(incidencia))
+        )
+        if (!isOwner && miVot != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+            UserVoteFeedbackBar(
+                miVot = miVot,
+                confirmedLabel = labels.confirmedVoteLabel,
+                falseReportLabel = labels.falseReportVoteLabel,
+                undoLabel = labels.undoLabel,
+                onUndo = onDesferVot
+            )
+        }
+    }
+}
+
+@Composable
+private fun IssueOverviewCards(
+    incidencia: IssueResponseDTO,
+    labels: ShowIssueDialogLabels
+) {
+    val isAccepted = incidencia.status.lowercase() == "accepted"
+    val statusValue = if (isAccepted) labels.issueStatusAccepted else labels.issueStatusPending
+    val statusIcon = if (isAccepted) Icons.Filled.CheckCircle else Icons.Filled.HelpOutline
+    val statusContent = if (isAccepted) Color(0xFF2E7D32) else Color(0xFFEF6C00)
+    val statusBg = if (isAccepted) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        InfoCard(
+            modifier = Modifier.weight(1f),
+            label = labels.issueTypeLabel,
+            value = labels.issueTypeValue,
+            icon = Icons.Filled.Label,
+            contentColor = Color(0xFF1976D2),
+            backgroundColor = Color(0xFFE3F2FD)
+        )
+        InfoCard(
+            modifier = Modifier.weight(1f),
+            label = labels.issueStatusLabel,
+            value = statusValue,
+            icon = statusIcon,
+            contentColor = statusContent,
+            backgroundColor = statusBg
+        )
+    }
+}
+
+@Composable
+private fun IssueLocationCard(adreca: String, locationLabel: String) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFFF5F6F7),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = Color(0xFFE3E5E8)
+            ) {
+                Icon(
+                    Icons.Filled.Place,
+                    contentDescription = null,
+                    tint = Color(0xFF444746),
+                    modifier = Modifier.padding(9.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = locationLabel,
+                    fontSize = 11.sp,
+                    color = Color(0xFF6B7280),
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.4.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = adreca,
+                    color = Color(0xFF1A1C1E),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun IssueVoteIndicators(
+    positiveVotes: Int,
+    negativeVotes: Int,
+    positiveLabel: String,
+    negativeLabel: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        VoteIndicator(
+            count = positiveVotes,
+            icon = Icons.Filled.ThumbUp,
+            color = Color(0xFF4CAF50),
+            label = positiveLabel
+        )
+        VoteIndicator(
+            count = negativeVotes,
+            icon = Icons.Filled.ThumbDown,
+            color = Color(0xFFF44336),
+            label = negativeLabel
+        )
+    }
+}
+
+@Composable
+private fun IssueDescriptionSection(
+    description: String?,
+    descriptionLabel: String,
+    emptyDescriptionLabel: String
+) {
+    Text(
+        text = descriptionLabel,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        color = Color.Black
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    Text(
+        text = description ?: emptyDescriptionLabel,
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color(0xFF444746),
+        lineHeight = 20.sp
+    )
+}
+
+@Composable
+private fun IssueAuthorCard(
+    authorName: String?,
+    authorLevel: Int,
+    anonymousLabel: String,
+    lastUpdateText: String
+) {
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Surface(
+                color = Color(0xFFF8F9FA),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFFE9ECEF))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(36.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFCED4DA)
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.padding(6.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = authorName ?: anonymousLabel,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        if (authorName != null) {
+                            Text(
+                                text = appString(R.string.issue_user_level, authorLevel),
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = lastUpdateText,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.LightGray
+            )
+        }
+    }
+}
+
+@Composable
+private fun UserVoteFeedbackBar(
+    miVot: Int,
+    confirmedLabel: String,
+    falseReportLabel: String,
+    undoLabel: String,
+    onUndo: () -> Unit
+) {
+    val isPositive = miVot == 1
+    Surface(
+        color = if (isPositive) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = if (isPositive) confirmedLabel else falseReportLabel,
+                color = if (isPositive) Color(0xFF2E7D32) else Color(0xFFD32F2F),
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = undoLabel,
+                modifier = Modifier.clickable { onUndo() },
+                color = Color.Gray,
+                textDecoration = TextDecoration.Underline,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConfirmActionButton(
+    isOwner: Boolean,
+    miVot: Int?,
+    onEditar: () -> Unit,
+    onConfirmar: () -> Unit
+) {
+    if (isOwner) {
+        OwnerEditButton(onClick = onEditar)
+    } else {
+        VoteConfirmButton(miVot = miVot, onClick = onConfirmar)
+    }
+}
+
+@Composable
+private fun OwnerEditButton(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(48.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
+        shape = RoundedCornerShape(12.dp)
+    ) { Text("Editar", fontWeight = FontWeight.Bold, color = Color.White) }
+}
+
+@Composable
+private fun VoteConfirmButton(miVot: Int?, onClick: () -> Unit) {
+    val jaConfirmat = miVot == 1
+    Button(
+        onClick = onClick,
+        enabled = miVot == null,
+        modifier = Modifier.fillMaxWidth().height(48.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF2E7D32),
+            disabledContainerColor = if (jaConfirmat) Color(0xFF2E7D32) else Color(0xFFBDBDBD)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(
+            text = if (jaConfirmat) "Confirmada ✓" else "Confirmar",
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+    }
+}
+
+@Composable
+private fun DismissActionButton(
+    isOwner: Boolean,
+    miVot: Int?,
+    deleteLabel: String,
+    onEsborrar: () -> Unit,
+    onRebutjar: () -> Unit
+) {
+    if (isOwner) {
+        OwnerDeleteButton(label = deleteLabel, onClick = onEsborrar)
+    } else {
+        VoteRejectButton(miVot = miVot, onClick = onRebutjar)
+    }
+}
+
+@Composable
+private fun OwnerDeleteButton(label: String, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).height(48.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
+        shape = RoundedCornerShape(12.dp)
+    ) { Text(label, fontWeight = FontWeight.Bold, color = Color.White) }
+}
+
+@Composable
+private fun VoteRejectButton(miVot: Int?, onClick: () -> Unit) {
+    val jaRebutjat = miVot == -1
+    Button(
+        onClick = onClick,
+        enabled = miVot == null,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).height(48.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFFD32F2F),
+            disabledContainerColor = if (jaRebutjat) Color(0xFFD32F2F) else Color(0xFFBDBDBD)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Text(
+            text = if (jaRebutjat) "Reportada ✓" else "Reportar com a fals",
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+    }
 }
 
 @Composable
@@ -904,6 +1305,3 @@ fun VoteIndicator(count: Int, icon: androidx.compose.ui.graphics.vector.ImageVec
         Text(text = label, fontSize = 10.sp, color = Color.Gray)
     }
 }
-
-
-
