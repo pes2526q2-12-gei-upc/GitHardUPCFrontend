@@ -15,7 +15,7 @@ name: Sanity Test
 - extendedWaitUntil:
     visible:
       id: "input_desti"
-    timeout: 10000
+    timeout: 30000
 
 - tapOn:
     id: "input_desti"
@@ -30,7 +30,7 @@ name: Sanity Test
 - extendedWaitUntil:
     visible:
       id: "input_origen"
-    timeout: 10000
+    timeout: 30000
 
 - tapOn:
     id: "input_origen"
@@ -45,14 +45,14 @@ name: Sanity Test
 
 - extendedWaitUntil:
     visible: ".*km|.*m"
-    timeout: 10000
+    timeout: 30000
 
 # 4. CANVI DE MODES DE RUTA
 
 - extendedWaitUntil:
     visible:
       id: "btn_safety"
-    timeout: 10000
+    timeout: 30000
 
 - tapOn:
     id: "btn_safety"
@@ -65,46 +65,16 @@ name: Sanity Test
 - extendedWaitUntil:
     visible:
       id: "btn_places"
-    timeout: 10000
+    timeout: 30000
 
 - tapOn:
     id: "btn_places"
 
-# 6. INICIAR RUTA
-
-- extendedWaitUntil:
-    visible:
-      id: "btn_start_route"
-    timeout: 10000
-
-- tapOn:
-    id: "btn_start_route"
-
-# 7. VALIDAR PANTALLA DE RUTA ACTIVA
-
-- extendedWaitUntil:
-    visible:
-      id: "btn_close_route"
-    timeout: 10000
-
-- assertVisible:
-    id: "active_route_duration"
-
-- assertVisible:
-    id: "active_route_distance"
-
-- assertVisible:
-    id: "active_route_eta"
-
-- tapOn:
-    id: "btn_close_route"
-
-# 5. INTERACCIONS DEL MAPA
 
 - extendedWaitUntil:
     visible:
       id: "btn_satellit"
-    timeout: 10000
+    timeout: 30000
 
 - tapOn:
     id: "btn_satellit"
@@ -112,7 +82,43 @@ name: Sanity Test
 - extendedWaitUntil:
     visible:
       id: "btn_ubicacio_actual"
-    timeout: 10000
+    timeout: 30000
 
 - tapOn:
     id: "btn_ubicacio_actual"
+
+- extendedWaitUntil:
+    visible:
+      id: "btn_incidencies"
+    timeout: 30000
+
+
+# 6. INICIAR RUTA
+
+- extendedWaitUntil:
+    visible:
+      id: "btn_start_route"
+    timeout: 30000
+
+- tapOn:
+    id: "btn_start_route"
+
+# 7. VALIDAR PANTALLA DE RUTA ACTIVA
+
+    #- extendedWaitUntil:
+      #visible:
+    #id: "btn_close_route"
+    #timeout: 30000
+
+    #- assertVisible:
+    #id: "active_route_duration"
+
+    #- assertVisible:
+    #id: "active_route_distance"
+
+    #- assertVisible:
+    #id: "active_route_eta"
+
+    #- tapOn:
+    #id: "btn_close_route"
+

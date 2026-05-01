@@ -1,8 +1,9 @@
 ﻿package com.safesteps.profile
 
+import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +33,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -42,8 +44,11 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,16 +57,29 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
+import com.safesteps.data.IssueApiType
+import com.safesteps.data.IssueRequestDTO
+import com.safesteps.data.IssueResponseDTO
+import com.safesteps.data.PhotonApi
+import com.safesteps.data.actualitzarIncidencia
+import com.safesteps.data.eliminarIncidencia
+import com.safesteps.data.getIssuesByUser
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.LanguageSelector
 import com.safesteps.i18n.appPlural
 import com.safesteps.i18n.appString
+import com.safesteps.map.IssueType
+import com.safesteps.map.ReportIssueDialog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private val filterLevelResIds = listOf(
@@ -93,11 +111,64 @@ fun ProfileScreen(
     onCustomizeClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var expandedGroups by rememberSaveable {
         mutableStateOf(List(profileFilterGroups.size) { false })
     }
     var isFiltersSectionExpanded by rememberSaveable { mutableStateOf(false) }
     var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
+
+    var userIssues by remember(user.googleId) { mutableStateOf<List<IssueResponseDTO>>(emptyList()) }
+    var isLoadingIssues by remember(user.googleId) { mutableStateOf(true) }
+    var issueLoadFailed by remember(user.googleId) { mutableStateOf(false) }
+    var issueBeingEdited by remember { mutableStateOf<IssueResponseDTO?>(null) }
+    var issueEditLocationText by remember { mutableStateOf("") }
+
+    val issueDeletedText = appString(R.string.profile_issue_deleted_success)
+    val issueUpdatedText = appString(R.string.profile_issue_updated_success)
+    val issueActionErrorText = appString(R.string.profile_issue_action_error)
+
+    suspend fun loadUserIssues() {
+        isLoadingIssues = true
+        issueLoadFailed = false
+
+        try {
+            userIssues = getIssuesByUser(user.googleId)
+                .sortedByDescending { issue ->
+                    issue.updatedAt.ifBlank { issue.createdAt }
+                }
+        } catch (_: Exception) {
+            issueLoadFailed = true
+        } finally {
+            isLoadingIssues = false
+        }
+    }
+
+    LaunchedEffect(user.googleId) {
+        loadUserIssues()
+    }
+
+    LaunchedEffect(issueBeingEdited?.id) {
+        val issue = issueBeingEdited ?: return@LaunchedEffect
+        issueEditLocationText = "${issue.coordinates.lat}, ${issue.coordinates.lon}"
+
+        try {
+            val response = withContext(Dispatchers.IO) {
+                PhotonApi.service.reverseGeocode(
+                    lat = issue.coordinates.lat,
+                    lon = issue.coordinates.lon
+                )
+            }
+            val address = response.features.firstOrNull()?.properties?.getAddress()
+            if (!address.isNullOrBlank()) {
+                issueEditLocationText = address
+            }
+        } catch (_: Exception) {
+            issueEditLocationText = "${issue.coordinates.lat}, ${issue.coordinates.lon}"
+        }
+    }
 
     Column(
         modifier = modifier
@@ -172,6 +243,31 @@ fun ProfileScreen(
                 ProfileHeader(user = user)
 
                 Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(28.dp))
+
+                ProfileIssuesSection(
+                    issues = userIssues,
+                    isLoading = isLoadingIssues,
+                    loadFailed = issueLoadFailed,
+                    onRetry = { scope.launch { loadUserIssues() } },
+                    onEdit = { issueBeingEdited = it },
+                    onDelete = { issue ->
+                        scope.launch {
+                            try {
+                                eliminarIncidencia(issue.id)
+                                userIssues = userIssues.filter { it.id != issue.id }
+                                if (issueBeingEdited?.id == issue.id) {
+                                    issueBeingEdited = null
+                                }
+                                Toast.makeText(context, issueDeletedText, Toast.LENGTH_SHORT).show()
+                            } catch (_: Exception) {
+                                Toast.makeText(context, issueActionErrorText, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(28.dp))
 
                 OutlinedButton(
                     onClick = onCustomizeClick,
@@ -271,6 +367,43 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+
+    issueBeingEdited?.let { issue ->
+        ReportIssueDialog(
+            visible = true,
+            isLoggedIn = true,
+            defaultLocationText = issueEditLocationText,
+            onDismiss = { issueBeingEdited = null },
+            onConfirm = { type, _, description, _ ->
+                scope.launch {
+                    try {
+                        val updatedIssue = actualitzarIncidencia(
+                            idIncidencia = issue.id,
+                            request = IssueRequestDTO(
+                                googleId = user.googleId,
+                                type = IssueApiType.valueOf(type.name),
+                                description = description,
+                                coordinates = issue.coordinates
+                            )
+                        )
+
+                        userIssues = userIssues.map { currentIssue ->
+                            if (currentIssue.id == updatedIssue.id) updatedIssue else currentIssue
+                        }
+                        issueBeingEdited = null
+                        Toast.makeText(context, issueUpdatedText, Toast.LENGTH_SHORT).show()
+                    } catch (_: Exception) {
+                        Toast.makeText(context, issueActionErrorText, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            onNavigateToLogin = {},
+            initialType = profileIssueType(issue.type),
+            initialDescription = issue.description.orEmpty(),
+            isEditMode = true,
+            initialCoord = issue.coordinates
+        )
     }
 }
 
@@ -550,6 +683,258 @@ private fun FiltersSyncStatusRow(
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+}
+
+@Composable
+private fun ProfileIssuesSection(
+    issues: List<IssueResponseDTO>,
+    isLoading: Boolean,
+    loadFailed: Boolean,
+    onRetry: () -> Unit,
+    onEdit: (IssueResponseDTO) -> Unit,
+    onDelete: (IssueResponseDTO) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, Color(0xFFE5ECE7), RoundedCornerShape(22.dp)),
+        shape = RoundedCornerShape(22.dp),
+        color = Color(0xFFF9FBFA)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+        ) {
+            Text(
+                text = appString(R.string.profile_my_issues_title),
+                color = Color(0xFF23333A),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = appString(R.string.profile_my_issues_subtitle),
+                color = Color(0xFF77837D),
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            when {
+                isLoading -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFFC86A37)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = appString(R.string.profile_my_issues_loading),
+                            color = Color(0xFF5C6A64),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+
+                loadFailed -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = appString(R.string.profile_my_issues_error),
+                            color = Color(0xFF8F3D1B),
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = onRetry,
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, Color(0xFFE0B6A3)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFF8F3D1B)
+                            )
+                        ) {
+                            Text(
+                                text = appString(R.string.retry_action),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                issues.isEmpty() -> {
+                    Text(
+                        text = appString(R.string.profile_my_issues_empty),
+                        color = Color(0xFF77837D),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                else -> {
+                    issues.forEachIndexed { index, issue ->
+                        ProfileIssueCard(
+                            issue = issue,
+                            onEdit = { onEdit(issue) },
+                            onDelete = { onDelete(issue) }
+                        )
+
+                        if (index < issues.lastIndex) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileIssueCard(
+    issue: IssueResponseDTO,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val accepted = issue.status.equals("accepted", ignoreCase = true)
+    val statusBackground = if (accepted) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+    val statusContent = if (accepted) Color(0xFF2E7D32) else Color(0xFFEF6C00)
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color.White,
+        shadowElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = profileIssueTypeLabel(issue.type),
+                    color = Color(0xFF23333A),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = statusBackground
+                ) {
+                    Text(
+                        text = if (accepted) {
+                            appString(R.string.profile_issue_status_accepted)
+                        } else {
+                            appString(R.string.profile_issue_status_pending)
+                        },
+                        color = statusContent,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = issue.description?.takeIf { it.isNotBlank() }
+                    ?: appString(R.string.profile_issue_no_description),
+                color = Color(0xFF4E5B56),
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF4F7F5)
+                ) {
+                    Text(
+                        text = "${appString(R.string.profile_issue_positive_votes)} ${issue.positiveVotes}",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        color = Color(0xFF2E7D32),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFF4F7F5)
+                ) {
+                    Text(
+                        text = "${appString(R.string.profile_issue_negative_votes)} ${issue.negativeVotes}",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        color = Color(0xFFD32F2F),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "${appString(R.string.profile_issue_last_update)} ${profileIssueDate(issue)}",
+                color = Color(0xFF77837D),
+                style = MaterialTheme.typography.labelMedium
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onEdit,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, Color(0xFFD9E2DD)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFFFDFEFE),
+                        contentColor = Color(0xFF33413B)
+                    )
+                ) {
+                    Text(
+                        text = appString(R.string.edit_action),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Button(
+                    onClick = onDelete,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFD8563F),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text(
+                        text = appString(R.string.delete_action),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         }
     }
 }
@@ -841,4 +1226,28 @@ private fun DeleteAccountBanner(
             }
         }
     }
+}
+
+@Composable
+private fun profileIssueTypeLabel(type: IssueApiType): String {
+    return when (type) {
+        IssueApiType.OBRES -> appString(R.string.issue_type_worksite)
+        IssueApiType.ACCESSIBILITAT -> appString(R.string.issue_type_accessibility)
+        IssueApiType.SEGURETAT -> appString(R.string.issue_type_security)
+        IssueApiType.ALTRES -> appString(R.string.issue_type_others)
+    }
+}
+
+private fun profileIssueType(type: IssueApiType): IssueType {
+    return when (type) {
+        IssueApiType.OBRES -> IssueType.OBRES
+        IssueApiType.ACCESSIBILITAT -> IssueType.ACCESSIBILITAT
+        IssueApiType.SEGURETAT -> IssueType.SEGURETAT
+        IssueApiType.ALTRES -> IssueType.ALTRES
+    }
+}
+
+private fun profileIssueDate(issue: IssueResponseDTO): String {
+    return issue.updatedAt.takeIf { it.isNotBlank() }?.substringBefore("T")
+        ?: issue.createdAt.substringBefore("T")
 }

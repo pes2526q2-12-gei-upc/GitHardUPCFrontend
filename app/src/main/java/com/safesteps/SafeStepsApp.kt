@@ -34,7 +34,7 @@ import com.safesteps.ui.notifications.ScreenNotificationManager
 private enum class SafeStepsDestination {
     MAP,
     PROFILE,
-    CUSTOMIZE // FEATURE RECUPERADA
+    CUSTOMIZE
 }
 
 private data class AuthNoticeTexts(
@@ -64,6 +64,9 @@ fun SafeStepsApp(
     val profileUiState by profileViewModel.uiState.collectAsState()
     var currentDestination by rememberSaveable {
         mutableStateOf(SafeStepsDestination.MAP)
+    }
+    var issuesRefreshTrigger by rememberSaveable {
+        mutableStateOf(0)
     }
     val onLoginClick = rememberGoogleSignInAction(
         onUserLoggedIn = authViewModel::onUserLoggedIn,
@@ -97,12 +100,19 @@ fun SafeStepsApp(
         }
     }
 
-    // FEATURE RECUPERADA: BackHandler adaptado para volver del CUSTOMIZE al PROFILE
-    BackHandler(enabled = isProfileDestination(currentDestination) || currentDestination == SafeStepsDestination.CUSTOMIZE) {
-        if (currentDestination == SafeStepsDestination.CUSTOMIZE) {
-            currentDestination = SafeStepsDestination.PROFILE
-        } else {
-            currentDestination = SafeStepsDestination.MAP
+    BackHandler(
+        enabled = isProfileDestination(currentDestination) ||
+                currentDestination == SafeStepsDestination.CUSTOMIZE
+    ) {
+        when (currentDestination) {
+            SafeStepsDestination.CUSTOMIZE -> {
+                currentDestination = SafeStepsDestination.PROFILE
+            }
+            SafeStepsDestination.PROFILE -> {
+                issuesRefreshTrigger += 1
+                currentDestination = SafeStepsDestination.MAP
+            }
+            SafeStepsDestination.MAP -> Unit
         }
     }
 
@@ -112,14 +122,18 @@ fun SafeStepsApp(
         currentLanguage = languageUiState.currentLanguage,
         authViewModel = authViewModel,
         currentDestination = currentDestination,
+        issuesRefreshTrigger = issuesRefreshTrigger,
         profileUiState = profileUiState,
         onLanguageSelected = onLanguageSelected,
         onFilterValueChange = profileViewModel::onFilterValueChanged,
         onFilterEnabledChange = profileViewModel::onFilterEnabledChanged,
         onLoginClick = onLoginClick,
-        onNavigateToMap = { currentDestination = SafeStepsDestination.MAP },
+        onNavigateToMap = {
+            issuesRefreshTrigger += 1
+            currentDestination = SafeStepsDestination.MAP
+        },
         onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE },
-        onNavigateToCustomize = { currentDestination = SafeStepsDestination.CUSTOMIZE } // FEATURE RECUPERADA
+        onNavigateToCustomize = { currentDestination = SafeStepsDestination.CUSTOMIZE }
     )
 }
 
@@ -129,9 +143,10 @@ private fun HandleProfileRedirectEffect(
     currentDestination: SafeStepsDestination,
     onNavigateToMap: () -> Unit
 ) {
-    // FEATURE RECUPERADA: Añadido CUSTOMIZE a las validaciones de redirección
     LaunchedEffect(currentUser, currentDestination) {
-        if (currentUser == null && (isProfileDestination(currentDestination) || currentDestination == SafeStepsDestination.CUSTOMIZE)) {
+        val needsLoggedUser = isProfileDestination(currentDestination) ||
+                currentDestination == SafeStepsDestination.CUSTOMIZE
+        if (currentUser == null && needsLoggedUser) {
             onNavigateToMap()
         }
     }
@@ -178,6 +193,7 @@ private fun SafeStepsLocalizedContent(
     currentLanguage: AppLanguage,
     authViewModel: AuthViewModel,
     currentDestination: SafeStepsDestination,
+    issuesRefreshTrigger: Int,
     profileUiState: com.safesteps.profile.ProfileUiState,
     onLanguageSelected: (AppLanguage) -> Unit,
     onFilterValueChange: (Int, Int) -> Unit,
@@ -185,7 +201,7 @@ private fun SafeStepsLocalizedContent(
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToCustomize: () -> Unit // FEATURE RECUPERADA
+    onNavigateToCustomize: () -> Unit
 ) {
     ProvideLocalizedStrings(currentLanguage) {
         HandleAuthNoticeEffect(
@@ -212,6 +228,7 @@ private fun SafeStepsLocalizedContent(
             authUiState = authUiState,
             currentLanguage = currentLanguage,
             currentDestination = currentDestination,
+            issuesRefreshTrigger = issuesRefreshTrigger,
             profileUiState = profileUiState,
             onLanguageSelected = onLanguageSelected,
             onFilterValueChange = onFilterValueChange,
@@ -219,13 +236,13 @@ private fun SafeStepsLocalizedContent(
             onLoginClick = onLoginClick,
             onNavigateToMap = { onNavigateToMap() },
             onNavigateToProfile = { onNavigateToProfile() },
-            onNavigateToCustomize = { onNavigateToCustomize() }, // FEATURE RECUPERADA
+            onNavigateToCustomize = { onNavigateToCustomize() },
             onLogout = rememberLogoutToMapAction(
                 authViewModel = authViewModel,
                 onNavigateToMap = onNavigateToMap
             ),
             onDeleteAccount = authViewModel::onDeleteAccountRequested,
-            onUpdateUserProfile = authViewModel::onUpdateUserProfile // FEATURE RECUPERADA
+            onUpdateUserProfile = authViewModel::onUpdateUserProfile
         )
     }
 }
@@ -263,6 +280,7 @@ private fun SafeStepsBody(
     authUiState: AuthUiState,
     currentLanguage: AppLanguage,
     currentDestination: SafeStepsDestination,
+    issuesRefreshTrigger: Int,
     profileUiState: com.safesteps.profile.ProfileUiState,
     onLanguageSelected: (AppLanguage) -> Unit,
     onFilterValueChange: (Int, Int) -> Unit,
@@ -270,16 +288,15 @@ private fun SafeStepsBody(
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToCustomize: () -> Unit, // FEATURE RECUPERADA
+    onNavigateToCustomize: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: (UserInfo) -> Unit,
-    onUpdateUserProfile: (UserInfo) -> Unit // FEATURE RECUPERADA
+    onUpdateUserProfile: (UserInfo) -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         val currentUser = authUiState.currentUser
 
         if (currentUser != null) {
-            // FEATURE RECUPERADA: Refactorizado usando "when" para manejar CUSTOMIZE
             when (currentDestination) {
                 SafeStepsDestination.PROFILE -> {
                     ProfileScreen(
@@ -310,6 +327,7 @@ private fun SafeStepsBody(
                         modifier = Modifier.fillMaxSize(),
                         currentUser = currentUser,
                         currentLanguage = currentLanguage,
+                        issuesRefreshTrigger = issuesRefreshTrigger,
                         onLoginClick = onLoginClick,
                         onProfileClick = onNavigateToProfile
                     )
@@ -320,6 +338,7 @@ private fun SafeStepsBody(
                 modifier = Modifier.fillMaxSize(),
                 currentUser = currentUser,
                 currentLanguage = currentLanguage,
+                issuesRefreshTrigger = issuesRefreshTrigger,
                 onLoginClick = onLoginClick,
                 onProfileClick = {}
             )

@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -634,6 +635,8 @@ private fun MapActionCircleButton(
 @Composable
 internal fun BoxScope.MapFloatingActions(
     uiState: MapUiState,
+    reportIssueLabel: String,
+    onReportIssueClick: () -> Unit,
     state: FloatingActionsState,
     labels: FloatingActionLabels,
     callbacks: FloatingActionCallbacks
@@ -659,9 +662,36 @@ internal fun BoxScope.MapFloatingActions(
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(if (state.compactMode) 8.dp else 10.dp)
         ) {
-            PoiFloatingAction(uiState = uiState, state = state, labels = labels, onClick = callbacks.onTogglePuntsInteres)
-            MapStyleFloatingAction(uiState = uiState, state = state, labels = labels, onClick = callbacks.onToggleMapStyle)
-            MyLocationFloatingAction(uiState = uiState, state = state, label = labels.myLocationLabel, onClick = callbacks.onMyLocationClick)
+            PoiFloatingAction(
+                uiState = uiState,
+                state = state,
+                labels = labels,
+                onClick = callbacks.onTogglePuntsInteres
+            )
+            MapStyleFloatingAction(
+                uiState = uiState,
+                state = state,
+                labels = labels,
+                onClick = callbacks.onToggleMapStyle
+            )
+
+            AnimatedVisibility(visible = !uiState.modoRuta) {
+                MapActionCircleButton(
+                    icon = Icons.Default.ReportProblem,
+                    contentDescription = reportIssueLabel,
+                    iconTint = Color(0xFFE53935),
+                    onClick = onReportIssueClick,
+                    compactMode = state.compactMode,
+                    modifier = Modifier.testTag("btn_incidencies")
+                )
+            }
+
+            MyLocationFloatingAction(
+                uiState = uiState,
+                state = state,
+                label = labels.myLocationLabel,
+                onClick = callbacks.onMyLocationClick
+            )
         }
     }
 }

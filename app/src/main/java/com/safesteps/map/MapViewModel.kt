@@ -1,17 +1,29 @@
-package com.safesteps.map
+﻿package com.safesteps.map
 
 import android.location.Location
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.auth.UserInfo
+import com.safesteps.data.Coord
 import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
+import com.safesteps.data.IssueApiType
+import com.safesteps.data.IssueRequestDTO
+import com.safesteps.data.IssueResponseDTO
 import com.safesteps.data.PhotonApi
 import com.safesteps.data.PuntInteres
 import com.safesteps.data.RouteCoordinatesRequest
 import com.safesteps.data.RouteType
+import com.safesteps.data.VoteRequestDTO
+import com.safesteps.data.VotesCache
+import com.safesteps.data.actualitzarIncidencia
+import com.safesteps.data.crearIncidencia
+import com.safesteps.data.eliminarIncidencia
+import com.safesteps.data.eliminarVot
+import com.safesteps.data.getAllIssues
 import com.safesteps.data.obtenirCoordenadesRuta
+import com.safesteps.data.votarIncidencia
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,9 +38,55 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+internal fun formatReadableDuration(durationMinutes: Int): String {
+    require(durationMinutes > 0) {
+        "durationMinutes must be greater than 0"
+    }
+
+    val hours = durationMinutes / 60
+    val minutes = durationMinutes % 60
+
+    return when {
+        hours == 0 -> "$durationMinutes min"
+        minutes == 0 -> "$hours h"
+        else -> "$hours h $minutes min"
+    }
+}
+
+internal fun proportionalRemainingDurationMinutes(
+    totalDurationMinutes: Int,
+    remainingDistanceMeters: Double,
+    routeProgressReferenceDistanceMeters: Double
+): Int {
+    require(totalDurationMinutes > 0) {
+        "totalDurationMinutes must be greater than 0"
+    }
+    require(routeProgressReferenceDistanceMeters > 0.0) {
+        "routeProgressReferenceDistanceMeters must be greater than 0"
+    }
+
+    val clampedRemainingDistanceMeters = remainingDistanceMeters
+        .coerceIn(0.0, routeProgressReferenceDistanceMeters)
+
+    if (clampedRemainingDistanceMeters <= 0.0) {
+        return 0
+    }
+
+    return max(
+        1,
+        (
+                totalDurationMinutes.toDouble() *
+                        clampedRemainingDistanceMeters /
+                        routeProgressReferenceDistanceMeters
+                ).roundToInt()
+    )
+}
+
 class MapViewModel(
-    private val textProvider: MapTextProvider
+    private val textProvider: MapTextProvider,
+    private val votesCache: VotesCache
 ) : ViewModel() {
+
     private companion object {
         const val DEFAULT_DISTANCE_TEXT = "-- km"
         const val DEFAULT_DURATION_TEXT = "-- min"
@@ -48,6 +106,10 @@ class MapViewModel(
     private var lastAutomaticRecalculationAtMs: Long = 0L
     private var currentGoogleId: String? = null
 
+    init {
+        loadIssuesMap()
+    }
+
     fun onLanguageChanged(language: AppLanguage) {
         currentLanguage = language
     }
@@ -58,6 +120,24 @@ class MapViewModel(
 
     fun onCurrentUserChanged(user: UserInfo?) {
         currentGoogleId = user?.googleId?.takeIf { it.isNotBlank() }
+        val gid = currentGoogleId
+        if (gid != null) {
+            val cached = votesCache.load(gid)
+            _uiState.update { it.copy(userVotes = cached) }
+
+            // TODO: quan el backend tingui /votes/users/{googleId}/scores:
+            // viewModelScope.launch {
+            //     try {
+            //         val remote = obtenirVotsUsuari(gid)
+            //         votesCache.save(gid, remote)
+            //         _uiState.update { it.copy(userVotes = remote) }
+            //     } catch (e: Exception) {
+            //         Log.w("MapViewModel", "No s'han pogut sincronitzar vots: ${e.message}")
+            //     }
+            // }
+        } else {
+            _uiState.update { it.copy(userVotes = emptyMap()) }
+        }
         _uiState.update { it.copy(routeColor = user?.routeColor) }
     }
 
@@ -98,22 +178,24 @@ class MapViewModel(
 
     fun cancelarRutaVisual() {
         resetNavigationState()
-        _uiState.update { it.copy(
-            rutaCoordenades = emptyList(),
-            activeRouteMode = ActiveRouteMode.NONE,
-            modoRuta = false,
-            navigationCameraFollowing = false,
-            routeCompleted = false,
-            routeCompletionSummary = null,
-            activeNavigationInstruction = null,
-            navigationNotice = null,
-            distanceText = DEFAULT_DISTANCE_TEXT,
-            durationText = DEFAULT_DURATION_TEXT,
-            etaText = DEFAULT_ETA_TEXT,
-            calculantRuta = false,
-            puntsInteres = emptyList(),
-            puntInteresSeleccionat = null
-        ) }
+        _uiState.update {
+            it.copy(
+                rutaCoordenades = emptyList(),
+                activeRouteMode = ActiveRouteMode.NONE,
+                modoRuta = false,
+                navigationCameraFollowing = false,
+                routeCompleted = false,
+                routeCompletionSummary = null,
+                activeNavigationInstruction = null,
+                navigationNotice = null,
+                distanceText = DEFAULT_DISTANCE_TEXT,
+                durationText = DEFAULT_DURATION_TEXT,
+                etaText = DEFAULT_ETA_TEXT,
+                calculantRuta = false,
+                puntsInteres = emptyList(),
+                puntInteresSeleccionat = null
+            )
+        }
     }
 
     fun updateLocation(location: Location) {
@@ -204,20 +286,22 @@ class MapViewModel(
     }
 
     fun limpiarOrigen() {
-        _uiState.update { it.copy(
-            origenSeleccionado = null,
-            textoOrigen = ""
-        ) }
+        _uiState.update {
+            it.copy(
+                origenSeleccionado = null,
+                textoOrigen = ""
+            )
+        }
     }
 
     fun limpiarDestino() {
-        _uiState.update { it.copy(
-            destinoSeleccionado = null,
-            textoDestino = ""
-        ) }
+        _uiState.update {
+            it.copy(
+                destinoSeleccionado = null,
+                textoDestino = ""
+            )
+        }
     }
-
-
 
     fun onMapClicked(point: LatLng) {
         if (_uiState.value.modoRuta) return
@@ -259,6 +343,16 @@ class MapViewModel(
         destiLat: Double
     ) {
         if (_uiState.value.calculantRuta) return
+
+        if (!isInsideBarcelonaArea(origenLat, origenLong)) {
+            _uiState.update { it.copy(navigationNotice = "L'inici de la ruta ha de ser dins de Barcelona") }
+            return
+        }
+
+        if (!isInsideBarcelonaArea(destiLat, destiLong)) {
+            _uiState.update { it.copy(navigationNotice = "El destí de la ruta ha de ser dins de Barcelona") }
+            return
+        }
 
         val prioridad = _uiState.value.prioridadSeleccionada
         val routeType = routeTypeFor(prioridad)
@@ -356,7 +450,7 @@ class MapViewModel(
         _uiState.update { it.copy(mostrarPuntsInteres = !it.mostrarPuntsInteres) }
     }
 
-    fun onPuntInteresSeleccionat(punt: com.safesteps.data.PuntInteres?) {
+    fun onPuntInteresSeleccionat(punt: PuntInteres?) {
         _uiState.update { it.copy(puntInteresSeleccionat = punt) }
     }
 
@@ -584,7 +678,7 @@ class MapViewModel(
 
     private fun shouldCompleteRoute(progress: NavigationProgressResult): Boolean {
         return progress.instruction.maneuver == NavigationManeuver.ARRIVE &&
-            progress.instruction.remainingDistanceMeters <= ARRIVAL_DISTANCE_METERS
+                progress.instruction.remainingDistanceMeters <= ARRIVAL_DISTANCE_METERS
     }
 
     private fun completeRoute(progress: NavigationProgressResult) {
@@ -624,9 +718,9 @@ class MapViewModel(
         val routeProgressReferenceDistanceMeters = navigationRoute?.totalDistanceMeters
         return when {
             routeSummary != null &&
-                routeSummary.totalDurationMinutes > 0 &&
-                routeProgressReferenceDistanceMeters != null &&
-                routeProgressReferenceDistanceMeters > 0.0 -> {
+                    routeSummary.totalDurationMinutes > 0 &&
+                    routeProgressReferenceDistanceMeters != null &&
+                    routeProgressReferenceDistanceMeters > 0.0 -> {
                 proportionalRemainingDurationMinutes(
                     totalDurationMinutes = routeSummary.totalDurationMinutes,
                     remainingDistanceMeters = remainingDistanceMeters,
@@ -635,8 +729,8 @@ class MapViewModel(
             }
 
             routeSummary != null &&
-                routeSummary.totalDurationMinutes > 0 &&
-                routeSummary.totalDistanceMeters > 0.0 -> {
+                    routeSummary.totalDurationMinutes > 0 &&
+                    routeSummary.totalDistanceMeters > 0.0 -> {
                 proportionalRemainingDurationMinutes(
                     totalDurationMinutes = routeSummary.totalDurationMinutes,
                     remainingDistanceMeters = remainingDistanceMeters,
@@ -672,48 +766,285 @@ class MapViewModel(
         val totalDurationMinutes: Int,
         val totalDistanceMeters: Double
     )
-}
 
-internal fun formatReadableDuration(durationMinutes: Int): String {
-    require(durationMinutes > 0) {
-        "durationMinutes must be greater than 0"
+    fun toggleMenuIncidencies(show: Boolean) {
+        _uiState.update { it.copy(mostrarIncidencies = show) }
     }
 
-    val hours = durationMinutes / 60
-    val minutes = durationMinutes % 60
+    fun reportIssue(
+        tipus: IssueType,
+        adrecaText: String,
+        descripcio: String,
+        textMevaUbicacio: String
+    ) {
+        val currentGoogleIdLocal = currentGoogleId
+        if (currentGoogleIdLocal == null) {
+            Log.e("MapViewModel", "No es pot reportar sense estar logat.")
+            return
+        }
 
-    return when {
-        hours == 0 -> "$durationMinutes min"
-        minutes == 0 -> "$hours h"
-        else -> "$hours h $minutes min"
+        viewModelScope.launch {
+            try {
+                val coord = if (adrecaText == textMevaUbicacio) {
+                    val loc = _uiState.value.ultimaUbicacion
+                    if (loc == null) {
+                        Log.e("MapViewModel", "No s'ha pogut obtenir la ubicació GPS actual")
+                        return@launch
+                    }
+                    Coord(lat = loc.latitude, lon = loc.longitude)
+                } else {
+                    val idiomaRecuperat = textProvider.photonLanguage(currentLanguage)
+                    val photonResponse = PhotonApi.service.findAddress(
+                        query = adrecaText,
+                        lang = idiomaRecuperat,
+                        limit = 1
+                    )
+
+                    val feature = photonResponse.features.firstOrNull()
+                    if (feature == null) {
+                        Log.e("MapViewModel", "No s'han pogut trobar coordenades per aquesta adreça")
+                        return@launch
+                    }
+
+                    Coord(lat = feature.geometry.latitud, lon = feature.geometry.longitud)
+                }
+
+                val (finalLat, finalLon) = calcularCoordenadesLliures(
+                    desiredLat = coord.lat,
+                    desiredLon = coord.lon,
+                    existingIssues = _uiState.value.issues
+                )
+
+                val coordDefinitiva = Coord(lat = finalLat, lon = finalLon)
+
+                val tipusApi = when (tipus) {
+                    IssueType.OBRES -> IssueApiType.OBRES
+                    IssueType.ACCESSIBILITAT -> IssueApiType.ACCESSIBILITAT
+                    IssueType.SEGURETAT -> IssueApiType.SEGURETAT
+                    IssueType.ALTRES -> IssueApiType.ALTRES
+                }
+
+                val request = IssueRequestDTO(
+                    googleId = currentGoogleIdLocal,
+                    type = tipusApi,
+                    description = descripcio,
+                    coordinates = coordDefinitiva
+                )
+
+                val resposta = crearIncidencia(request)
+
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        issues = currentState.issues + resposta
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "Error on registering issue: ${e.message}")
+            }
+        }
     }
-}
 
-internal fun proportionalRemainingDurationMinutes(
-    totalDurationMinutes: Int,
-    remainingDistanceMeters: Double,
-    routeProgressReferenceDistanceMeters: Double
-): Int {
-    require(totalDurationMinutes > 0) {
-        "totalDurationMinutes must be greater than 0"
-    }
-    require(routeProgressReferenceDistanceMeters > 0.0) {
-        "routeProgressReferenceDistanceMeters must be greater than 0"
-    }
+    fun loadIssuesMap() {
+        viewModelScope.launch {
+            try {
+                val llista = getAllIssues()
 
-    val clampedRemainingDistanceMeters = remainingDistanceMeters
-        .coerceIn(0.0, routeProgressReferenceDistanceMeters)
+                val llistaSenseDuplicats = llista
+                    .distinctBy { it.id }
 
-    if (clampedRemainingDistanceMeters <= 0.0) {
-        return 0
+                _uiState.update { it.copy(issues = llistaSenseDuplicats) }
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "Error on loading issues: ${e.message}")
+            }
+        }
     }
 
-    return max(
-        1,
-        (
-            totalDurationMinutes.toDouble() *
-                clampedRemainingDistanceMeters /
-                routeProgressReferenceDistanceMeters
-            ).roundToInt()
-    )
+    fun isInsideBarcelonaArea(lat: Double, lon: Double): Boolean {
+        val minLat = 41.317
+        val maxLat = 41.468
+        val minLon = 2.052
+        val maxLon = 2.228
+        return lat in minLat..maxLat && lon in minLon..maxLon
+    }
+
+    fun selectIssue(incidencia: IssueResponseDTO?) {
+        _uiState.update { it.copy(incidenciaSeleccionada = incidencia) }
+    }
+
+    fun voteIssue(incidenciaId: Long, esReal: Boolean, googleId: String) {
+        viewModelScope.launch {
+            try {
+                val score = if (esReal) 1 else -1
+                val request = VoteRequestDTO(
+                    googleId = googleId,
+                    voteScore = score,
+                    voteScoreValid = true
+                )
+
+                votarIncidencia(incidenciaId, request)
+
+                val totesSenseDuplicats = getAllIssues()
+                    .groupBy { Pair(it.coordinates.lat, it.coordinates.lon) }
+                    .map { (_, issuesEnAquestPunt) ->
+                        issuesEnAquestPunt.minByOrNull { it.createdAt } ?: issuesEnAquestPunt.first()
+                    }
+
+                votesCache.update(googleId, incidenciaId, score)
+
+                _uiState.update { currentState ->
+                    val incidenciaObertaActualitzada = totesSenseDuplicats.find { it.id == incidenciaId }
+                    currentState.copy(
+                        issues = totesSenseDuplicats,
+                        userVotes = currentState.userVotes + (incidenciaId to score),
+                        incidenciaSeleccionada = if (currentState.incidenciaSeleccionada?.id == incidenciaId) {
+                            incidenciaObertaActualitzada
+                        } else {
+                            currentState.incidenciaSeleccionada
+                        }
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "Error al votar la incidència: ${e.message}")
+            }
+        }
+    }
+
+    fun desferVot(idIncidencia: Long, googleId: String) {
+        val votActual = uiState.value.userVotes[idIncidencia] ?: return
+
+        viewModelScope.launch {
+            try {
+                eliminarVot(idIncidencia, googleId)
+
+                votesCache.update(googleId, idIncidencia, null)
+
+                _uiState.update { currentState ->
+                    val nousVots = currentState.userVotes.toMutableMap()
+                    nousVots.remove(idIncidencia)
+
+                    val issuesActualitzades = currentState.issues.map {
+                        if (it.id == idIncidencia) {
+                            if (votActual == 1) it.copy(positiveVotes = (it.positiveVotes - 1).coerceAtLeast(0))
+                            else it.copy(negativeVotes = (it.negativeVotes - 1).coerceAtLeast(0))
+                        } else it
+                    }
+
+                    currentState.copy(
+                        userVotes = nousVots,
+                        issues = issuesActualitzades,
+                        incidenciaSeleccionada = issuesActualitzades.find { it.id == idIncidencia }
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "Error al desfer vot: ${e.message}")
+            }
+        }
+    }
+
+    private fun calcularCoordenadesLliures(
+        desiredLat: Double,
+        desiredLon: Double,
+        existingIssues: List<IssueResponseDTO>,
+        stepSize: Double = 0.0001,
+        maxRadiusSteps: Int = 3
+    ): Pair<Double, Double> {
+
+        val isOriginalFree = existingIssues.none {
+            it.coordinates.lat == desiredLat && it.coordinates.lon == desiredLon
+        }
+        if (isOriginalFree) return Pair(desiredLat, desiredLon)
+
+        for (radius in 1..maxRadiusSteps) {
+            for (dx in -radius..radius) {
+                for (dy in -radius..radius) {
+                    if (Math.abs(dx) == radius || Math.abs(dy) == radius) {
+                        val testLat = desiredLat + (dx * stepSize)
+                        val testLon = desiredLon + (dy * stepSize)
+
+                        val isFree = existingIssues.none {
+                            it.coordinates.lat == testLat && it.coordinates.lon == testLon
+                        }
+
+                        if (isFree) {
+                            return Pair(testLat, testLon)
+                        }
+                    }
+                }
+            }
+        }
+
+        return Pair(desiredLat, desiredLon)
+    }
+
+    fun esborrarIncidencia(incidenciaId: Long) {
+        viewModelScope.launch {
+            try {
+                eliminarIncidencia(incidenciaId)
+
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        issues = currentState.issues.filter { it.id != incidenciaId },
+                        incidenciaSeleccionada = null
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "Error esborrant incidència: ${e.message}")
+            }
+        }
+    }
+
+    fun iniciarEdicio(incidencia: IssueResponseDTO) {
+        _uiState.update { currentState ->
+            currentState.copy(
+                incidenciaSeleccionada = null,
+                incidenciaEnEdicio = incidencia
+            )
+        }
+    }
+
+    fun cancelarEdicio() {
+        _uiState.update { it.copy(incidenciaEnEdicio = null) }
+    }
+
+    fun guardarEdicio(
+        incidenciaId: Long,
+        nouTipus: IssueApiType,
+        novaDescripcio: String,
+        coordenades: Coord,
+        googleId: String
+    ) {
+        viewModelScope.launch {
+            try {
+                Log.d("MapViewModel", "guardarEdicio ENVIANT id=$incidenciaId coords=(${coordenades.lat},${coordenades.lon})")
+
+                val request = IssueRequestDTO(
+                    googleId = googleId,
+                    type = nouTipus,
+                    description = novaDescripcio,
+                    coordinates = coordenades
+                )
+
+                val resposta = actualitzarIncidencia(incidenciaId, request)
+                Log.d("MapViewModel", "guardarEdicio RESPOSTA id=${resposta.id} type=${resposta.type} desc=${resposta.description}")
+
+                _uiState.update { currentState ->
+                    currentState.copy(
+                        issues = currentState.issues.map { si ->
+                            if (si.id == incidenciaId) resposta else si
+                        },
+                        incidenciaEnEdicio = null,
+                        incidenciaSeleccionada = if (currentState.incidenciaSeleccionada?.id == incidenciaId) {
+                            resposta
+                        } else {
+                            currentState.incidenciaSeleccionada
+                        }
+                    )
+                }
+
+
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "Error desant l'edició: ${e.message}")
+            }
+        }
+    }
 }

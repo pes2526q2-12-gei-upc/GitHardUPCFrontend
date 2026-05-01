@@ -1,8 +1,11 @@
 package com.safesteps.map
 
 import android.location.Location
+import androidx.annotation.StringRes
+import com.safesteps.R
 import com.safesteps.data.Coordenada
 import com.safesteps.data.Feature
+import com.safesteps.data.IssueResponseDTO
 import com.safesteps.data.PuntInteres
 import com.safesteps.domain.RoutePriority
 import org.maplibre.android.geometry.LatLng
@@ -11,6 +14,13 @@ enum class textField {
     NONE,
     ORIGIN,
     DESTINY
+}
+
+enum class IssueType(@StringRes val labelRes: Int) {
+    OBRES(R.string.issue_type_worksite),
+    ACCESSIBILITAT(R.string.issue_type_accessibility),
+    SEGURETAT(R.string.issue_type_security),
+    ALTRES(R.string.issue_type_others)
 }
 
 enum class ActiveRouteMode {
@@ -53,8 +63,13 @@ data class MapUiState(
     val calculantRuta: Boolean = false,
     val routeColor: String? = null,
     val puntsInteres: List<PuntInteres> = emptyList(),
+    val issues: List<IssueResponseDTO> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
-    val puntInteresSeleccionat: PuntInteres? = null
+    val puntInteresSeleccionat: PuntInteres? = null,
+    val mostrarIncidencies: Boolean = false,
+    val incidenciaSeleccionada: IssueResponseDTO? = null,
+    val incidenciaEnEdicio: IssueResponseDTO? = null,
+    val userVotes: Map<Long, Int> = emptyMap(),
 )
 
 val MapUiState.usesLiveNavigation: Boolean
