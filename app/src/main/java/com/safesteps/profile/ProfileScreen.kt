@@ -1,9 +1,9 @@
 ﻿package com.safesteps.profile
 
 import android.widget.Toast
-import androidx.compose.foundation.background
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -96,46 +96,47 @@ private val filterLevelDescriptionResIds = listOf(
     R.string.filter_level_required_description
 )
 
-@Composable
-fun ProfileScreen(
-    user: UserInfo,
-    currentLanguage: AppLanguage,
-    onLanguageSelected: (AppLanguage) -> Unit,
-    filterValues: List<Int>,
-    onFilterValueChange: (Int, Int) -> Unit,
-    isLoadingFilters: Boolean,
-    areFiltersEnabled: Boolean,
-    onBack: () -> Unit,
-    onLogout: () -> Unit,
-    onDeleteAccount: () -> Unit,
-    onCustomizeClick: () -> Unit,
-    modifier: Modifier = Modifier
+data class ProfileGamificationState(
+    val level: Long,
+    val points: Long,
+    val recompenses: Long,
+    val isLoading: Boolean,
+    val showLevelUpAnimation: Boolean,
+    val showPrizeAnimation: Boolean,
+    val lastOpenedPrize: com.safesteps.data.PremiResponse?
+)
+
+data class ProfileGamificationCallbacks(
+    val onOpenPrize: () -> Unit,
+    val onDismissLevelUp: () -> Unit,
+    val onDismissPrize: () -> Unit
+)
+
+data class ProfileFilterState(
+    val values: List<Int>,
+    val isLoading: Boolean,
+    val areEnabled: Boolean
+)
+
+class ProfileIssuesState(
+    val userGoogleId: String,
+    val scope: kotlinx.coroutines.CoroutineScope,
+    val context: android.content.Context,
+    val issueDeletedText: String,
+    val issueUpdatedText: String,
+    val issueActionErrorText: String
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
-    var expandedGroups by rememberSaveable {
-        mutableStateOf(List(profileFilterGroups.size) { false })
-    }
-    var isFiltersSectionExpanded by rememberSaveable { mutableStateOf(false) }
-    var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
-
-    var userIssues by remember(user.googleId) { mutableStateOf<List<IssueResponseDTO>>(emptyList()) }
-    var isLoadingIssues by remember(user.googleId) { mutableStateOf(true) }
-    var issueLoadFailed by remember(user.googleId) { mutableStateOf(false) }
-    var issueBeingEdited by remember { mutableStateOf<IssueResponseDTO?>(null) }
-    var issueEditLocationText by remember { mutableStateOf("") }
-
-    val issueDeletedText = appString(R.string.profile_issue_deleted_success)
-    val issueUpdatedText = appString(R.string.profile_issue_updated_success)
-    val issueActionErrorText = appString(R.string.profile_issue_action_error)
+    var userIssues by mutableStateOf<List<IssueResponseDTO>>(emptyList())
+    var isLoadingIssues by mutableStateOf(true)
+    var issueLoadFailed by mutableStateOf(false)
+    var issueBeingEdited by mutableStateOf<IssueResponseDTO?>(null)
+    var issueEditLocationText by mutableStateOf("")
 
     suspend fun loadUserIssues() {
         isLoadingIssues = true
         issueLoadFailed = false
-
         try {
-            userIssues = getIssuesByUser(user.googleId)
+            userIssues = getIssuesByUser(userGoogleId)
                 .sortedByDescending { issue ->
                     issue.updatedAt.ifBlank { issue.createdAt }
                 }
@@ -146,14 +147,47 @@ fun ProfileScreen(
         }
     }
 
-    LaunchedEffect(user.googleId) {
-        loadUserIssues()
+    fun deleteIssue(issue: IssueResponseDTO) {
+        scope.launch {
+            try {
+                eliminarIncidencia(issue.id)
+                userIssues = userIssues.filter { it.id != issue.id }
+                if (issueBeingEdited?.id == issue.id) {
+                    issueBeingEdited = null
+                }
+                Toast.makeText(context, issueDeletedText, Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, issueActionErrorText, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
-    LaunchedEffect(issueBeingEdited?.id) {
-        val issue = issueBeingEdited ?: return@LaunchedEffect
-        issueEditLocationText = "${issue.coordinates.lat}, ${issue.coordinates.lon}"
+    fun updateIssue(issue: IssueResponseDTO, type: IssueType, description: String?) {
+        scope.launch {
+            try {
+                val updatedIssue = actualitzarIncidencia(
+                    idIncidencia = issue.id,
+                    request = IssueRequestDTO(
+                        googleId = userGoogleId,
+                        type = IssueApiType.valueOf(type.name),
+                        description = description ?: "",
+                        coordinates = issue.coordinates
+                    )
+                )
 
+                userIssues = userIssues.map { currentIssue ->
+                    if (currentIssue.id == updatedIssue.id) updatedIssue else currentIssue
+                }
+                issueBeingEdited = null
+                Toast.makeText(context, issueUpdatedText, Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, issueActionErrorText, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    suspend fun resolveLocationText(issue: IssueResponseDTO) {
+        issueEditLocationText = "${issue.coordinates.lat}, ${issue.coordinates.lon}"
         try {
             val response = withContext(Dispatchers.IO) {
                 PhotonApi.service.reverseGeocode(
@@ -169,234 +203,69 @@ fun ProfileScreen(
             issueEditLocationText = "${issue.coordinates.lat}, ${issue.coordinates.lon}"
         }
     }
+}
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Color(0xFFF4F7F5))
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier.width(60.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = CircleShape,
-                    color = Color.White,
-                    shadowElevation = 4.dp
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = appString(R.string.back),
-                            tint = Color(0xFF33413B)
-                        )
-                    }
-                }
-            }
+@Composable
+fun rememberProfileIssuesState(
+    userGoogleId: String,
+    scope: kotlinx.coroutines.CoroutineScope = rememberCoroutineScope(),
+    context: android.content.Context = LocalContext.current
+): ProfileIssuesState {
+    val issueDeletedText = appString(R.string.profile_issue_deleted_success)
+    val issueUpdatedText = appString(R.string.profile_issue_updated_success)
+    val issueActionErrorText = appString(R.string.profile_issue_action_error)
 
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = appString(R.string.profile_title),
-                    color = Color(0xFF23333A),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Box(
-                modifier = Modifier.width(60.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                LanguageSelector(
-                    currentLanguage = currentLanguage,
-                    onLanguageSelected = onLanguageSelected
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                ProfileHeader(user = user)
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Spacer(modifier = Modifier.height(28.dp))
-
-                ProfileIssuesSection(
-                    issues = userIssues,
-                    isLoading = isLoadingIssues,
-                    loadFailed = issueLoadFailed,
-                    onRetry = { scope.launch { loadUserIssues() } },
-                    onEdit = { issueBeingEdited = it },
-                    onDelete = { issue ->
-                        scope.launch {
-                            try {
-                                eliminarIncidencia(issue.id)
-                                userIssues = userIssues.filter { it.id != issue.id }
-                                if (issueBeingEdited?.id == issue.id) {
-                                    issueBeingEdited = null
-                                }
-                                Toast.makeText(context, issueDeletedText, Toast.LENGTH_SHORT).show()
-                            } catch (_: Exception) {
-                                Toast.makeText(context, issueActionErrorText, Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(28.dp))
-
-                OutlinedButton(
-                    onClick = onCustomizeClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, Color(0xFFE5ECE7)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color(0xFFF9FBFA),
-                        contentColor = Color(0xFF23333A)
-                    )
-                ) {
-                    Text(
-                        text = appString(R.string.profile_customize),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                ProfileFiltersSection(
-                    filterValues = filterValues,
-                    expanded = isFiltersSectionExpanded,
-                    expandedGroups = expandedGroups,
-                    isLoadingFilters = isLoadingFilters,
-                    areFiltersEnabled = areFiltersEnabled,
-                    onExpandedChange = {
-                        isFiltersSectionExpanded = !isFiltersSectionExpanded
-                    },
-                    onExpandedGroupToggle = { groupIndex ->
-                        expandedGroups = expandedGroups.toMutableList().also { groups ->
-                            groups[groupIndex] = !groups[groupIndex]
-                        }
-                    },
-                    onFilterValueChange = onFilterValueChange
-                )
-
-                Spacer(modifier = Modifier.height(28.dp))
-
-                Button(
-                    onClick = {
-                        showDeleteBanner = false
-                        onLogout()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFC86A37),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text(
-                        text = appString(R.string.log_out),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    OutlinedButton(
-                        onClick = { showDeleteBanner = true },
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, Color(0xFFD58A63)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.White,
-                            contentColor = Color(0xFFB76435)
-                        ),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = appString(R.string.delete_account_short),
-                            color = Color(0xFFB76435),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.End
-                        )
-                    }
-                }
-
-                if (showDeleteBanner) {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    DeleteAccountBanner(
-                        onDismiss = { showDeleteBanner = false },
-                        onConfirm = {
-                            showDeleteBanner = false
-                            onDeleteAccount()
-                        }
-                    )
-                }
-            }
-        }
+    val state = remember(userGoogleId) {
+        ProfileIssuesState(
+            userGoogleId = userGoogleId,
+            scope = scope,
+            context = context,
+            issueDeletedText = issueDeletedText,
+            issueUpdatedText = issueUpdatedText,
+            issueActionErrorText = issueActionErrorText
+        )
     }
 
-    issueBeingEdited?.let { issue ->
+    LaunchedEffect(userGoogleId) {
+        state.loadUserIssues()
+    }
+
+    LaunchedEffect(state.issueBeingEdited?.id) {
+        val issue = state.issueBeingEdited ?: return@LaunchedEffect
+        state.resolveLocationText(issue)
+    }
+
+    return state
+}
+
+@Composable
+private fun ProfileOverlays(
+    gamification: ProfileGamificationState,
+    gamificationCallbacks: ProfileGamificationCallbacks,
+    issuesState: ProfileIssuesState
+) {
+    if (gamification.showLevelUpAnimation) {
+        LevelUpAnimationOverlay(
+            level = gamification.level,
+            onDismiss = gamificationCallbacks.onDismissLevelUp
+        )
+    }
+
+    if (gamification.showPrizeAnimation && gamification.lastOpenedPrize != null) {
+        PrizeAnimationOverlay(
+            prize = gamification.lastOpenedPrize,
+            onDismiss = gamificationCallbacks.onDismissPrize
+        )
+    }
+
+    issuesState.issueBeingEdited?.let { issue ->
         ReportIssueDialog(
             visible = true,
             isLoggedIn = true,
-            defaultLocationText = issueEditLocationText,
-            onDismiss = { issueBeingEdited = null },
+            defaultLocationText = issuesState.issueEditLocationText,
+            onDismiss = { issuesState.issueBeingEdited = null },
             onConfirm = { type, _, description, _ ->
-                scope.launch {
-                    try {
-                        val updatedIssue = actualitzarIncidencia(
-                            idIncidencia = issue.id,
-                            request = IssueRequestDTO(
-                                googleId = user.googleId,
-                                type = IssueApiType.valueOf(type.name),
-                                description = description,
-                                coordinates = issue.coordinates
-                            )
-                        )
-
-                        userIssues = userIssues.map { currentIssue ->
-                            if (currentIssue.id == updatedIssue.id) updatedIssue else currentIssue
-                        }
-                        issueBeingEdited = null
-                        Toast.makeText(context, issueUpdatedText, Toast.LENGTH_SHORT).show()
-                    } catch (_: Exception) {
-                        Toast.makeText(context, issueActionErrorText, Toast.LENGTH_SHORT).show()
-                    }
-                }
+                issuesState.updateIssue(issue, type, description)
             },
             onNavigateToLogin = {},
             initialType = profileIssueType(issue.type),
@@ -408,154 +277,289 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileFiltersSection(
-    filterValues: List<Int>,
-    expanded: Boolean,
-    expandedGroups: List<Boolean>,
-    isLoadingFilters: Boolean,
-    areFiltersEnabled: Boolean,
-    onExpandedChange: () -> Unit,
-    onExpandedGroupToggle: (Int) -> Unit,
-    onFilterValueChange: (Int, Int) -> Unit
+fun ProfileScreen(
+    user: UserInfo,
+    gamification: ProfileGamificationState,
+    gamificationCallbacks: ProfileGamificationCallbacks,
+    filterState: ProfileFilterState,
+    onFilterValueChange: (Int, Int) -> Unit,
+    currentLanguage: AppLanguage,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    onBack: () -> Unit,
+    onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    onCustomizeClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize()
-            .border(1.dp, Color(0xFFD7E5DC), RoundedCornerShape(26.dp)),
-        shape = RoundedCornerShape(26.dp),
-        color = Color(0xFFF2F7F3)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .background(Color(0xFF5E9F7A))
+    var expandedGroups by rememberSaveable {
+        mutableStateOf(List(profileFilterGroups.size) { false })
+    }
+    var isFiltersSectionExpanded by rememberSaveable { mutableStateOf(false) }
+    var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
+
+    val issuesState = rememberProfileIssuesState(userGoogleId = user.googleId)
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF4F7F5))
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            ProfileTopBar(
+                currentLanguage = currentLanguage,
+                onLanguageSelected = onLanguageSelected,
+                onBack = onBack
             )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 18.dp)
+            Spacer(modifier = Modifier.height(24.dp))
+
+            ProfileContentCard(
+                user = user,
+                gamification = gamification,
+                gamificationCallbacks = gamificationCallbacks,
+                filterState = filterState,
+                onFilterValueChange = onFilterValueChange,
+                isFiltersSectionExpanded = isFiltersSectionExpanded,
+                onFiltersSectionExpandedChange = { isFiltersSectionExpanded = !isFiltersSectionExpanded },
+                expandedGroups = expandedGroups,
+                onExpandedGroupToggle = { groupIndex ->
+                    expandedGroups = expandedGroups.toMutableList().also { groups ->
+                        groups[groupIndex] = !groups[groupIndex]
+                    }
+                },
+                onCustomizeClick = onCustomizeClick,
+                onLogout = onLogout,
+                onDeleteAccount = onDeleteAccount,
+                showDeleteBanner = showDeleteBanner,
+                onShowDeleteBanner = { showDeleteBanner = true },
+                onDismissDeleteBanner = { showDeleteBanner = false },
+                issues = issuesState.userIssues,
+                isLoadingIssues = issuesState.isLoadingIssues,
+                issueLoadFailed = issuesState.issueLoadFailed,
+                onRetryIssues = { issuesState.scope.launch { issuesState.loadUserIssues() } },
+                onEditIssue = { issuesState.issueBeingEdited = it },
+                onDeleteIssue = { issue -> issuesState.deleteIssue(issue) }
+            )
+        }
+
+        ProfileOverlays(
+            gamification = gamification,
+            gamificationCallbacks = gamificationCallbacks,
+            issuesState = issuesState
+        )
+    }
+}
+
+
+@Composable
+private fun ProfileTopBar(
+    currentLanguage: AppLanguage,
+    onLanguageSelected: (AppLanguage) -> Unit,
+    onBack: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.width(60.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = Color.White,
+                shadowElevation = 4.dp
             ) {
-                ProfileFiltersHeader(
-                    expanded = expanded,
-                    onExpandedChange = onExpandedChange
-                )
-
-                if (isLoadingFilters) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    FiltersSyncStatusRow(isLoadingFilters = isLoadingFilters)
-                }
-
-                if (expanded) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    FilterGroupsList(
-                        filterValues = filterValues,
-                        expandedGroups = expandedGroups,
-                        areFiltersEnabled = areFiltersEnabled,
-                        onExpandedGroupToggle = onExpandedGroupToggle,
-                        onFilterValueChange = onFilterValueChange
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = appString(R.string.back),
+                        tint = Color(0xFF33413B)
                     )
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun ProfileFiltersHeader(
-    expanded: Boolean,
-    onExpandedChange: () -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(18.dp))
-                .clickable(onClick = onExpandedChange)
-                .padding(vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.Center
         ) {
             Text(
-                modifier = Modifier.weight(1f),
-                text = appString(R.string.profile_filters_intro_title),
+                text = appString(R.string.profile_title),
                 color = Color(0xFF23333A),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
+        }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = null,
-                tint = Color(0xFF5C6A64)
+        Box(
+            modifier = Modifier.width(60.dp),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            LanguageSelector(
+                currentLanguage = currentLanguage,
+                onLanguageSelected = onLanguageSelected
             )
         }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = appString(R.string.profile_filters_intro_message),
-            color = Color(0xFF60716A),
-            style = MaterialTheme.typography.bodyMedium
-        )
     }
 }
 
 @Composable
-private fun FilterGroupsList(
-    filterValues: List<Int>,
+private fun ProfileContentCard(
+    user: UserInfo,
+    gamification: ProfileGamificationState,
+    gamificationCallbacks: ProfileGamificationCallbacks,
+    filterState: ProfileFilterState,
+    onFilterValueChange: (Int, Int) -> Unit,
+    isFiltersSectionExpanded: Boolean,
+    onFiltersSectionExpandedChange: () -> Unit,
     expandedGroups: List<Boolean>,
-    areFiltersEnabled: Boolean,
     onExpandedGroupToggle: (Int) -> Unit,
-    onFilterValueChange: (Int, Int) -> Unit
+    onCustomizeClick: () -> Unit,
+    onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    showDeleteBanner: Boolean,
+    onShowDeleteBanner: () -> Unit,
+    onDismissDeleteBanner: () -> Unit,
+    issues: List<IssueResponseDTO>,
+    isLoadingIssues: Boolean,
+    issueLoadFailed: Boolean,
+    onRetryIssues: () -> Unit,
+    onEditIssue: (IssueResponseDTO) -> Unit,
+    onDeleteIssue: (IssueResponseDTO) -> Unit
 ) {
-    var filterOffset = 0
-    profileFilterGroups.forEachIndexed { groupIndex, group ->
-        val groupStartIndex = filterOffset
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ProfileHeaderSection(
+                user = user,
+                gamification = gamification,
+                gamificationCallbacks = gamificationCallbacks
+            )
 
-        FilterAccordion(
-            title = appString(group.titleResId),
-            description = appString(group.descriptionResId),
-            accentColor = group.accentColor,
-            icon = group.icon,
-            filterCountText = appPlural(
-                R.plurals.profile_filter_count,
-                group.filters.size,
-                group.filters.size
-            ),
-            expanded = expandedGroups[groupIndex],
-            filterLabels = group.filters.map { appString(it.labelResId) },
-            filterValues = group.filters.indices.map { localIndex ->
-                filterValues.getOrElse(groupStartIndex + localIndex) { 1 }
-            },
-            enabled = areFiltersEnabled,
-            onExpandedChange = { onExpandedGroupToggle(groupIndex) },
-            onValueChange = { localIndex, newValue ->
-                onFilterValueChange(groupStartIndex + localIndex, newValue)
+            Spacer(modifier = Modifier.height(28.dp))
+
+            ProfileIssuesSection(
+                issues = issues,
+                isLoading = isLoadingIssues,
+                loadFailed = issueLoadFailed,
+                onRetry = onRetryIssues,
+                onEdit = onEditIssue,
+                onDelete = onDeleteIssue
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            OutlinedButton(
+                onClick = onCustomizeClick,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFFE5ECE7)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color(0xFFF9FBFA),
+                    contentColor = Color(0xFF23333A)
+                )
+            ) {
+                Text(
+                    text = appString(R.string.profile_customize),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
-        )
 
-        filterOffset += group.filters.size
+            Spacer(modifier = Modifier.height(20.dp))
 
-        if (groupIndex < profileFilterGroups.lastIndex) {
-            Spacer(modifier = Modifier.height(12.dp))
+            ProfileFiltersSection(
+                filterValues = filterState.values,
+                expanded = isFiltersSectionExpanded,
+                expandedGroups = expandedGroups,
+                isLoadingFilters = filterState.isLoading,
+                areFiltersEnabled = filterState.areEnabled,
+                onExpandedChange = onFiltersSectionExpandedChange,
+                onExpandedGroupToggle = onExpandedGroupToggle,
+                onFilterValueChange = onFilterValueChange
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            ProfileAccountActions(
+                onLogout = onLogout,
+                onDeleteAccount = onDeleteAccount,
+                showDeleteBanner = showDeleteBanner,
+                onShowDeleteBanner = onShowDeleteBanner,
+                onDismissDeleteBanner = onDismissDeleteBanner
+            )
         }
     }
 }
 
 @Composable
-private fun ProfileHeader(user: UserInfo) {
-    val points = 1045
-    val pointsPerLevel = 100
-    val maxLevel = 20
+private fun ProfileHeaderSection(
+    user: UserInfo,
+    gamification: ProfileGamificationState,
+    gamificationCallbacks: ProfileGamificationCallbacks
+) {
+    if (gamification.isLoading) {
+        CircularProgressIndicator(color = Color(0xFF5E9F7A))
+    } else {
+        ProfileHeader(
+            user = user,
+            level = gamification.level,
+            points = gamification.points
+        )
+    }
 
-    val currentLevel = (points / pointsPerLevel + 1).coerceAtMost(maxLevel)
-    val pointsInCurrentLevel = points % pointsPerLevel
-    val progress = if (currentLevel == maxLevel) 1f else pointsInCurrentLevel.toFloat() / pointsPerLevel
+    if (gamification.recompenses > 0) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = gamificationCallbacks.onOpenPrize,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape = RoundedCornerShape(20.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF5E9F7A),
+                contentColor = Color.White
+            )
+        ) {
+            Text(
+                text = "🎁 Open reward (${gamification.recompenses} available)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileHeader(
+    user: UserInfo,
+    level: Long,
+    points: Long
+) {
+    val currentLevel = level.toInt()
+    val pointsForCurrentLevel = ((currentLevel - 1).toLong() * 10L).let { it * it }
+    val pointsForNextLevel = (currentLevel.toLong() * 10L).let { it * it }
+    val pointsInCurrentLevel = (points - pointsForCurrentLevel).coerceAtLeast(0)
+    val pointsNeededForNext = pointsForNextLevel - pointsForCurrentLevel
+    val progress = if (pointsNeededForNext > 0) {
+        (pointsInCurrentLevel.toFloat() / pointsNeededForNext.toFloat()).coerceIn(0f, 1f)
+    } else 1f
 
     val tier = ((currentLevel - 1) / 5).coerceIn(0, 3)
     val tierColor = when (tier) {
@@ -638,7 +642,7 @@ private fun ProfileHeader(user: UserInfo) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = appString(R.string.profile_points, pointsInCurrentLevel, pointsPerLevel),
+                    text = appString(R.string.profile_points, pointsInCurrentLevel.toInt(), pointsNeededForNext.toInt()),
                     color = Color(0xFF77837D),
                     style = MaterialTheme.typography.labelSmall
                 )
@@ -654,34 +658,6 @@ private fun ProfileHeader(user: UserInfo) {
                     .clip(RoundedCornerShape(4.dp)),
                 color = tierColor,
                 trackColor = Color(0xFFE5ECE7)
-            )
-        }
-    }
-}
-
-@Composable
-private fun FiltersSyncStatusRow(
-    isLoadingFilters: Boolean
-) {
-    if (!isLoadingFilters) {
-        return
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start
-    ) {
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = Color(0xFFE4F0FA)
-        ) {
-            Text(
-                text = appString(R.string.profile_filters_sync_loading),
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                color = Color(0xFF2A5F8A),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
             )
         }
     }
@@ -940,6 +916,174 @@ private fun ProfileIssueCard(
 }
 
 @Composable
+private fun FiltersSyncStatusRow(
+    isLoadingFilters: Boolean
+) {
+    if (!isLoadingFilters) {
+        return
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = Color(0xFFE4F0FA)
+        ) {
+            Text(
+                text = appString(R.string.profile_filters_sync_loading),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                color = Color(0xFF2A5F8A),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileFiltersSection(
+    filterValues: List<Int>,
+    expanded: Boolean,
+    expandedGroups: List<Boolean>,
+    isLoadingFilters: Boolean,
+    areFiltersEnabled: Boolean,
+    onExpandedChange: () -> Unit,
+    onExpandedGroupToggle: (Int) -> Unit,
+    onFilterValueChange: (Int, Int) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .border(1.dp, Color(0xFFD7E5DC), RoundedCornerShape(26.dp)),
+        shape = RoundedCornerShape(26.dp),
+        color = Color(0xFFF2F7F3)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .background(Color(0xFF5E9F7A))
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 18.dp)
+            ) {
+                ProfileFiltersHeader(
+                    expanded = expanded,
+                    onExpandedChange = onExpandedChange
+                )
+
+                if (isLoadingFilters) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    FiltersSyncStatusRow(isLoadingFilters = isLoadingFilters)
+                }
+
+                if (expanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    FilterGroupsList(
+                        filterValues = filterValues,
+                        expandedGroups = expandedGroups,
+                        areFiltersEnabled = areFiltersEnabled,
+                        onExpandedGroupToggle = onExpandedGroupToggle,
+                        onFilterValueChange = onFilterValueChange
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileFiltersHeader(
+    expanded: Boolean,
+    onExpandedChange: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .clickable(onClick = onExpandedChange)
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                modifier = Modifier.weight(1f),
+                text = appString(R.string.profile_filters_intro_title),
+                color = Color(0xFF23333A),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = null,
+                tint = Color(0xFF5C6A64)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = appString(R.string.profile_filters_intro_message),
+            color = Color(0xFF60716A),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun FilterGroupsList(
+    filterValues: List<Int>,
+    expandedGroups: List<Boolean>,
+    areFiltersEnabled: Boolean,
+    onExpandedGroupToggle: (Int) -> Unit,
+    onFilterValueChange: (Int, Int) -> Unit
+) {
+    var filterOffset = 0
+    profileFilterGroups.forEachIndexed { groupIndex, group ->
+        val groupStartIndex = filterOffset
+
+        FilterAccordion(
+            title = appString(group.titleResId),
+            description = appString(group.descriptionResId),
+            accentColor = group.accentColor,
+            icon = group.icon,
+            filterCountText = appPlural(
+                R.plurals.profile_filter_count,
+                group.filters.size,
+                group.filters.size
+            ),
+            expanded = expandedGroups[groupIndex],
+            filterLabels = group.filters.map { appString(it.labelResId) },
+            filterValues = group.filters.indices.map { localIndex ->
+                filterValues.getOrElse(groupStartIndex + localIndex) { 1 }
+            },
+            enabled = areFiltersEnabled,
+            onExpandedChange = { onExpandedGroupToggle(groupIndex) },
+            onValueChange = { localIndex, newValue ->
+                onFilterValueChange(groupStartIndex + localIndex, newValue)
+            }
+        )
+
+        filterOffset += group.filters.size
+
+        if (groupIndex < profileFilterGroups.lastIndex) {
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+    }
+}
+
+@Composable
 private fun FilterAccordion(
     title: String,
     description: String,
@@ -1152,6 +1296,74 @@ private fun PreferenceBadge(
             color = accentColor,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun ProfileAccountActions(
+    onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    showDeleteBanner: Boolean,
+    onShowDeleteBanner: () -> Unit,
+    onDismissDeleteBanner: () -> Unit
+) {
+    Button(
+        onClick = {
+            onDismissDeleteBanner()
+            onLogout()
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp),
+        shape = RoundedCornerShape(20.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFFC86A37),
+            contentColor = Color.White
+        )
+    ) {
+        Text(
+            text = appString(R.string.log_out),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+
+    Spacer(modifier = Modifier.height(10.dp))
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End
+    ) {
+        OutlinedButton(
+            onClick = onShowDeleteBanner,
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, Color(0xFFD58A63)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color.White,
+                contentColor = Color(0xFFB76435)
+            ),
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = appString(R.string.delete_account_short),
+                color = Color(0xFFB76435),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.End
+            )
+        }
+    }
+
+    if (showDeleteBanner) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        DeleteAccountBanner(
+            onDismiss = onDismissDeleteBanner,
+            onConfirm = {
+                onDismissDeleteBanner()
+                onDeleteAccount()
+            }
         )
     }
 }
