@@ -17,6 +17,7 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.modes.CameraMode
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 
 fun drawRoute(
@@ -164,4 +165,27 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     canvas.drawText(emoji, size / 2f, y, textPaint)
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
+}
+
+fun drawRouteOnMap(
+    map: MapLibreMap,
+    coordenades: List<Coordenada>,
+    origen: LatLng?,
+    desti: LatLng?,
+    context: Context,
+    originTitle: String,
+    destinationTitle: String,
+    animateCamera: Boolean = true,
+    routeColor: String? = null
+) {
+    if (coordenades.isEmpty()) return
+    if (map.style?.isFullyLoaded != true) return
+
+    disableLocationCamera(map)
+    val puntsRuta = buildRoutePoints(coordenades, origen, desti)
+    drawRoutePolyline(map, puntsRuta, routeColor)
+    addRouteMarkers(map, origen, desti, context, originTitle, destinationTitle)
+    if (animateCamera) {
+        animateCameraToRoute(map, puntsRuta)
+    }
 }

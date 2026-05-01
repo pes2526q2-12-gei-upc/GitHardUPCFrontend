@@ -1224,6 +1224,9 @@ private fun renderMapStateAfterStyleLoaded(
     renderContext: MapRenderContext
 ) {
     renderContext.viewModel.onMapaListo()
+
+    clearLegacyAnnotations(map)
+
     enableLocationOnMapIfNeeded(
         locationGranted = uiState.locationGranted,
         mapView = renderContext.mapView,
@@ -1240,8 +1243,8 @@ private fun renderMapStateAfterStyleLoaded(
     )
 
     if (uiState.rutaCoordenades.isNotEmpty()) {
-        drawCurrentRoute(
-            mapView = renderContext.mapView,
+        drawCurrentRouteOnMap(
+            map = map,
             uiState = uiState,
             context = renderContext.context,
             originLabel = renderContext.originLabel,
@@ -1253,7 +1256,7 @@ private fun renderMapStateAfterStyleLoaded(
             puntsInteres = uiState.puntsInteres,
             context = renderContext.context
         )
-        addIssueMarkers(map, uiState.issues, renderContext.context)   // NOU
+        addIssueMarkers(map, uiState.issues, renderContext.context)
         return
     }
 
@@ -1265,7 +1268,7 @@ private fun renderMapStateAfterStyleLoaded(
         originLabel = renderContext.originLabel,
         destinationLabel = renderContext.destinationLabel
     )
-    addIssueMarkers(map, uiState.issues, renderContext.context)        // NOU
+    addIssueMarkers(map, uiState.issues, renderContext.context)
 }
 
 private fun addIssueMarkers(
@@ -1317,8 +1320,8 @@ private fun syncNavigationCameraTracking(
     }
 }
 
-private fun drawCurrentRoute(
-    mapView: MapView,
+private fun drawCurrentRouteOnMap(
+    map: MapLibreMap,
     uiState: MapUiState,
     context: Context,
     originLabel: String,
@@ -1330,8 +1333,8 @@ private fun drawCurrentRoute(
         uiState.origenSeleccionado ?: uiState.ultimaUbicacion?.toLatLng()
     }
 
-    drawRoute(
-        mapView = mapView,
+    drawRouteOnMap(
+        map = map,
         coordenades = uiState.rutaCoordenades,
         origen = routeOrigin,
         desti = uiState.destinoSeleccionado,
@@ -1489,6 +1492,8 @@ fun createIssueIcon(context: Context, tipus: IssueApiType): org.maplibre.android
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
 }
+
+
 
 
 

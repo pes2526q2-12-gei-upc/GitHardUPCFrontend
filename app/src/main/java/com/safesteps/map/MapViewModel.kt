@@ -852,10 +852,7 @@ class MapViewModel(
                 val llista = getAllIssues()
 
                 val llistaSenseDuplicats = llista
-                    .groupBy { Pair(it.coordinates.lat, it.coordinates.lon) }
-                    .map { (_, issuesEnAquestPunt) ->
-                        issuesEnAquestPunt.minByOrNull { it.createdAt } ?: issuesEnAquestPunt.first()
-                    }
+                    .distinctBy { it.id }
 
                 _uiState.update { it.copy(issues = llistaSenseDuplicats) }
             } catch (e: Exception) {
@@ -1030,18 +1027,22 @@ class MapViewModel(
                 )
 
                 val resposta = actualitzarIncidencia(incidenciaId, request)
-                Log.d("MapViewModel", "guardarEdicio RESPOSTA id=${resposta.id} coords=(${resposta.coordinates.lat},${resposta.coordinates.lon})")
+                Log.d("MapViewModel", "guardarEdicio RESPOSTA id=${resposta.id} type=${resposta.type} desc=${resposta.description}")
 
                 _uiState.update { currentState ->
                     currentState.copy(
                         issues = currentState.issues.map { si ->
                             if (si.id == incidenciaId) resposta else si
                         },
-                        incidenciaEnEdicio = null
+                        incidenciaEnEdicio = null,
+                        incidenciaSeleccionada = if (currentState.incidenciaSeleccionada?.id == incidenciaId) {
+                            resposta
+                        } else {
+                            currentState.incidenciaSeleccionada
+                        }
                     )
                 }
 
-                loadIssuesMap()
 
             } catch (e: Exception) {
                 Log.e("MapViewModel", "Error desant l'edició: ${e.message}")
