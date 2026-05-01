@@ -100,8 +100,6 @@ fun SafeStepsApp(
         }
     }
 
-    // Combina les dues lògiques de back: si estem a CUSTOMIZE tornem a PROFILE,
-    // si estem a PROFILE tornem a MAP i refresquem incidències.
     BackHandler(
         enabled = isProfileDestination(currentDestination) ||
                 currentDestination == SafeStepsDestination.CUSTOMIZE

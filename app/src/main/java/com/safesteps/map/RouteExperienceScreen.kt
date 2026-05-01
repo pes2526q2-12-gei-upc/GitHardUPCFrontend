@@ -1094,7 +1094,10 @@ private fun RouteActiveBottomBar(
             Spacer(modifier = Modifier.width(8.dp))
 
             Surface(
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier
+                    .size(40.dp)
+                    .semantics { testTag = "btn_close_route" }
+                    .testTag("btn_close_route"),
                 shape = CircleShape,
                 color = Color(0xFFF1F3F4)
             ) {

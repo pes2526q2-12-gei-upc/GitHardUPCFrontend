@@ -38,8 +38,6 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-// Funcions de nivell superior — extretes fora de la classe perquè el merge
-// les havia ficat dins de voteIssue per error.
 internal fun formatReadableDuration(durationMinutes: Int): String {
     require(durationMinutes > 0) {
         "durationMinutes must be greater than 0"
