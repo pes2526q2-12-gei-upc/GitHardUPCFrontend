@@ -458,16 +458,6 @@ private fun ProfileContentCard(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            ProfileIssuesSection(
-                issues = issues,
-                isLoading = isLoadingIssues,
-                loadFailed = issueLoadFailed,
-                expanded = isIssuesSectionExpanded,
-                onExpandedChange = onIssuesSectionExpandedChange,
-                onRetry = onRetryIssues,
-                onEdit = onEditIssue,
-                onDelete = onDeleteIssue
-            )
 
             Spacer(modifier = Modifier.height(28.dp))
 
@@ -499,6 +489,19 @@ private fun ProfileContentCard(
                 onExpandedChange = onFiltersSectionExpandedChange,
                 onExpandedGroupToggle = onExpandedGroupToggle,
                 onFilterValueChange = onFilterValueChange
+            )
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            ProfileIssuesSection(
+                issues = issues,
+                isLoading = isLoadingIssues,
+                loadFailed = issueLoadFailed,
+                expanded = isIssuesSectionExpanded,
+                onExpandedChange = onIssuesSectionExpandedChange,
+                onRetry = onRetryIssues,
+                onEdit = onEditIssue,
+                onDelete = onDeleteIssue
             )
 
             Spacer(modifier = Modifier.height(28.dp))
