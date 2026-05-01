@@ -116,4 +116,44 @@ class NavigationInstructionsTest {
         assertEquals(NavigationManeuver.RIGHT, progress.instruction.followUpManeuver)
         assertTrue((progress.instruction.followUpDistanceMeters ?: 0.0) > 70.0)
     }
+
+    @Test
+    fun resolveStartedRouteMode_usesFixedOverviewWhenOriginIsFarFromUser() {
+        val routeMode = resolveStartedRouteMode(
+            selectedOrigin = Coordenada(lat = 41.3851, lon = 2.1734),
+            currentLocation = Coordenada(lat = 41.3875, lon = 2.1762)
+        )
+
+        assertEquals(ActiveRouteMode.FIXED_OVERVIEW, routeMode)
+    }
+
+    @Test
+    fun resolveStartedRouteMode_usesLiveNavigationWhenOriginMatchesUserLocation() {
+        val routeMode = resolveStartedRouteMode(
+            selectedOrigin = Coordenada(lat = 41.3851, lon = 2.1734),
+            currentLocation = Coordenada(lat = 41.38511, lon = 2.17341)
+        )
+
+        assertEquals(ActiveRouteMode.USER_LOCATION_NAVIGATION, routeMode)
+    }
+
+    @Test
+    fun remainingRouteCoordinates_keepsOnlyPendingRouteSegment() {
+        val route = buildNavigationRouteModel(
+            coordinates = listOf(
+                Coordenada(lat = 41.3851, lon = 2.1734),
+                Coordenada(lat = 41.3851, lon = 2.1747),
+                Coordenada(lat = 41.3842, lon = 2.1747)
+            )
+        )!!
+
+        val remainingCoordinates = remainingRouteCoordinates(
+            route = route,
+            progressMeters = 60.0
+        )
+
+        assertTrue(remainingCoordinates.size >= 2)
+        assertTrue(remainingCoordinates.first().lon > route.points.first().lon)
+        assertEquals(route.points.last(), remainingCoordinates.last())
+    }
 }

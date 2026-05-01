@@ -2,7 +2,6 @@
 
 import android.location.Location
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.auth.UserInfo
@@ -33,11 +32,57 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.maplibre.android.geometry.LatLng
-import java.text.SimpleDateFormat
+import java.text.DateFormat
 import java.util.Calendar
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
+
+// Funcions de nivell superior — extretes fora de la classe perquè el merge
+// les havia ficat dins de voteIssue per error.
+internal fun formatReadableDuration(durationMinutes: Int): String {
+    require(durationMinutes > 0) {
+        "durationMinutes must be greater than 0"
+    }
+
+    val hours = durationMinutes / 60
+    val minutes = durationMinutes % 60
+
+    return when {
+        hours == 0 -> "$durationMinutes min"
+        minutes == 0 -> "$hours h"
+        else -> "$hours h $minutes min"
+    }
+}
+
+internal fun proportionalRemainingDurationMinutes(
+    totalDurationMinutes: Int,
+    remainingDistanceMeters: Double,
+    routeProgressReferenceDistanceMeters: Double
+): Int {
+    require(totalDurationMinutes > 0) {
+        "totalDurationMinutes must be greater than 0"
+    }
+    require(routeProgressReferenceDistanceMeters > 0.0) {
+        "routeProgressReferenceDistanceMeters must be greater than 0"
+    }
+
+    val clampedRemainingDistanceMeters = remainingDistanceMeters
+        .coerceIn(0.0, routeProgressReferenceDistanceMeters)
+
+    if (clampedRemainingDistanceMeters <= 0.0) {
+        return 0
+    }
+
+    return max(
+        1,
+        (
+                totalDurationMinutes.toDouble() *
+                        clampedRemainingDistanceMeters /
+                        routeProgressReferenceDistanceMeters
+                ).roundToInt()
+    )
+}
 
 class MapViewModel(
     private val textProvider: MapTextProvider,
@@ -66,6 +111,7 @@ class MapViewModel(
     init {
         loadIssuesMap()
     }
+
     fun onLanguageChanged(language: AppLanguage) {
         currentLanguage = language
     }
@@ -81,18 +127,20 @@ class MapViewModel(
             val cached = votesCache.load(gid)
             _uiState.update { it.copy(userVotes = cached) }
 
-            /*viewModelScope.launch {
-                try {
-                    val remote = obtenirVotsUsuari(gid)
-                    votesCache.save(gid, remote)
-                    _uiState.update { it.copy(userVotes = remote) }
-                } catch (e: Exception) {
-                    Log.w("MapViewModel", "No s'han pogut sincronitzar vots: ${e.message}")
-                    }
-            }*/
+            // TODO: quan el backend tingui /votes/users/{googleId}/scores:
+            // viewModelScope.launch {
+            //     try {
+            //         val remote = obtenirVotsUsuari(gid)
+            //         votesCache.save(gid, remote)
+            //         _uiState.update { it.copy(userVotes = remote) }
+            //     } catch (e: Exception) {
+            //         Log.w("MapViewModel", "No s'han pogut sincronitzar vots: ${e.message}")
+            //     }
+            // }
         } else {
             _uiState.update { it.copy(userVotes = emptyMap()) }
         }
+        _uiState.update { it.copy(routeColor = user?.routeColor) }
     }
 
     fun toggleEstiloSatelite() {
@@ -113,6 +161,7 @@ class MapViewModel(
                 durationText = DEFAULT_DURATION_TEXT,
                 etaText = DEFAULT_ETA_TEXT,
                 rutaCoordenades = emptyList(),
+                activeRouteMode = ActiveRouteMode.NONE,
                 modoRuta = false,
                 navigationCameraFollowing = false,
                 routeCompleted = false,
@@ -131,21 +180,24 @@ class MapViewModel(
 
     fun cancelarRutaVisual() {
         resetNavigationState()
-        _uiState.update { it.copy(
-            rutaCoordenades = emptyList(),
-            modoRuta = false,
-            navigationCameraFollowing = false,
-            routeCompleted = false,
-            routeCompletionSummary = null,
-            activeNavigationInstruction = null,
-            navigationNotice = null,
-            distanceText = DEFAULT_DISTANCE_TEXT,
-            durationText = DEFAULT_DURATION_TEXT,
-            etaText = DEFAULT_ETA_TEXT,
-            calculantRuta = false,
-            puntsInteres = emptyList(),
-            puntInteresSeleccionat = null
-        ) }
+        _uiState.update {
+            it.copy(
+                rutaCoordenades = emptyList(),
+                activeRouteMode = ActiveRouteMode.NONE,
+                modoRuta = false,
+                navigationCameraFollowing = false,
+                routeCompleted = false,
+                routeCompletionSummary = null,
+                activeNavigationInstruction = null,
+                navigationNotice = null,
+                distanceText = DEFAULT_DISTANCE_TEXT,
+                durationText = DEFAULT_DURATION_TEXT,
+                etaText = DEFAULT_ETA_TEXT,
+                calculantRuta = false,
+                puntsInteres = emptyList(),
+                puntInteresSeleccionat = null
+            )
+        }
     }
 
     fun updateLocation(location: Location) {
@@ -199,7 +251,7 @@ class MapViewModel(
                         state.copy(adrecesSuggerides = resultatsNets)
                     }
                 } catch (e: Exception) {
-                    Log.e("PhotonAPI", "Error en la peticiÃ³: ${e.message}")
+                    Log.e("PhotonAPI", "Error en la petició: ${e.message}")
                     _uiState.update { it.copy(adrecesSuggerides = emptyList()) }
                 }
             }
@@ -236,20 +288,22 @@ class MapViewModel(
     }
 
     fun limpiarOrigen() {
-        _uiState.update { it.copy(
-            origenSeleccionado = null,
-            textoOrigen = ""
-        ) }
+        _uiState.update {
+            it.copy(
+                origenSeleccionado = null,
+                textoOrigen = ""
+            )
+        }
     }
 
     fun limpiarDestino() {
-        _uiState.update { it.copy(
-            destinoSeleccionado = null,
-            textoDestino = ""
-        ) }
+        _uiState.update {
+            it.copy(
+                destinoSeleccionado = null,
+                textoDestino = ""
+            )
+        }
     }
-
-
 
     fun onMapClicked(point: LatLng) {
         if (_uiState.value.modoRuta) return
@@ -298,7 +352,7 @@ class MapViewModel(
         }
 
         if (!isInsideBarcelonaArea(destiLat, destiLong)) {
-            _uiState.update { it.copy(navigationNotice = "El destÃ­ de la ruta ha de ser dins de Barcelona") }
+            _uiState.update { it.copy(navigationNotice = "El destí de la ruta ha de ser dins de Barcelona") }
             return
         }
 
@@ -345,21 +399,29 @@ class MapViewModel(
         }
     }
 
-    fun iniciarNavegacio() {
+    fun iniciarRuta(): ActiveRouteMode {
+        val startedRouteMode = resolveStartedRouteMode(
+            selectedOrigin = _uiState.value.origenSeleccionado?.toCoordenada(),
+            currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada()
+        )
         lastNavigationProgressMeters = 0.0
         _uiState.update {
             it.copy(
+                activeRouteMode = startedRouteMode,
                 modoRuta = true,
-                navigationCameraFollowing = true,
+                navigationCameraFollowing = startedRouteMode == ActiveRouteMode.USER_LOCATION_NAVIGATION,
                 routeCompleted = false,
                 routeCompletionSummary = null,
+                activeNavigationInstruction = null,
                 navigationNotice = null
             )
         }
-        refreshNavigationProgress(
-            currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate(),
-            force = true
-        )
+        if (startedRouteMode == ActiveRouteMode.USER_LOCATION_NAVIGATION) {
+            refreshNavigationProgress(
+                currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate()
+            )
+        }
+        return startedRouteMode
     }
 
     fun onMapaListo() {
@@ -368,7 +430,7 @@ class MapViewModel(
 
     fun onNavigationCameraDismissedByGesture() {
         _uiState.update { state ->
-            if (!state.modoRuta || !state.navigationCameraFollowing) {
+            if (!state.usesLiveNavigation || !state.navigationCameraFollowing) {
                 state
             } else {
                 state.copy(navigationCameraFollowing = false)
@@ -378,7 +440,7 @@ class MapViewModel(
 
     fun resumeNavigationCameraTracking() {
         _uiState.update { state ->
-            if (!state.modoRuta || state.routeCompleted) {
+            if (!state.usesLiveNavigation || state.routeCompleted) {
                 state
             } else {
                 state.copy(navigationCameraFollowing = true)
@@ -390,7 +452,7 @@ class MapViewModel(
         _uiState.update { it.copy(mostrarPuntsInteres = !it.mostrarPuntsInteres) }
     }
 
-    fun onPuntInteresSeleccionat(punt: com.safesteps.data.PuntInteres?) {
+    fun onPuntInteresSeleccionat(punt: PuntInteres?) {
         _uiState.update { it.copy(puntInteresSeleccionat = punt) }
     }
 
@@ -426,13 +488,7 @@ class MapViewModel(
             return DEFAULT_DURATION_TEXT
         }
 
-        if (durationMinutes <= 60) {
-            return "$durationMinutes min"
-        }
-
-        val hours = durationMinutes / 60
-        val minutes = durationMinutes % 60
-        return "${hours}h y ${minutes}min"
+        return formatReadableDuration(durationMinutes)
     }
 
     private fun formatEta(durationMinutes: Int): String {
@@ -440,7 +496,8 @@ class MapViewModel(
         val calendar = Calendar.getInstance().apply {
             add(Calendar.MINUTE, durationMinutes)
         }
-        return SimpleDateFormat("h:mm a", localeForCurrentLanguage()).format(calendar.time)
+        return DateFormat.getTimeInstance(DateFormat.SHORT, localeForCurrentLanguage())
+            .format(calendar.time)
     }
 
     private fun estimateMinutesFromDistanceMeters(distanceMeters: Double): Int {
@@ -516,10 +573,9 @@ class MapViewModel(
             )
         }
 
-        if (_uiState.value.modoRuta) {
+        if (_uiState.value.usesLiveNavigation) {
             refreshNavigationProgress(
-                currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate(),
-                force = true
+                currentLocation = _uiState.value.ultimaUbicacion?.toCoordenada() ?: routeStartCoordinate()
             )
         }
     }
@@ -531,15 +587,12 @@ class MapViewModel(
         lastAutomaticRecalculationAtMs = 0L
     }
 
-    private fun refreshNavigationProgress(
-        currentLocation: Coordenada?,
-        force: Boolean = false
-    ) {
+    private fun refreshNavigationProgress(currentLocation: Coordenada?) {
         val route = navigationRoute ?: return
         val location = currentLocation ?: return
         val state = _uiState.value
 
-        if (!force && !state.modoRuta) {
+        if (!state.usesLiveNavigation) {
             return
         }
 
@@ -566,9 +619,14 @@ class MapViewModel(
         lastNavigationProgressMeters = progress.progressMeters
 
         val remainingDurationMinutes = remainingDurationMinutes(progress.instruction.remainingDistanceMeters)
+        val remainingCoordinates = remainingRouteCoordinates(
+            route = route,
+            progressMeters = progress.progressMeters
+        )
 
         _uiState.update {
             it.copy(
+                rutaCoordenades = remainingCoordinates,
                 activeNavigationInstruction = progress.instruction,
                 distanceText = formatDistance(progress.instruction.remainingDistanceMeters),
                 durationText = formatDuration(remainingDurationMinutes),
@@ -581,7 +639,7 @@ class MapViewModel(
         state: MapUiState,
         progress: NavigationProgressResult
     ): Boolean {
-        if (!state.modoRuta || state.calculantRuta || state.routeCompleted) {
+        if (!state.usesLiveNavigation || state.calculantRuta || state.routeCompleted) {
             return false
         }
 
@@ -622,7 +680,7 @@ class MapViewModel(
 
     private fun shouldCompleteRoute(progress: NavigationProgressResult): Boolean {
         return progress.instruction.maneuver == NavigationManeuver.ARRIVE &&
-            progress.instruction.remainingDistanceMeters <= ARRIVAL_DISTANCE_METERS
+                progress.instruction.remainingDistanceMeters <= ARRIVAL_DISTANCE_METERS
     }
 
     private fun completeRoute(progress: NavigationProgressResult) {
@@ -659,17 +717,26 @@ class MapViewModel(
         }
 
         val routeSummary = currentRouteSummary
+        val routeProgressReferenceDistanceMeters = navigationRoute?.totalDistanceMeters
         return when {
             routeSummary != null &&
-                routeSummary.totalDurationMinutes > 0 &&
-                routeSummary.totalDistanceMeters > 0.0 -> {
-                max(
-                    1,
-                    (
-                        routeSummary.totalDurationMinutes.toDouble() *
-                            remainingDistanceMeters /
-                            routeSummary.totalDistanceMeters
-                        ).roundToInt()
+                    routeSummary.totalDurationMinutes > 0 &&
+                    routeProgressReferenceDistanceMeters != null &&
+                    routeProgressReferenceDistanceMeters > 0.0 -> {
+                proportionalRemainingDurationMinutes(
+                    totalDurationMinutes = routeSummary.totalDurationMinutes,
+                    remainingDistanceMeters = remainingDistanceMeters,
+                    routeProgressReferenceDistanceMeters = routeProgressReferenceDistanceMeters
+                )
+            }
+
+            routeSummary != null &&
+                    routeSummary.totalDurationMinutes > 0 &&
+                    routeSummary.totalDistanceMeters > 0.0 -> {
+                proportionalRemainingDurationMinutes(
+                    totalDurationMinutes = routeSummary.totalDurationMinutes,
+                    remainingDistanceMeters = remainingDistanceMeters,
+                    routeProgressReferenceDistanceMeters = routeSummary.totalDistanceMeters
                 )
             }
 
@@ -682,7 +749,7 @@ class MapViewModel(
     }
 
     private fun routeOriginForState(state: MapUiState): Coordenada? {
-        return if (state.modoRuta) {
+        return if (state.usesLiveNavigation) {
             state.ultimaUbicacion?.toCoordenada() ?: state.origenSeleccionado?.toCoordenada()
         } else {
             state.origenSeleccionado?.toCoordenada() ?: state.ultimaUbicacion?.toCoordenada()
@@ -702,7 +769,7 @@ class MapViewModel(
         val totalDistanceMeters: Double
     )
 
-    fun toggleMenuIncidencies(show: Boolean){
+    fun toggleMenuIncidencies(show: Boolean) {
         _uiState.update { it.copy(mostrarIncidencies = show) }
     }
 
@@ -723,7 +790,7 @@ class MapViewModel(
                 val coord = if (adrecaText == textMevaUbicacio) {
                     val loc = _uiState.value.ultimaUbicacion
                     if (loc == null) {
-                        Log.e("MapViewModel", "No s'ha pogut obtenir la ubicaciÃ³ GPS actual")
+                        Log.e("MapViewModel", "No s'ha pogut obtenir la ubicació GPS actual")
                         return@launch
                     }
                     Coord(lat = loc.latitude, lon = loc.longitude)
@@ -737,7 +804,7 @@ class MapViewModel(
 
                     val feature = photonResponse.features.firstOrNull()
                     if (feature == null) {
-                        Log.e("MapViewModel", "No s'han pogut trobar coordenades per aquesta adreÃ§a")
+                        Log.e("MapViewModel", "No s'han pogut trobar coordenades per aquesta adreça")
                         return@launch
                     }
 
@@ -780,7 +847,6 @@ class MapViewModel(
     }
 
     fun loadIssuesMap() {
-
         viewModelScope.launch {
             try {
                 val llista = getAllIssues()
@@ -848,6 +914,38 @@ class MapViewModel(
         }
     }
 
+    fun desferVot(idIncidencia: Long, googleId: String) {
+        val votActual = uiState.value.userVotes[idIncidencia] ?: return
+
+        viewModelScope.launch {
+            try {
+                eliminarVot(idIncidencia, googleId)
+
+                votesCache.update(googleId, idIncidencia, null)
+
+                _uiState.update { currentState ->
+                    val nousVots = currentState.userVotes.toMutableMap()
+                    nousVots.remove(idIncidencia)
+
+                    val issuesActualitzades = currentState.issues.map {
+                        if (it.id == idIncidencia) {
+                            if (votActual == 1) it.copy(positiveVotes = (it.positiveVotes - 1).coerceAtLeast(0))
+                            else it.copy(negativeVotes = (it.negativeVotes - 1).coerceAtLeast(0))
+                        } else it
+                    }
+
+                    currentState.copy(
+                        userVotes = nousVots,
+                        issues = issuesActualitzades,
+                        incidenciaSeleccionada = issuesActualitzades.find { it.id == idIncidencia }
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("MapViewModel", "Error al desfer vot: ${e.message}")
+            }
+        }
+    }
+
     private fun calcularCoordenadesLliures(
         desiredLat: Double,
         desiredLon: Double,
@@ -895,7 +993,7 @@ class MapViewModel(
                     )
                 }
             } catch (e: Exception) {
-                Log.e("MapViewModel", "Error esborrant incidÃ¨ncia: ${e.message}")
+                Log.e("MapViewModel", "Error esborrant incidència: ${e.message}")
             }
         }
     }
@@ -946,74 +1044,8 @@ class MapViewModel(
                 loadIssuesMap()
 
             } catch (e: Exception) {
-                Log.e("MapViewModel", "Error desant l'ediciÃ³: ${e.message}")
+                Log.e("MapViewModel", "Error desant l'edició: ${e.message}")
             }
         }
     }
-
-    fun votar(idIncidencia: Long, esPositiu: Int, googleId: String) {
-        viewModelScope.launch {
-            try {
-                val request = VoteRequestDTO(
-                    googleId = googleId,
-                    voteScore = esPositiu,
-                    voteScoreValid = true
-                )
-                votarIncidencia(idIncidencia, request)
-
-                _uiState.update { currentState ->
-                    val nousVots = currentState.userVotes.toMutableMap()
-                    nousVots[idIncidencia] = esPositiu
-
-                    val issuesActualitzades = currentState.issues.map {
-                        if (it.id == idIncidencia) {
-                            if (esPositiu == 1) it.copy(positiveVotes = it.positiveVotes + 1)
-                            else it.copy(negativeVotes = it.negativeVotes + 1)
-                        } else it
-                    }
-
-                    currentState.copy(
-                        userVotes = nousVots,
-                        issues = issuesActualitzades,
-                        incidenciaSeleccionada = issuesActualitzades.find { it.id == idIncidencia }
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e("MapViewModel", "Error al votar: ${e.message}")
-            }
-        }
-    }
-
-    fun desferVot(idIncidencia: Long, googleId: String) {
-        val votActual = uiState.value.userVotes[idIncidencia] ?: return
-
-        viewModelScope.launch {
-            try {
-                eliminarVot(idIncidencia, googleId)
-
-                _uiState.update { currentState ->
-                    val nousVots = currentState.userVotes.toMutableMap()
-                    nousVots.remove(idIncidencia)
-
-                    val issuesActualitzades = currentState.issues.map {
-                        if (it.id == idIncidencia) {
-                            if (votActual == 1) it.copy(positiveVotes = (it.positiveVotes - 1).coerceAtLeast(0))
-                            else it.copy(negativeVotes = (it.negativeVotes - 1).coerceAtLeast(0))
-                        } else it
-                    }
-
-                    currentState.copy(
-                        userVotes = nousVots,
-                        issues = issuesActualitzades,
-                        incidenciaSeleccionada = issuesActualitzades.find { it.id == idIncidencia }
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e("MapViewModel", "Error al desfer: ${e.message}")
-            }
-        }
-    }
-
 }
-
-

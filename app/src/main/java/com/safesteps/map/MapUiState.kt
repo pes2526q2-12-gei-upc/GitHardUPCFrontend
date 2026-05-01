@@ -23,6 +23,12 @@ enum class IssueType(@StringRes val labelRes: Int) {
     ALTRES(R.string.issue_type_others)
 }
 
+enum class ActiveRouteMode {
+    NONE,
+    USER_LOCATION_NAVIGATION,
+    FIXED_OVERVIEW
+}
+
 data class RouteCompletionSummary(
     val distanceText: String,
     val durationText: String
@@ -47,6 +53,7 @@ data class MapUiState(
     val firstLocationZoomDone: Boolean = false,
     val campActiu: textField = textField.NONE,
     val rutaCoordenades: List<Coordenada> = emptyList(),
+    val activeRouteMode: ActiveRouteMode = ActiveRouteMode.NONE,
     val modoRuta: Boolean = false,
     val navigationCameraFollowing: Boolean = false,
     val routeCompleted: Boolean = false,
@@ -54,6 +61,7 @@ data class MapUiState(
     val activeNavigationInstruction: ActiveNavigationInstruction? = null,
     val navigationNotice: String? = null,
     val calculantRuta: Boolean = false,
+    val routeColor: String? = null,
     val puntsInteres: List<PuntInteres> = emptyList(),
     val issues: List<IssueResponseDTO> = emptyList(),
     val mostrarPuntsInteres: Boolean = true,
@@ -63,3 +71,9 @@ data class MapUiState(
     val incidenciaEnEdicio: IssueResponseDTO? = null,
     val userVotes: Map<Long, Int> = emptyMap(),
 )
+
+val MapUiState.usesLiveNavigation: Boolean
+    get() = modoRuta && activeRouteMode == ActiveRouteMode.USER_LOCATION_NAVIGATION
+
+val MapUiState.showsFixedRouteSummary: Boolean
+    get() = modoRuta && activeRouteMode == ActiveRouteMode.FIXED_OVERVIEW

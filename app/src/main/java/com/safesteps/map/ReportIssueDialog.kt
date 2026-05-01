@@ -574,13 +574,12 @@ fun showIssueDialog(
     incidencia: IssueResponseDTO,
     isOwner: Boolean,
     miVot: Int? = null,
-    userVote: Int?,
     onDismiss: () -> Unit,
     onConfirmar: () -> Unit,
     onRebutjar: () -> Unit,
     onEditar: () -> Unit,
     onEsborrar: () -> Unit,
-    onDesferVot: () -> Unit
+    onDesferVot: () -> Unit = {}
 ) {
     val loadingAddressLabel = appString(R.string.issue_loading_address)
     val coordinatesFallbackLabel = appString(
@@ -763,10 +762,10 @@ fun showIssueDialog(
                     }
                 }
 
-                if (!isOwner && userVote != null) {
+                if (!isOwner && miVot != null) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Surface(
-                        color = if (userVote == 1) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                        color = if (miVot == 1) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -776,8 +775,8 @@ fun showIssueDialog(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = if (userVote == 1) confirmedVoteLabel else falseReportVoteLabel,
-                                color = if (userVote == 1) Color(0xFF2E7D32) else Color(0xFFD32F2F),
+                                text = if (miVot == 1) confirmedVoteLabel else falseReportVoteLabel,
+                                color = if (miVot == 1) Color(0xFF2E7D32) else Color(0xFFD32F2F),
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
@@ -849,7 +848,9 @@ fun showIssueDialog(
             }
         }
     )
-}@Composable
+}
+
+@Composable
 private fun InfoCard(
     modifier: Modifier = Modifier,
     label: String,

@@ -68,6 +68,7 @@ private const val INSTRUCTION_ANCHOR_DISTANCE_METERS = 18.0
 private const val MIN_INSTRUCTION_SPACING_METERS = 24.0
 private const val PASSED_MANEUVER_DISTANCE_METERS = 12.0
 internal const val ARRIVAL_DISTANCE_METERS = 25.0
+internal const val USER_LOCATION_MATCH_THRESHOLD_METERS = 30.0
 private const val BACKTRACKING_THRESHOLD_METERS = 20.0
 
 internal fun buildNavigationRouteModel(
@@ -236,6 +237,67 @@ internal fun resolveNavigationProgress(
         distanceToRouteMeters = routeProjection.distanceToRouteMeters,
         instruction = activeInstruction
     )
+}
+
+internal fun resolveStartedRouteMode(
+    selectedOrigin: Coordenada?,
+    currentLocation: Coordenada?
+): ActiveRouteMode {
+    if (selectedOrigin == null) {
+        return ActiveRouteMode.USER_LOCATION_NAVIGATION
+    }
+
+    if (currentLocation == null) {
+        return ActiveRouteMode.FIXED_OVERVIEW
+    }
+
+    return if (distanceMeters(selectedOrigin, currentLocation) <= USER_LOCATION_MATCH_THRESHOLD_METERS) {
+        ActiveRouteMode.USER_LOCATION_NAVIGATION
+    } else {
+        ActiveRouteMode.FIXED_OVERVIEW
+    }
+}
+
+internal fun remainingRouteCoordinates(
+    route: NavigationRouteModel,
+    progressMeters: Double
+): List<Coordenada> {
+    if (route.points.size < 2) {
+        return route.points
+    }
+
+    val clampedProgressMeters = progressMeters.coerceIn(0.0, route.totalDistanceMeters)
+    if (clampedProgressMeters <= 0.0) {
+        return route.points
+    }
+
+    if (clampedProgressMeters >= route.totalDistanceMeters) {
+        return listOf(route.points.last())
+    }
+
+    val segmentIndex = route.cumulativeDistancesMeters.indexOfLast { it <= clampedProgressMeters }
+        .coerceAtMost(route.points.lastIndex - 1)
+    val segmentStartDistanceMeters = route.cumulativeDistancesMeters[segmentIndex]
+    val segmentEndDistanceMeters = route.cumulativeDistancesMeters[segmentIndex + 1]
+    val segmentProgressRatio = if (segmentEndDistanceMeters > segmentStartDistanceMeters) {
+        (clampedProgressMeters - segmentStartDistanceMeters) /
+            (segmentEndDistanceMeters - segmentStartDistanceMeters)
+    } else {
+        1.0
+    }.coerceIn(0.0, 1.0)
+
+    val remainingPoints = mutableListOf(
+        interpolateCoordinate(
+            start = route.points[segmentIndex],
+            end = route.points[segmentIndex + 1],
+            progressRatio = segmentProgressRatio
+        )
+    )
+    for (index in (segmentIndex + 1)..route.points.lastIndex) {
+        remainingPoints += route.points[index]
+    }
+
+    return remainingPoints.removeConsecutiveDuplicates()
 }
 
 private fun List<Coordenada>.removeConsecutiveDuplicates(): List<Coordenada> {
@@ -410,7 +472,18 @@ private fun toMeterPoint(
     )
 }
 
-private fun distanceMeters(
+private fun interpolateCoordinate(
+    start: Coordenada,
+    end: Coordenada,
+    progressRatio: Double
+): Coordenada {
+    return Coordenada(
+        lat = start.lat + (end.lat - start.lat) * progressRatio,
+        lon = start.lon + (end.lon - start.lon) * progressRatio
+    )
+}
+
+internal fun distanceMeters(
     start: Coordenada,
     end: Coordenada
 ): Double {
