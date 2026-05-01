@@ -36,7 +36,7 @@ jobs:
           api-level: 29
           target: default
           arch: x86_64
-          profile: Nexus 6
+          profile: Pixel 6
           script: |
             echo "Desactivant animacions per evitar errors de CI..."
             adb shell settings put global window_animation_scale 0.0
