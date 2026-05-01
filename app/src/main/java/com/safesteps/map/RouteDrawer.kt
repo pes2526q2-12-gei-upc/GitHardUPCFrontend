@@ -17,6 +17,7 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.modes.CameraMode
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 
 fun drawRoute(
@@ -28,7 +29,7 @@ fun drawRoute(
     originTitle: String,
     destinationTitle: String,
     animateCamera: Boolean = true,
-    routeColor: String? = null // FEATURE RECUPERADA
+    routeColor: String? = null
 ) {
     if (coordenades.isEmpty()) return
 
@@ -38,7 +39,6 @@ fun drawRoute(
         disableLocationCamera(map)
         clearLegacyAnnotations(map)
         val puntsRuta = buildRoutePoints(coordenades, origen, desti)
-        // FEATURE RECUPERADA: Pasamos el color a la polyline
         drawRoutePolyline(map, puntsRuta, routeColor)
         addRouteMarkers(map, origen, desti, context, originTitle, destinationTitle)
         if (animateCamera) {
@@ -83,7 +83,6 @@ private fun hasSameCoordinates(first: LatLng, second: LatLng): Boolean {
     return first.latitude == second.latitude && first.longitude == second.longitude
 }
 
-// FEATURE RECUPERADA: Añadido el parámetro routeColor y lógica de fallback al azul por defecto
 private fun drawRoutePolyline(map: org.maplibre.android.maps.MapLibreMap, puntsRuta: List<LatLng>, routeColor: String? = null) {
     map.addPolyline(
         PolylineOptions()
@@ -164,4 +163,27 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     canvas.drawText(emoji, size / 2f, y, textPaint)
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
+}
+
+fun drawRouteOnMap(
+    map: MapLibreMap,
+    coordenades: List<Coordenada>,
+    origen: LatLng?,
+    desti: LatLng?,
+    context: Context,
+    originTitle: String,
+    destinationTitle: String,
+    animateCamera: Boolean = true,
+    routeColor: String? = null
+) {
+    if (coordenades.isEmpty()) return
+    if (map.style?.isFullyLoaded != true) return
+
+    disableLocationCamera(map)
+    val puntsRuta = buildRoutePoints(coordenades, origen, desti)
+    drawRoutePolyline(map, puntsRuta, routeColor)
+    addRouteMarkers(map, origen, desti, context, originTitle, destinationTitle)
+    if (animateCamera) {
+        animateCameraToRoute(map, puntsRuta)
+    }
 }

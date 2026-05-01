@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="change_language">Cambiar idioma</string>
     <string name="log_in">Iniciar sesi&#243;n</string>
@@ -94,17 +94,82 @@
     <string name="map_style_standard">Est&#225;ndar</string>
     <string name="map_style_satellite">Sat&#233;lite</string>
     <string name="calculating_best_route">Calculando la mejor ruta&#8230;</string>
+    <string name="notification_title_auth">Autenticaci&#243;n</string>
+    <string name="notification_title_map">Mapa</string>
+    <string name="notification_title_permissions">Permisos</string>
     <string name="sign_in_failed">No se ha podido iniciar sesi&#243;n. Int&#233;ntalo de nuevo.</string>
     <string name="auth_banner_login_success">Inicio de sesi&#243;n correcto.</string>
     <string name="auth_banner_register_success">Usuario registrado correctamente.</string>
+    <string name="auth_banner_account_banned">No se puede acceder a esta cuenta porque est&#225; baneada.</string>
+    <string name="auth_banner_account_suspended">No se puede acceder a esta cuenta porque est&#225; suspendida.</string>
     <string name="auth_banner_server_error">Error del servidor. No se ha podido iniciar sesi&#243;n.</string>
     <string name="delete_account_success">Cuenta eliminada correctamente.</string>
     <string name="delete_account_error">Error del servidor. No se ha podido eliminar la cuenta.</string>
     <string name="delete_account_short">Eliminar cuenta</string>
     <string name="delete_account_banner_title">&#191;Eliminar la cuenta definitivamente?</string>
-    <string name="delete_account_banner_message">Toda tu informaci&#243;, incluidas las incidencias reportadas y el historial de rutas, se borrar&#225; de forma definitiva. &#191;Quieres continuar?</string>
+    <string name="delete_account_banner_message">Toda tu informaci&#243;n, incluidas las issues reportadas y el historial de rutas, se borrar&#225; de forma definitiva. &#191;Quieres continuar?</string>
     <string name="cancel_action">Cancelar</string>
     <string name="confirm_action">Confirmar</string>
+    <string name="report_issue">Incidencia</string>
+    <string name="issue_type_worksite">Obras</string>
+    <string name="issue_type_others">Otros</string>
+    <string name="issue_type_accessibility">Accesibilidad</string>
+    <string name="issue_type_security">Seguridad</string>
+    <string name="report_issue_failed_label">Acción restringida</string>
+    <string name="report_issue_failed_text">Únicamente los usuarios registrados pueden reportar incidencias por motivos de seguretat</string>
+    <string name="report_issue_title">Informar incidència</string>
+    <string name="report_location_placeholder">Ex: Carrer d\'arago, 20</string>
+    <string name="report_type_label">Tipo de incidencia:</string>
+    <string name="report_description_label">Descripción:</string>
+    <string name="report_description_placeholder">Describe el motivo i los detalles de la incidencia</string>
+    <string name="report_error_msg_text">Selecciona una ubicación i rellena la descripción de la incidencia</string>
+    <string name="report_location_label">Ubicación:</string>
+    <string name="report_registered">Incidencia registrada correctamente</string>
+
+
+
+
+    <string name="issue_details_title">Detalles de la issue</string>
+    <string name="issue_type_card_label">Tipo</string>
+    <string name="issue_status_card_label">Estado</string>
+    <string name="issue_status_pending">Pendiente</string>
+    <string name="issue_status_accepted">Aceptada</string>
+    <string name="issue_location_card_label">Ubicacion</string>
+    <string name="issue_positive_votes_label">Positivos</string>
+    <string name="issue_negative_votes_label">Negativos</string>
+    <string name="issue_description_title">Descripcion</string>
+    <string name="issue_description_empty">El usuario no ha anadido ninguna descripcion.</string>
+    <string name="issue_anonymous_user">Usuario anonimo</string>
+    <string name="issue_unknown_address">Direccion desconocida</string>
+    <string name="issue_vote_confirmed">Has confirmado esta issue</string>
+    <string name="issue_vote_reported_false">Has reportado esta issue como falsa</string>
+    <string name="issue_undo_action">Deshacer</string>
+    <string name="issue_report_false_action">Reportar como falsa</string>
+    <string name="issue_user_level">Nivel %1$d</string>
+    <string name="issue_last_update">Ultima modificacion: %1$s</string>
+    <string name="issue_coordinates_fallback">Ubicacion: %1$.6f, %2$.6f</string>
+    <string name="issue_loading_address">Cargando direccion...</string>
+    <string name="issue_location_fallback">Ubicacion de la issue</string>
+    <string name="issue_location_locked_message">La ubicacion no se puede modificar al editar una issue.</string>
+    <string name="issue_report_outside_barcelona">No puedes reportar issues fuera de Barcelona usando tu ubicacion actual.</string>
+    <string name="map_location_selection_restricted">Solo se permite seleccionar ubicaciones dentro del area de Barcelona.</string>
+    <string name="profile_my_issues_title">Mis issues</string>
+    <string name="profile_my_issues_subtitle">Edita o elimina las issues que has reportado.</string>
+    <string name="profile_my_issues_loading">Cargando tus issues...</string>
+    <string name="profile_my_issues_error">No se ha podido cargar el listado de issues.</string>
+    <string name="profile_my_issues_empty">Todavia no has reportado ninguna issue.</string>
+    <string name="profile_issue_status_pending">Pendiente</string>
+    <string name="profile_issue_status_accepted">Aceptada</string>
+    <string name="profile_issue_no_description">Sin descripcion</string>
+    <string name="profile_issue_positive_votes">Positivos:</string>
+    <string name="profile_issue_negative_votes">Negativos:</string>
+    <string name="profile_issue_last_update">Ultima modificacion:</string>
+    <string name="profile_issue_deleted_success">Issue eliminada correctamente.</string>
+    <string name="profile_issue_updated_success">Issue actualizada correctamente.</string>
+    <string name="profile_issue_action_error">No se ha podido completar la accion.</string>
+    <string name="retry_action">Reintentar</string>
+    <string name="edit_action">Editar</string>
+    <string name="delete_action">Eliminar</string>
 
     <!-- STRINGS RECUPERADOS DE LA FEATURE ANTIGUA -->
     <string name="profile_level">Nivel %1$d</string>
@@ -136,4 +201,5 @@
         <item quantity="many">%d filtros</item>
         <item quantity="other">%d filtros</item>
     </plurals>
+    <string name="route_completed_points">¡Enhorabuena! Has conseguido %1$d puntos.</string>
 </resources>

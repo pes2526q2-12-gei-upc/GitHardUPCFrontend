@@ -211,7 +211,12 @@ private fun RoutePlannerHeader(onClose: () -> Unit) {
 
         Spacer(modifier = Modifier.width(6.dp))
 
-        IconButton(onClick = onClose) {
+        IconButton(
+            onClick = onClose,
+            modifier = Modifier
+                .semantics { testTag = "btn_close" }
+                .testTag("btn_close")
+            ) {
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = closeLabel,
@@ -248,10 +253,10 @@ private fun RoutePrioritySelector(
         ) {
             options.forEach { option ->
                 val testModifier = when (option.priority) {
-                    RoutePriority.SAFETY -> Modifier.testTag("btn_safety")
-                    RoutePriority.ACCESSIBILITY -> Modifier.testTag("btn_accessibility")
-                    RoutePriority.HEAT -> Modifier.testTag("btn_clima")
-                    RoutePriority.PERSONALIZED -> Modifier.testTag("btn_preferences")
+                    RoutePriority.SAFETY -> Modifier.semantics(mergeDescendants = true) { testTag = "btn_safety" }
+                    RoutePriority.ACCESSIBILITY -> Modifier.semantics(mergeDescendants = true) { testTag = "btn_accessibility" }
+                    RoutePriority.HEAT -> Modifier.semantics(mergeDescendants = true) { testTag = "btn_clima" }
+                    RoutePriority.PERSONALIZED -> Modifier.semantics(mergeDescendants = true) { testTag = "btn_preferences" }
                 }
                 RoutePriorityCompactOption(
                     title = option.title,
@@ -341,7 +346,7 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
             .fillMaxWidth()
             .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
             .padding(12.dp)
-            .semantics{ testTag = "btn_places" }
+            .semantics(mergeDescendants = true) { testTag = "btn_places" }
             .testTag("btn_places"),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
@@ -466,7 +471,7 @@ private fun RoutePlannerSheet(
                 onClick = onStartRoute,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .semantics { testTag = "btn_start_route" }
+                    .semantics(mergeDescendants = true) { testTag = "btn_start_route" }
                     .testTag("btn_start_route")
                     .height(56.dp),
                 shape = RoundedCornerShape(22.dp),
@@ -549,7 +554,11 @@ private fun NavigationTopBanner(
 
                     Spacer(modifier = Modifier.width(14.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier
+                        .weight(1f)
+                        .semantics(mergeDescendants = true) {}
+                        .testTag("active_route_instruction")
+                    ) {
                         Text(
                             text = navigationActiveLabel,
                             color = Color.White.copy(alpha = 0.82f),
@@ -560,7 +569,6 @@ private fun NavigationTopBanner(
                         Text(
                             text = instructionTitle,
                             color = Color.White,
-                            modifier = Modifier.testTag("active_route_instruction"),
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleLarge,
                             maxLines = 2,
@@ -644,7 +652,10 @@ private fun FixedRouteSummaryCard(
                 }
 
                 Surface(
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier
+                        .size(40.dp)
+                        .semantics(mergeDescendants = true) { testTag = "btn_close_route" }
+                        .testTag("btn_close_route"),
                     shape = CircleShape,
                     color = Color(0xFFF1F3F4)
                 ) {
@@ -994,10 +1005,19 @@ private fun NavigationCompactMetric(
     modifier: Modifier = Modifier,
     valueTestTag: String? = null
 ) {
+    val semanticsModifier = if (valueTestTag != null) {
+        Modifier
+            .semantics(mergeDescendants = true) { testTag = valueTestTag }
+            .testTag(valueTestTag)
+    } else {
+        Modifier
+    }
+
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(999.dp))
             .background(Color(0xFFF6F8FB))
+            .then(semanticsModifier)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1021,7 +1041,6 @@ private fun NavigationCompactMetric(
         Text(
             text = value,
             color = Color(0xFF202124),
-            modifier = if (valueTestTag != null) Modifier.testTag(valueTestTag) else Modifier,
             fontWeight = FontWeight.SemiBold,
             style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
@@ -1055,46 +1074,50 @@ private fun RouteActiveBottomBar(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = durationText,
-                    modifier = Modifier
-                        .semantics { testTag = "active_route_duration" }
-                        .testTag("active_route_duration"),
-                    color = Color(0xFF202124),
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleLarge
+                Column(modifier = Modifier
+                    .weight(1f)
+                    .semantics(mergeDescendants = true) {}
+                    .testTag("active_route_duration")
+                ) {
+                    Text(
+                        text = durationText,
+                        color = Color(0xFF202124),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Spacer(modifier = Modifier.height(1.dp))
+                    Text(
+                        text = remainingLabel,
+                        color = Color(0xFF5F6368),
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                NavigationCompactMetric(
+                    icon = Icons.Default.LocationOn,
+                    value = distanceText,
+                    accentColor = Color(0xFF1A73E8),
+                    valueTestTag = "active_route_distance"
                 )
-                Spacer(modifier = Modifier.height(1.dp))
-                Text(
-                    text = remainingLabel,
-                    color = Color(0xFF5F6368),
-                    style = MaterialTheme.typography.labelMedium
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                NavigationCompactMetric(
+                    icon = Icons.Default.AccessTime,
+                    value = etaText,
+                    accentColor = Color(0xFF34A853),
+                    valueTestTag = "active_route_eta"
                 )
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            NavigationCompactMetric(
-                icon = Icons.Default.LocationOn,
-                value = distanceText,
-                accentColor = Color(0xFF1A73E8),
-                valueTestTag = "active_route_distance"
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            NavigationCompactMetric(
-                icon = Icons.Default.AccessTime,
-                value = etaText,
-                accentColor = Color(0xFF34A853),
-                valueTestTag = "active_route_eta"
-            )
 
             Spacer(modifier = Modifier.width(8.dp))
 
             Surface(
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier
+                    .size(40.dp)
+                    .semantics(mergeDescendants = true) { testTag = "btn_close_route" }
+                    .testTag("btn_close_route"),
                 shape = CircleShape,
                 color = Color(0xFFF1F3F4)
             ) {
@@ -1102,8 +1125,6 @@ private fun RouteActiveBottomBar(
                     onClick = onClose,
                     modifier = Modifier
                         .size(40.dp)
-                        .semantics { testTag = "btn_close_route" }
-                        .testTag("btn_close_route")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
@@ -1205,8 +1226,8 @@ private fun RouteCompletedBottomCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .semantics { testTag = "btn_exit_route" }
-                    .testTag("btn_exit_route"),
+                    .semantics(mergeDescendants = true) { testTag = "btn_close_route" }
+                    .testTag("btn_close_route"),
                 shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF1A73E8),

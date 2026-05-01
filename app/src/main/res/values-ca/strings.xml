@@ -94,17 +94,81 @@
     <string name="map_style_standard">Est&#224;ndard</string>
     <string name="map_style_satellite">Sat&#232;l&#183;lit</string>
     <string name="calculating_best_route">Calculant la millor ruta&#8230;</string>
+    <string name="notification_title_auth">Autenticaci&#243;</string>
+    <string name="notification_title_map">Mapa</string>
+    <string name="notification_title_permissions">Permisos</string>
     <string name="sign_in_failed">No s\'ha pogut iniciar la sessi&#243;. Torna-ho a provar.</string>
     <string name="auth_banner_login_success">Inici de sessi&#243; correcte.</string>
     <string name="auth_banner_register_success">Usuari registrat correctament.</string>
+    <string name="auth_banner_account_banned">No es pot accedir a aquest compte perqu&#232; est&#224; banejat.</string>
+    <string name="auth_banner_account_suspended">No es pot accedir a aquest compte perqu&#232; est&#224; susp&#232;s.</string>
     <string name="auth_banner_server_error">Error del servidor. No s\'ha pogut iniciar la sessi&#243;.</string>
     <string name="delete_account_success">Compte eliminat correctament.</string>
     <string name="delete_account_error">Error del servidor. No s\'ha pogut eliminar el compte.</string>
     <string name="delete_account_short">Eliminar el compte</string>
     <string name="delete_account_banner_title">Eliminar el compte definitivament?</string>
-    <string name="delete_account_banner_message">Tota la teva informaci&#243;, incloses les incid&#232;ncies reportades i l\'historial de rutes, s\'esborrar&#224; de forma definitiva. Vols continuar?</string>
+    <string name="delete_account_banner_message">Tota la teva informaci&#243;, incloses les issues reportades i l\'historial de rutes, s\'esborrar&#224; de forma definitiva. Vols continuar?</string>
     <string name="cancel_action">Cancel&#183;la</string>
     <string name="confirm_action">Confirma</string>
+    <string name="report_issue">Incidencia</string>
+    <string name="issue_type_worksite">Obres</string>
+    <string name="issue_type_others">Altres</string>
+    <string name="issue_type_accessibility">Accessibilitat</string>
+    <string name="issue_type_security">Seguretat</string>
+    <string name="report_issue_failed_label">Acció restringida</string>
+    <string name="report_issue_failed_text">Unicament els usuaris registrats poden reportar incidències per motius de seguretat</string>
+    <string name="report_issue_title">Informar incidencia</string>
+    <string name="report_location_placeholder">Ex: Carrer d\'arago, 20</string>
+    <string name="report_type_label">Tipus d\'incidència:</string>
+    <string name="report_description_label">Descripció:</string>
+    <string name="report_description_placeholder">Descriu el motiu i detalls de la incidència</string>
+    <string name="report_error_msg_text">Selecciona una ubicació i omple la descripció de la incidència</string>
+    <string name="report_location_label">Ubicació:</string>
+    <string name="report_registered">Incidència registrada correctament</string>
+
+
+
+    <string name="issue_details_title">Detalls de la issue</string>
+    <string name="issue_type_card_label">Tipus</string>
+    <string name="issue_status_card_label">Estat</string>
+    <string name="issue_status_pending">Pendent</string>
+    <string name="issue_status_accepted">Acceptada</string>
+    <string name="issue_location_card_label">Ubicacio</string>
+    <string name="issue_positive_votes_label">Positius</string>
+    <string name="issue_negative_votes_label">Negatius</string>
+    <string name="issue_description_title">Descripcio</string>
+    <string name="issue_description_empty">L\'usuari no ha afegit cap descripcio.</string>
+    <string name="issue_anonymous_user">Usuari anonim</string>
+    <string name="issue_unknown_address">Adreca desconeguda</string>
+    <string name="issue_vote_confirmed">Has confirmat aquesta issue</string>
+    <string name="issue_vote_reported_false">Has reportat aquesta issue com a falsa</string>
+    <string name="issue_undo_action">Desfer</string>
+    <string name="issue_report_false_action">Reportar com a falsa</string>
+    <string name="issue_user_level">Nivell %1$d</string>
+    <string name="issue_last_update">Ultima modificacio: %1$s</string>
+    <string name="issue_coordinates_fallback">Ubicacio: %1$.6f, %2$.6f</string>
+    <string name="issue_loading_address">Carregant adreca...</string>
+    <string name="issue_location_fallback">Ubicacio de la issue</string>
+    <string name="issue_location_locked_message">La ubicacio no es pot modificar en editar una issue.</string>
+    <string name="issue_report_outside_barcelona">No pots reportar issues fora de Barcelona usant la teva ubicacio actual.</string>
+    <string name="map_location_selection_restricted">Nomes es permet seleccionar ubicacions dins de l\'area de Barcelona.</string>
+    <string name="profile_my_issues_title">Les meves issues</string>
+    <string name="profile_my_issues_subtitle">Edita o esborra les issues que has reportat.</string>
+    <string name="profile_my_issues_loading">Carregant les teves issues...</string>
+    <string name="profile_my_issues_error">No s\'ha pogut carregar el llistat d\'issues.</string>
+    <string name="profile_my_issues_empty">Encara no has reportat cap issue.</string>
+    <string name="profile_issue_status_pending">Pendent</string>
+    <string name="profile_issue_status_accepted">Acceptada</string>
+    <string name="profile_issue_no_description">Sense descripcio</string>
+    <string name="profile_issue_positive_votes">Positius:</string>
+    <string name="profile_issue_negative_votes">Negatius:</string>
+    <string name="profile_issue_last_update">Ultima modificacio:</string>
+    <string name="profile_issue_deleted_success">Issue esborrada correctament.</string>
+    <string name="profile_issue_updated_success">Issue actualitzada correctament.</string>
+    <string name="profile_issue_action_error">No s\'ha pogut completar l\'accio.</string>
+    <string name="retry_action">Reintenta</string>
+    <string name="edit_action">Edita</string>
+    <string name="delete_action">Esborra</string>
 
     <!-- STRINGS RECUPERADOS DE LA FEATURE ANTIGUA -->
     <string name="profile_level">Nivell %1$d</string>
@@ -136,4 +200,5 @@
         <item quantity="many">%d filtres</item>
         <item quantity="other">%d filtres</item>
     </plurals>
+    <string name="route_completed_points">Enhorabona! Has aconseguit %1$d punts.</string>
 </resources>
