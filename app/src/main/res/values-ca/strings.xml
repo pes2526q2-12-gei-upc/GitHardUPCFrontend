@@ -200,4 +200,5 @@
         <item quantity="many">%d filtres</item>
         <item quantity="other">%d filtres</item>
     </plurals>
+    <string name="route_completed_points">Enhorabona! Has aconseguit %1$d punts.</string>
 </resources>

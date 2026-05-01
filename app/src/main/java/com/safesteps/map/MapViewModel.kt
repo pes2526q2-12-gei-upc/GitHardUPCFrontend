@@ -2,6 +2,9 @@
 
 import android.location.Location
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.auth.UserInfo
@@ -13,11 +16,13 @@ import com.safesteps.data.IssueRequestDTO
 import com.safesteps.data.IssueResponseDTO
 import com.safesteps.data.PhotonApi
 import com.safesteps.data.PuntInteres
+import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.data.RouteCoordinatesRequest
 import com.safesteps.data.RouteType
 import com.safesteps.data.VoteRequestDTO
 import com.safesteps.data.VotesCache
 import com.safesteps.data.actualitzarIncidencia
+import com.safesteps.data.completarRutaEnBackend
 import com.safesteps.data.crearIncidencia
 import com.safesteps.data.eliminarIncidencia
 import com.safesteps.data.eliminarVot
@@ -26,11 +31,14 @@ import com.safesteps.data.obtenirCoordenadesRuta
 import com.safesteps.data.votarIncidencia
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
+import com.safesteps.ui.notifications.ScreenNotificationManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.maplibre.android.geometry.LatLng
 import java.text.DateFormat
 import java.util.Calendar
@@ -106,8 +114,16 @@ class MapViewModel(
     private var lastAutomaticRecalculationAtMs: Long = 0L
     private var currentGoogleId: String? = null
 
+    // NOU: Guardar resultats de gamificació
+    var routeResult by mutableStateOf<RouteCompletionResponse?>(null)
+        private set
+
     init {
         loadIssuesMap()
+    }
+
+    fun dismissRouteResult() {
+        routeResult = null
     }
 
     fun onLanguageChanged(language: AppLanguage) {
@@ -124,17 +140,6 @@ class MapViewModel(
         if (gid != null) {
             val cached = votesCache.load(gid)
             _uiState.update { it.copy(userVotes = cached) }
-
-            // TODO: quan el backend tingui /votes/users/{googleId}/scores:
-            // viewModelScope.launch {
-            //     try {
-            //         val remote = obtenirVotsUsuari(gid)
-            //         votesCache.save(gid, remote)
-            //         _uiState.update { it.copy(userVotes = remote) }
-            //     } catch (e: Exception) {
-            //         Log.w("MapViewModel", "No s'han pogut sincronitzar vots: ${e.message}")
-            //     }
-            // }
         } else {
             _uiState.update { it.copy(userVotes = emptyMap()) }
         }
@@ -225,9 +230,7 @@ class MapViewModel(
                 kotlinx.coroutines.delay(300)
                 try {
                     val queryFormatada = texto.replace(Regex("(?<=[a-zA-Z])\\s+(?=\\d+)"), ", ")
-
                     val idiomaRecuperat = textProvider.photonLanguage(currentLanguage)
-
                     val latActual = _uiState.value.ultimaUbicacion?.latitude
                     val lonActual = _uiState.value.ultimaUbicacion?.longitude
 
@@ -377,11 +380,6 @@ class MapViewModel(
                 val tiempoDistancia = infoRuta.second
                 val puntosInteres = infoRuta.third
 
-                Log.d("ROUTE_VM", "Coordenadas = ${coordenadas.size}")
-                Log.d("time", "time = ${tiempoDistancia.first}")
-                Log.d("distance", "distancia = ${tiempoDistancia.second}")
-                Log.d("POIS", "Puntos encontrados = ${puntosInteres.size}")
-
                 val routeDurationMinutes = resolveRouteDurationMinutes(tiempoDistancia)
                 applyCalculatedRoute(
                     coordenadas = coordenadas,
@@ -485,7 +483,6 @@ class MapViewModel(
         if (durationMinutes <= 0) {
             return DEFAULT_DURATION_TEXT
         }
-
         return formatReadableDuration(durationMinutes)
     }
 
@@ -681,6 +678,7 @@ class MapViewModel(
                 progress.instruction.remainingDistanceMeters <= ARRIVAL_DISTANCE_METERS
     }
 
+    // AQUESTA ÉS LA FUNCIÓ MAGICA QUE ENVIA ELS PUNTS (DE LA DRETA)
     private fun completeRoute(progress: NavigationProgressResult) {
         val routeSummary = currentRouteSummary
         val totalDistanceMeters = routeSummary?.totalDistanceMeters
@@ -690,6 +688,7 @@ class MapViewModel(
         val totalDurationMinutes = routeSummary?.totalDurationMinutes ?: 0
         lastNavigationProgressMeters = navigationRoute?.totalDistanceMeters ?: progress.progressMeters
 
+        // 1. Actualizamos la UI para mostrar que la ruta ha terminado
         _uiState.update {
             it.copy(
                 navigationCameraFollowing = false,
@@ -706,6 +705,29 @@ class MapViewModel(
                 durationText = formatDuration(0),
                 etaText = DEFAULT_ETA_TEXT
             )
+        }
+
+        // 2. ENVIAMOS LOS DATOS AL BACKEND
+        val googleId = currentGoogleId
+        Log.d("ROUTE_VM", "googleId=$currentGoogleId, totalDistanceMeters=$totalDistanceMeters")
+        if (!googleId.isNullOrBlank() && totalDistanceMeters > 0.0) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val result = completarRutaEnBackend(googleId, totalDistanceMeters)
+                    if (result != null && result.pointsAdded != null && result.pointsAdded > 0) {
+                        ScreenNotificationManager.showNotification(
+                            notificationName = textProvider.notificationTitleMap(currentLanguage),
+                            text = textProvider.routeCompletedPoints(currentLanguage, result.pointsAdded)
+                        )
+                    }
+                    withContext(Dispatchers.Main) {
+                        routeResult = result
+                        Log.d("ROUTE_VM", "Backend response: levelUpdated=${result?.levelUpdated}, level=${result?.level}, recompenses=${result?.recompenses}, pointsAdded=${result?.pointsAdded}")
+                    }
+                } catch (e: Exception) {
+                    Log.e("ROUTE_VM", "Error de red al enviar la ruta completada", e)
+                }
+            }
         }
     }
 
@@ -766,6 +788,8 @@ class MapViewModel(
         val totalDurationMinutes: Int,
         val totalDistanceMeters: Double
     )
+
+    // --- A PARTIR D'AQUÍ, TOTES LES FUNCIONS D'INCIDÈNCIES DE L'ESQUERRA ---
 
     fun toggleMenuIncidencies(show: Boolean) {
         _uiState.update { it.copy(mostrarIncidencies = show) }
@@ -948,44 +972,19 @@ class MapViewModel(
         stepSize: Double = 0.0001,
         maxRadiusSteps: Int = 3
     ): Pair<Double, Double> {
-        if (isCoordinateFree(desiredLat, desiredLon, existingIssues)) {
-            return Pair(desiredLat, desiredLon)
-        }
-        for (radius in 1..maxRadiusSteps) {
-            val freePoint = findFreeCoordinateAtRadius(
-                desiredLat, desiredLon, radius, stepSize, existingIssues
-            )
-            if (freePoint != null) return freePoint
-        }
-        return Pair(desiredLat, desiredLon)
-    }
+        val occupied = existingIssues.map { it.coordinates.lat to it.coordinates.lon }.toSet()
+        val original = Pair(desiredLat, desiredLon)
+        if (original !in occupied) return original
 
-    private fun isCoordinateFree(
-        lat: Double,
-        lon: Double,
-        existingIssues: List<IssueResponseDTO>
-    ): Boolean = existingIssues.none {
-        it.coordinates.lat == lat && it.coordinates.lon == lon
-    }
-
-    private fun findFreeCoordinateAtRadius(
-        desiredLat: Double,
-        desiredLon: Double,
-        radius: Int,
-        stepSize: Double,
-        existingIssues: List<IssueResponseDTO>
-    ): Pair<Double, Double>? {
-        for (dx in -radius..radius) {
-            for (dy in -radius..radius) {
-                if (Math.abs(dx) != radius && Math.abs(dy) != radius) continue
-                val testLat = desiredLat + (dx * stepSize)
-                val testLon = desiredLon + (dy * stepSize)
-                if (isCoordinateFree(testLat, testLon, existingIssues)) {
-                    return Pair(testLat, testLon)
-                }
+        val candidate = (1..maxRadiusSteps).asSequence().flatMap { r ->
+            (-r..r).asSequence().flatMap { dx ->
+                (-r..r).asSequence()
+                    .filter { dy -> kotlin.math.abs(dx) == r || kotlin.math.abs(dy) == r }
+                    .map { dy -> Pair(desiredLat + dx * stepSize, desiredLon + dy * stepSize) }
             }
-        }
-        return null
+        }.firstOrNull { it !in occupied }
+
+        return candidate ?: original
     }
 
     fun esborrarIncidencia(incidenciaId: Long) {
@@ -1052,7 +1051,6 @@ class MapViewModel(
                         }
                     )
                 }
-
 
             } catch (e: Exception) {
                 Log.e("MapViewModel", "Error desant l'edició: ${e.message}")

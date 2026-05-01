@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="server_client_id" translatable="false">48435478487-tupu01hq8mjcjgvrm1ckh32ak4heff8q.apps.googleusercontent.com</string>
     <string name="change_language">Change language</string>
@@ -52,8 +52,8 @@
     <string name="preference_level">Preference level</string>
     <string name="profile_filter_security_cameras">Security cameras</string>
     <string name="profile_filter_police_stations">Police stations</string>
-    <string name="profile_filter_criminal_incidents">Criminal issues</string>
-    <string name="profile_filter_user_reported_incidents">Issues reported by other users</string>
+    <string name="profile_filter_criminal_incidents">Criminal incidents</string>
+    <string name="profile_filter_user_reported_incidents">Incidents reported by other users</string>
     <string name="profile_filter_infractions">Infractions</string>
     <string name="profile_filter_benches">Benches</string>
     <string name="profile_filter_noise_pollution">Noise pollution</string>
@@ -195,4 +195,5 @@
         <item quantity="one">%d filter</item>
         <item quantity="other">%d filters</item>
     </plurals>
+    <string name="route_completed_points">Congratulations! You have earned %1$d points.</string>
 </resources>

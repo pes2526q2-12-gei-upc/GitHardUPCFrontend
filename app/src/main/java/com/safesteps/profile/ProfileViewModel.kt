@@ -4,6 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.auth.UserInfo
+import com.safesteps.data.PremiResponse
+import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.data.UserFilters
 import com.safesteps.data.actualizarFiltrosUsuario
 import com.safesteps.data.cargarFiltrosUsuario
@@ -22,7 +24,17 @@ data class ProfileUiState(
     val filterValues: List<Int> = ProfileFiltersUiModel().values,
     val filterEnabledStates: List<Boolean> = ProfileFiltersUiModel().enabledStates,
     val isLoadingFilters: Boolean = false,
-    val isSavingFilters: Boolean = false
+    val isSavingFilters: Boolean = false,
+    val isLoadingProfile: Boolean = false,
+    val level: Long = 1,
+    val points: Long = 0,
+    val reputacio: Double = 0.0,
+    val recompenses: Long = 0,
+    val premis: List<PremiResponse> = emptyList(),
+    val showLevelUpAnimation: Boolean = false,
+    val newLevel: Long = 1,
+    val showPrizeAnimation: Boolean = false,
+    val lastOpenedPrize: PremiResponse? = null
 )
 
 class ProfileViewModel(
@@ -39,6 +51,30 @@ class ProfileViewModel(
     private var latestLoadVersion = 0L
     private var latestSaveVersion = 0L
     private var refreshAfterSave = false
+
+
+    fun onProfileScreenOpened() {
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() } ?: return
+        loadUserProfile(googleId)
+    }
+
+    fun onRouteCompleted(response: RouteCompletionResponse) {
+        Log.d("PROFILE_VM", "onRouteCompleted: levelUpdated=${response.levelUpdated}, level=${response.level}, recompenses=${response.recompenses}")
+
+        _uiState.update { state ->
+            state.copy(
+                level = response.level ?: state.level,
+                points = response.totalPoints ?: state.points,
+                recompenses = response.recompenses ?: state.recompenses,
+                showLevelUpAnimation = response.levelUpdated == true,
+                newLevel = response.level ?: state.level
+            )
+        }
+    }
+
+    fun dismissLevelUpAnimation() {
+        _uiState.update { it.copy(showLevelUpAnimation = false) }
+    }
 
     fun onCurrentUserChanged(user: UserInfo?) {
         val googleId = user?.googleId?.takeIf { it.isNotBlank() }
@@ -60,10 +96,47 @@ class ProfileViewModel(
             return
         }
 
+        // 1. Cargamos los filtros (lo que ya hacía)
         startLoadingFilters(
             googleId = googleId,
             preserveCurrentValues = false
         )
+
+        // 2. ¡NUEVO! Cargamos los datos de gamificación
+        loadUserProfile(googleId)
+    }
+
+    // Añade esta nueva función justo debajo de onCurrentUserChanged:
+    private fun loadUserProfile(googleId: String) {
+        _uiState.update { it.copy(isLoadingProfile = true) }
+
+        viewModelScope.launch {
+            try {
+                // Importa cargarPerfilDeUsuario si te lo pide Android Studio
+                val userProfile = withContext(ioDispatcher) {
+                    com.safesteps.data.cargarPerfilDeUsuario(googleId)
+                }
+
+                if (userProfile != null) {
+                    _uiState.update { state ->
+                        state.copy(
+                            isLoadingProfile = false,
+                            level = userProfile.level ?: 1,
+                            points = userProfile.points ?: 0,
+                            reputacio = userProfile.reputacio ?: 0.0,
+                            recompenses = userProfile.recompenses ?: 0,
+                            premis = userProfile.premis ?: emptyList()
+                        )
+                    }
+                    Log.d("PROFILE_VM", "Perfil cargado: Nivel ${userProfile.level}, Puntos: ${userProfile.points}")
+                } else {
+                    _uiState.update { it.copy(isLoadingProfile = false) }
+                }
+            } catch (e: Exception) {
+                Log.e("PROFILE_VM", "Error cargando el perfil", e)
+                _uiState.update { it.copy(isLoadingProfile = false) }
+            }
+        }
     }
 
     fun onFiltersScreenOpened() {
@@ -266,6 +339,41 @@ class ProfileViewModel(
         }
     }
 
+    fun openPrize() {
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() } ?: return
+        if (_uiState.value.recompenses <= 0) return
+
+        Log.d("PROFILE_VM", "openPrize: calling backend...")
+
+        viewModelScope.launch {
+            try {
+                val prize = withContext(ioDispatcher) {
+                    com.safesteps.data.abrirPremioEnBackend(googleId)
+                }
+                Log.d("PROFILE_VM", "openPrize: backend response = $prize")
+                if (prize != null) {
+                    _uiState.update { state ->
+                        state.copy(
+                            recompenses = (state.recompenses - 1).coerceAtLeast(0),
+                            premis = state.premis + prize,
+                            showPrizeAnimation = true,
+                            lastOpenedPrize = prize
+                        )
+                    }
+                    Log.d("PROFILE_VM", "openPrize: animation triggered, prize id=${prize.id}")
+                } else {
+                    Log.e("PROFILE_VM", "openPrize: backend returned null")
+                }
+            } catch (e: Exception) {
+                Log.e("PROFILE_VM", "openPrize: error", e)
+            }
+        }
+    }
+
+    fun dismissPrizeAnimation() {
+        _uiState.update { it.copy(showPrizeAnimation = false, lastOpenedPrize = null) }
+    }
+
     private fun currentUiFilters(): ProfileFiltersUiModel {
         return ProfileFiltersUiModel(
             values = _uiState.value.filterValues,
@@ -302,3 +410,4 @@ class ProfileViewModel(
         )
     }
 }
+
