@@ -39,6 +39,7 @@ import com.safesteps.data.Coord
 import com.safesteps.data.Feature
 import com.safesteps.data.IssueApiType
 import com.safesteps.data.PuntInteres
+import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
@@ -115,28 +116,23 @@ private data class NavigationTrackingState(
     val currentLocation: Location?
 )
 
+private data class MapScreenActions(
+    val requestLocationPermissions: () -> Unit,
+    val resetToMainMenu: () -> Unit,
+    val onPrioritySelected: (RoutePriority) -> Unit,
+    val onAddressSelected: (Feature) -> Unit,
+    val onCenterCurrentLocation: () -> Unit
+)
+
 @Composable
-fun MapLibreScreen(
-    modifier: Modifier = Modifier,
-    currentUser: UserInfo? = null,
-    currentLanguage: AppLanguage = AppLanguage.default,
-    issuesRefreshTrigger: Int = 0,
-    onLoginClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {},
-) {
-    val context = LocalContext.current
-    val viewModel: MapViewModel = viewModel(
-        factory = MapViewModelFactory(context.applicationContext)
-    )
-    val mapView = rememberMapViewWithLifecycle()
-    val uiState by viewModel.uiState.collectAsState()
-    val strings = mapScreenStrings()
-    var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
-
-    var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
-    var topOverlayHeightPx by remember { mutableFloatStateOf(0f) }
-    val density = LocalDensity.current
-
+private fun rememberMapScreenActions(
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    mapView: MapView,
+    context: Context,
+    strings: MapScreenStrings,
+    navigationHeadingDegrees: Float?
+): MapScreenActions {
     val requestLocationPermissions = rememberLocationPermissionRequester(
         context = context,
         viewModel = viewModel,
@@ -178,33 +174,146 @@ fun MapLibreScreen(
             searchingGpsSignalMessage = strings.searchingGpsSignalMessage
         )
     }
-    val renderContext = MapRenderContext(
-        mapView = mapView,
-        context = context,
-        viewModel = viewModel,
-        navigationHeadingDegrees = navigationHeadingDegrees,
-        originLabel = strings.originLabel,
-        destinationLabel = strings.destinationLabel
+    return MapScreenActions(
+        requestLocationPermissions = requestLocationPermissions,
+        resetToMainMenu = resetToMainMenu,
+        onPrioritySelected = onPrioritySelected,
+        onAddressSelected = onAddressSelected,
+        onCenterCurrentLocation = onCenterCurrentLocation
+    )
+}
+
+@Composable
+private fun MapScreenDialogs(
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    currentUser: UserInfo?,
+    strings: MapScreenStrings,
+    context: Context,
+    onLoginClick: () -> Unit
+) {
+    val textMevaUbicacio = appString(R.string.my_location)
+    val textExit = context.getString(R.string.report_registered)
+
+    ReportIssueDialog(
+        visible = uiState.mostrarIncidencies,
+        isLoggedIn = currentUser != null,
+        defaultLocationText = textMevaUbicacio,
+        onDismiss = {
+            viewModel.toggleMenuIncidencies(false)
+        },
+        onConfirm = { tipus, ubicacio, descripcio, coord ->
+            if (ubicacio == textMevaUbicacio) {
+                val loc = uiState.ultimaUbicacion
+                if (loc == null || !viewModel.isInsideBarcelonaArea(loc.latitude, loc.longitude)) {
+                    Toast.makeText(
+                        context,
+                        strings.reportIssueOutsideBarcelonaMessage,
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return@ReportIssueDialog
+                }
+            }
+            viewModel.reportIssue(
+                tipus = tipus,
+                adrecaText = ubicacio,
+                descripcio = descripcio,
+                textMevaUbicacio = textMevaUbicacio
+            )
+
+            viewModel.toggleMenuIncidencies(false)
+            Toast.makeText(context, textExit, Toast.LENGTH_SHORT).show()
+        },
+        onNavigateToLogin = onLoginClick,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false
+        ),
+        initialCoord = Coord(0.0, 0.0),
+        modifier = Modifier
+            .fillMaxWidth(0.95f)
+            .padding(horizontal = 16.dp)
     )
 
-    LaunchedEffect(currentUser?.googleId) {
-        viewModel.onCurrentUserChanged(currentUser)
-    }
-
-    LaunchedEffect(issuesRefreshTrigger) {
-        viewModel.loadIssuesMap()
-    }
-
-    MapScreenEffects(
-        currentLanguage = currentLanguage,
-        uiState = uiState,
-        renderContext = renderContext,
-        mapNotificationTitle = strings.mapNotificationTitle,
-        callbacks = MapScreenEffectCallbacks(
-            requestLocationPermissions = requestLocationPermissions,
-            onNavigationHeadingChanged = { navigationHeadingDegrees = it }
+    uiState.incidenciaSeleccionada?.let { incidencia ->
+        val isOwner = currentUser?.username == incidencia.authorName
+        val miVot = uiState.userVotes[incidencia.id]
+        showIssueDialog(
+            incidencia = incidencia,
+            isOwner = isOwner,
+            miVot = miVot,
+            onDismiss = { viewModel.selectIssue(null) },
+            onConfirmar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, true, it) } },
+            onRebutjar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, false, it) } },
+            onEditar = { viewModel.iniciarEdicio(incidencia) },
+            onEsborrar = { viewModel.esborrarIncidencia(incidencia.id) },
+            onDesferVot = { currentUser?.googleId?.let { viewModel.desferVot(incidencia.id, it) } }
         )
-    )
+    }
+
+    uiState.incidenciaEnEdicio?.let { incidencia ->
+        var adrecaTransformada by remember(incidencia) { mutableStateOf(strings.issueLoadingAddressLabel) }
+
+        LaunchedEffect(incidencia) {
+            try {
+                val response = com.safesteps.data.PhotonApi.service.reverseGeocode(
+                    lat = incidencia.coordinates.lat,
+                    lon = incidencia.coordinates.lon
+                )
+
+                val feature = response.features.firstOrNull()
+                if (feature != null) {
+                    val adreca = feature.properties.getAddress()
+                    adrecaTransformada = adreca.ifBlank { strings.issueLocationFallbackLabel }
+                } else {
+                    adrecaTransformada = strings.issueLocationFallbackLabel
+                }
+            } catch (_: Exception) {
+                adrecaTransformada = strings.issueLocationFallbackLabel
+            }
+        }
+
+        ReportIssueDialog(
+            visible = true,
+            isLoggedIn = currentUser != null,
+            isEditMode = true,
+            defaultLocationText = adrecaTransformada,
+            initialType = try { IssueType.valueOf(incidencia.type.name) } catch (e: Exception) { IssueType.OBRES },
+            initialDescription = incidencia.description ?: "",
+            initialCoord = incidencia.coordinates,
+            onDismiss = { viewModel.cancelarEdicio() },
+            onConfirm = { tipus, _, descripcio, _ ->
+                currentUser?.googleId?.let { googleId ->
+                    val apiType = IssueApiType.valueOf(tipus.name)
+                    viewModel.guardarEdicio(
+                        incidenciaId = incidencia.id,
+                        nouTipus = apiType,
+                        novaDescripcio = descripcio,
+                        coordenades = incidencia.coordinates,
+                        googleId = googleId
+                    )
+                }
+            },
+            onNavigateToLogin = onLoginClick
+        )
+    }
+}
+
+@Composable
+private fun MapScreenContent(
+    modifier: Modifier,
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    mapView: MapView,
+    currentUser: UserInfo?,
+    strings: MapScreenStrings,
+    actions: MapScreenActions,
+    navigationHeadingDegrees: Float?,
+    onLoginClick: () -> Unit,
+    onProfileClick: () -> Unit
+) {
+    var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
+    var topOverlayHeightPx by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
 
     LaunchedEffect(uiState.modoRuta) {
         if (uiState.modoRuta) {
@@ -264,7 +373,7 @@ fun MapLibreScreen(
                 onDestinoFocus = {
                     viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY)
                 },
-                onAdrecaSeleccionada = onAddressSelected,
+                onAdrecaSeleccionada = actions.onAddressSelected,
                 onHeightChanged = { topOverlayHeightPx = it }
             )
         )
@@ -272,7 +381,7 @@ fun MapLibreScreen(
         RouteExperienceOverlay(
             uiState = uiState,
             showProfilePreferences = !currentUser?.googleId.isNullOrBlank(),
-            onPrioritySelected = onPrioritySelected,
+            onPrioritySelected = actions.onPrioritySelected,
             onStartRoute = {
                 when (viewModel.iniciarRuta()) {
                     ActiveRouteMode.USER_LOCATION_NAVIGATION -> {
@@ -292,7 +401,7 @@ fun MapLibreScreen(
                     }
                 }
             },
-            onClose = resetToMainMenu,
+            onClose = actions.resetToMainMenu,
             onBottomPaddingChange = { padding ->
                 floatingActionsBottomPadding = padding
             }
@@ -317,7 +426,7 @@ fun MapLibreScreen(
             callbacks = FloatingActionCallbacks(
                 onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
                 onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
-                onMyLocationClick = onCenterCurrentLocation
+                onMyLocationClick = actions.onCenterCurrentLocation
             ),
             reportIssueLabel = strings.reportIssueLabel,
             onReportIssueClick = { viewModel.toggleMenuIncidencies(true) }
@@ -328,110 +437,106 @@ fun MapLibreScreen(
             calculatingBestRouteLabel = strings.calculatingBestRouteLabel
         )
 
-        val textMevaUbicacio = appString(R.string.my_location)
-        val textExit = context.getString(R.string.report_registered)
-
-        ReportIssueDialog(
-            visible = uiState.mostrarIncidencies,
-            isLoggedIn = currentUser != null,
-            defaultLocationText = textMevaUbicacio,
-            onDismiss = {
-                viewModel.toggleMenuIncidencies(false)
-            },
-            onConfirm = { tipus, ubicacio, descripcio, coord ->
-                if (ubicacio == textMevaUbicacio) {
-                    val loc = uiState.ultimaUbicacion
-                    if (loc == null || !viewModel.isInsideBarcelonaArea(loc.latitude, loc.longitude)) {
-                        Toast.makeText(
-                            context,
-                            strings.reportIssueOutsideBarcelonaMessage,
-                            Toast.LENGTH_LONG
-                        ).show()
-                        return@ReportIssueDialog
-                    }
-                }
-                viewModel.reportIssue(
-                    tipus = tipus,
-                    adrecaText = ubicacio,
-                    descripcio = descripcio,
-                    textMevaUbicacio = textMevaUbicacio
-                )
-
-                viewModel.toggleMenuIncidencies(false)
-                Toast.makeText(context, textExit, Toast.LENGTH_SHORT).show()
-            },
-            onNavigateToLogin = onLoginClick,
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false
-            ),
-            initialCoord = Coord(0.0, 0.0),
-            modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .padding(horizontal = 16.dp)
+        MapScreenDialogs(
+            uiState = uiState,
+            viewModel = viewModel,
+            currentUser = currentUser,
+            strings = strings,
+            context = LocalContext.current,
+            onLoginClick = onLoginClick
         )
+    }
+}
 
-        uiState.incidenciaSeleccionada?.let { incidencia ->
-            val isOwner = currentUser?.username == incidencia.authorName
-            val miVot = uiState.userVotes[incidencia.id]
-            showIssueDialog(
-                incidencia = incidencia,
-                isOwner = isOwner,
-                miVot = miVot,
-                onDismiss = { viewModel.selectIssue(null) },
-                onConfirmar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, true, it) } },
-                onRebutjar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, false, it) } },
-                onEditar = { viewModel.iniciarEdicio(incidencia) },
-                onEsborrar = { viewModel.esborrarIncidencia(incidencia.id) },
-                onDesferVot = { currentUser?.googleId?.let { viewModel.desferVot(incidencia.id, it) } }
-            )
-        }
+@Composable
+fun MapLibreScreen(
+    modifier: Modifier = Modifier,
+    currentUser: UserInfo? = null,
+    currentLanguage: AppLanguage = AppLanguage.default,
+    issuesRefreshTrigger: Int = 0,
+    onLoginClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
+    onRouteCompleted: (RouteCompletionResponse) -> Unit = {}
+) {
 
-        uiState.incidenciaEnEdicio?.let { incidencia ->
-            var adrecaTransformada by remember(incidencia) { mutableStateOf(strings.issueLoadingAddressLabel) }
+    val context = LocalContext.current
+    val viewModel: MapViewModel = viewModel(
+        factory = MapViewModelFactory(context.applicationContext)
+    )
+    val mapView = rememberMapViewWithLifecycle()
+    val uiState by viewModel.uiState.collectAsState()
+    val routeCompletionResult = viewModel.routeResult
+    var showLevelUpOverlay by remember { mutableStateOf(false) }
+    var levelUpLevel by remember { mutableStateOf(1L) }
 
-            LaunchedEffect(incidencia) {
-                try {
-                    val response = com.safesteps.data.PhotonApi.service.reverseGeocode(
-                        lat = incidencia.coordinates.lat,
-                        lon = incidencia.coordinates.lon
-                    )
-
-                    val feature = response.features.firstOrNull()
-                    if (feature != null) {
-                        val adreca = feature.properties.getAddress()
-                        adrecaTransformada = adreca.ifBlank { strings.issueLocationFallbackLabel }
-                    } else {
-                        adrecaTransformada = strings.issueLocationFallbackLabel
-                    }
-                } catch (_: Exception) {
-                    adrecaTransformada = strings.issueLocationFallbackLabel
-                }
+    LaunchedEffect(routeCompletionResult) {
+        if (routeCompletionResult != null) {
+            onRouteCompleted(routeCompletionResult)
+            if (routeCompletionResult.levelUpdated == true) {
+                levelUpLevel = routeCompletionResult.level ?: 1
+                showLevelUpOverlay = true
             }
-
-            ReportIssueDialog(
-                visible = true,
-                isLoggedIn = currentUser != null,
-                isEditMode = true,
-                defaultLocationText = adrecaTransformada,
-                initialType = try { IssueType.valueOf(incidencia.type.name) } catch (e: Exception) { IssueType.OBRES },
-                initialDescription = incidencia.description ?: "",
-                initialCoord = incidencia.coordinates,
-                onDismiss = { viewModel.cancelarEdicio() },
-                onConfirm = { tipus, _, descripcio, _ ->
-                    currentUser?.googleId?.let { googleId ->
-                        val apiType = IssueApiType.valueOf(tipus.name)
-                        viewModel.guardarEdicio(
-                            incidenciaId = incidencia.id,
-                            nouTipus = apiType,
-                            novaDescripcio = descripcio,
-                            coordenades = incidencia.coordinates,
-                            googleId = googleId
-                        )
-                    }
-                },
-                onNavigateToLogin = onLoginClick
-            )
+            viewModel.dismissRouteResult()
         }
+    }
+    val strings = mapScreenStrings()
+    var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
+
+    val actions = rememberMapScreenActions(
+        uiState = uiState,
+        viewModel = viewModel,
+        mapView = mapView,
+        context = context,
+        strings = strings,
+        navigationHeadingDegrees = navigationHeadingDegrees
+    )
+
+    val renderContext = MapRenderContext(
+        mapView = mapView,
+        context = context,
+        viewModel = viewModel,
+        navigationHeadingDegrees = navigationHeadingDegrees,
+        originLabel = strings.originLabel,
+        destinationLabel = strings.destinationLabel
+    )
+
+    LaunchedEffect(currentUser?.googleId) {
+        viewModel.onCurrentUserChanged(currentUser)
+    }
+
+    LaunchedEffect(issuesRefreshTrigger) {
+        viewModel.loadIssuesMap()
+    }
+
+    MapScreenEffects(
+        currentLanguage = currentLanguage,
+        uiState = uiState,
+        renderContext = renderContext,
+        mapNotificationTitle = strings.mapNotificationTitle,
+        callbacks = MapScreenEffectCallbacks(
+            requestLocationPermissions = actions.requestLocationPermissions,
+            onNavigationHeadingChanged = { navigationHeadingDegrees = it }
+        )
+    )
+
+    MapScreenContent(
+        modifier = modifier,
+        uiState = uiState,
+        viewModel = viewModel,
+        mapView = mapView,
+        currentUser = currentUser,
+        strings = strings,
+        actions = actions,
+        navigationHeadingDegrees = navigationHeadingDegrees,
+        onLoginClick = onLoginClick,
+        onProfileClick = onProfileClick
+    )
+
+    if (showLevelUpOverlay) {
+        com.safesteps.profile.LevelUpAnimationOverlay(
+            level = levelUpLevel,
+            onDismiss = { showLevelUpOverlay = false }
+        )
     }
 }
 

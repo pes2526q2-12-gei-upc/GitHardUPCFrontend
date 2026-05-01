@@ -27,9 +27,21 @@ enum class UserSyncResult {
     ACCOUNT_BANNED
 }
 
+data class PremiResponse(
+    val id: String? = null,
+    val url: String? = null
+)
 data class UserSyncOutcome(
     val result: UserSyncResult,
     val languageTag: String? = null
+)
+
+data class RouteCompletionResponse(
+    val level: Long? = null,
+    val levelUpdated: Boolean? = null,
+    val pointsAdded: Long? = null,
+    val totalPoints: Long? = null,
+    val recompenses: Long? = null
 )
 
 data class UserFilters(
@@ -55,14 +67,20 @@ private data class UserRequest(
     val isAnonymous: Boolean
 )
 
-private data class UserResponse(
+data class UserResponse(
     val id: Long? = null,
     val email: String? = null,
     val username: String? = null,
     val googleId: String? = null,
     val pictureUrl: String? = null,
     val language: String? = null,
-    val isAnonymous: Boolean? = null
+    val isAnonymous: Boolean? = null,
+    val points: Long? = null,
+    val level: Long? = null,
+    val reputacio: Double? = null,
+    val createdAt: String? = null,
+    val recompenses: Long? = null,
+    val premis: List<PremiResponse>? = null
 )
 
 private data class FilterRequest(
@@ -127,6 +145,17 @@ private interface UserApiService {
     suspend fun deleteUser(
         @Path("googleId") googleId: String
     ): Response<Unit>
+
+    @GET("$USERS_PATH/{googleId}/complete-route")
+    suspend fun completeRoute(
+        @Path("googleId") googleId: String,
+        @Query("meters") meters: Double
+    ): Response<RouteCompletionResponse>
+
+    @GET("$USERS_PATH/{googleId}/open-prize")
+    suspend fun openPrize(
+        @Path("googleId") googleId: String
+    ): Response<PremiResponse>
 }
 
 private object UserBackend {
@@ -389,4 +418,45 @@ private fun <T> ensureSuccess(
     if (!response.isSuccessful) {
         throw IOException("Error $action: ${response.code()} ${response.message()}")
     }
+}
+
+suspend fun completarRutaEnBackend(googleId: String, distanceMeters: Double): RouteCompletionResponse? {
+    if (googleId.isBlank()) {
+        Log.e("USER_API", "Falta el googleId para guardar la ruta en el backend")
+        return null
+    }
+
+    val response = UserBackend.service.completeRoute(googleId, distanceMeters)
+
+    if (response.isSuccessful) {
+        return response.body()
+    }
+
+    Log.e("USER_API", "Error al completar ruta: ${response.code()} ${response.message()}")
+    return null
+}
+
+suspend fun cargarPerfilDeUsuario(googleId: String): UserResponse? {
+    val response = UserBackend.service.getUserByGoogleId(googleId)
+    if (response.isSuccessful) {
+        return response.body()
+    }
+    return null
+}
+
+suspend fun abrirPremioEnBackend(googleId: String): PremiResponse? {
+    if (googleId.isBlank()) {
+        Log.e("USER_API", "Falta el googleId para abrir premio")
+        return null
+    }
+
+    Log.d("USER_API", "Abriendo premio: googleId=$googleId")
+    val response = UserBackend.service.openPrize(googleId)
+
+    if (response.isSuccessful) {
+        return response.body()
+    }
+
+    Log.e("USER_API", "Error al abrir premio: ${response.code()} ${response.message()}")
+    return null
 }

@@ -20,6 +20,7 @@ import com.safesteps.auth.AuthViewModel
 import com.safesteps.auth.UserInfo
 import com.safesteps.auth.rememberGoogleSignOutAction
 import com.safesteps.auth.rememberGoogleSignInAction
+import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.LanguagePreferencesRepository
 import com.safesteps.i18n.LanguageViewModel
@@ -27,7 +28,11 @@ import com.safesteps.i18n.LanguageViewModelFactory
 import com.safesteps.i18n.ProvideLocalizedStrings
 import com.safesteps.i18n.appString
 import com.safesteps.map.MapLibreScreen
+import com.safesteps.profile.ProfileFilterState
+import com.safesteps.profile.ProfileGamificationCallbacks
+import com.safesteps.profile.ProfileGamificationState
 import com.safesteps.profile.ProfileScreen
+import com.safesteps.profile.ProfileUiState
 import com.safesteps.profile.ProfileViewModel
 import com.safesteps.ui.notifications.ScreenNotificationManager
 
@@ -48,6 +53,8 @@ private data class AuthNoticeTexts(
     val deleteAccountError: String
 )
 
+
+
 @Composable
 fun SafeStepsApp(
     modifier: Modifier = Modifier,
@@ -65,9 +72,12 @@ fun SafeStepsApp(
     var currentDestination by rememberSaveable {
         mutableStateOf(SafeStepsDestination.MAP)
     }
+
+    // FUSIONADO: Añadido trigger para recargar incidencias
     var issuesRefreshTrigger by rememberSaveable {
         mutableStateOf(0)
     }
+
     val onLoginClick = rememberGoogleSignInAction(
         onUserLoggedIn = authViewModel::onUserLoggedIn,
         onSessionRestored = authViewModel::restoreLoggedUser
@@ -91,6 +101,11 @@ fun SafeStepsApp(
         currentDestination = currentDestination,
         onProfileOpened = profileViewModel::onFiltersScreenOpened
     )
+    HandleProfileDataRefreshEffect(
+        currentUser = authUiState.currentUser,
+        currentDestination = currentDestination,
+        onProfileOpened = profileViewModel::onProfileScreenOpened
+    )
     val onLanguageSelected: (AppLanguage) -> Unit = remember(languageViewModel, authViewModel) {
         { language ->
             languageViewModel.onLanguageSelected(
@@ -100,6 +115,7 @@ fun SafeStepsApp(
         }
     }
 
+    // FUSIONADO: BackHandler que soporta CUSTOMIZE y recarga incidencias
     BackHandler(
         enabled = isProfileDestination(currentDestination) ||
                 currentDestination == SafeStepsDestination.CUSTOMIZE
@@ -109,7 +125,7 @@ fun SafeStepsApp(
                 currentDestination = SafeStepsDestination.PROFILE
             }
             SafeStepsDestination.PROFILE -> {
-                issuesRefreshTrigger += 1
+                issuesRefreshTrigger += 1 // REFRESCA INCIDENCIAS AL VOLVER
                 currentDestination = SafeStepsDestination.MAP
             }
             SafeStepsDestination.MAP -> Unit
@@ -122,7 +138,7 @@ fun SafeStepsApp(
         currentLanguage = languageUiState.currentLanguage,
         authViewModel = authViewModel,
         currentDestination = currentDestination,
-        issuesRefreshTrigger = issuesRefreshTrigger,
+        issuesRefreshTrigger = issuesRefreshTrigger, // FUSIONADO
         profileUiState = profileUiState,
         onLanguageSelected = onLanguageSelected,
         onFilterValueChange = profileViewModel::onFilterValueChanged,
@@ -133,8 +149,25 @@ fun SafeStepsApp(
             currentDestination = SafeStepsDestination.MAP
         },
         onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE },
-        onNavigateToCustomize = { currentDestination = SafeStepsDestination.CUSTOMIZE }
+        onNavigateToCustomize = { currentDestination = SafeStepsDestination.CUSTOMIZE },
+        onRouteCompleted = { response -> profileViewModel.onRouteCompleted(response) },
+        onOpenPrize = profileViewModel::openPrize,
+        onDismissLevelUp = profileViewModel::dismissLevelUpAnimation,
+        onDismissPrize = profileViewModel::dismissPrizeAnimation
     )
+}
+
+@Composable
+private fun HandleProfileDataRefreshEffect(
+    currentUser: UserInfo?,
+    currentDestination: SafeStepsDestination,
+    onProfileOpened: () -> Unit
+) {
+    LaunchedEffect(currentDestination, currentUser?.googleId) {
+        if (isProfileDestination(currentDestination) && currentUser != null) {
+            onProfileOpened()
+        }
+    }
 }
 
 @Composable
@@ -194,14 +227,18 @@ private fun SafeStepsLocalizedContent(
     authViewModel: AuthViewModel,
     currentDestination: SafeStepsDestination,
     issuesRefreshTrigger: Int,
-    profileUiState: com.safesteps.profile.ProfileUiState,
+    profileUiState: ProfileUiState,
     onLanguageSelected: (AppLanguage) -> Unit,
     onFilterValueChange: (Int, Int) -> Unit,
     onFilterEnabledChange: (Int, Boolean) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
     onNavigateToProfile: () -> Unit,
-    onNavigateToCustomize: () -> Unit
+    onNavigateToCustomize: () -> Unit,
+    onRouteCompleted: (RouteCompletionResponse) -> Unit,
+    onOpenPrize: () -> Unit,
+    onDismissLevelUp: () -> Unit,
+    onDismissPrize: () -> Unit
 ) {
     ProvideLocalizedStrings(currentLanguage) {
         HandleAuthNoticeEffect(
@@ -210,8 +247,8 @@ private fun SafeStepsLocalizedContent(
                 title = appString(R.string.notification_title_auth),
                 loginSuccess = appString(R.string.auth_banner_login_success),
                 registerSuccess = appString(R.string.auth_banner_register_success),
-                accountBanned = appString(R.string.auth_banner_account_banned),
-                accountSuspended = appString(R.string.auth_banner_account_suspended),
+                accountBanned = appString(R.string.auth_banner_account_banned), // FUSIONADO
+                accountSuspended = appString(R.string.auth_banner_account_suspended), // FUSIONADO
                 serverError = appString(R.string.auth_banner_server_error),
                 deleteAccountSuccess = appString(R.string.delete_account_success),
                 deleteAccountError = appString(R.string.delete_account_error)
@@ -228,21 +265,25 @@ private fun SafeStepsLocalizedContent(
             authUiState = authUiState,
             currentLanguage = currentLanguage,
             currentDestination = currentDestination,
-            issuesRefreshTrigger = issuesRefreshTrigger,
+            issuesRefreshTrigger = issuesRefreshTrigger, // FUSIONADO
             profileUiState = profileUiState,
             onLanguageSelected = onLanguageSelected,
             onFilterValueChange = onFilterValueChange,
             onFilterEnabledChange = onFilterEnabledChange,
             onLoginClick = onLoginClick,
-            onNavigateToMap = { onNavigateToMap() },
-            onNavigateToProfile = { onNavigateToProfile() },
-            onNavigateToCustomize = { onNavigateToCustomize() },
+            onNavigateToMap = onNavigateToMap,
+            onNavigateToProfile = onNavigateToProfile,
+            onNavigateToCustomize = onNavigateToCustomize,
             onLogout = rememberLogoutToMapAction(
                 authViewModel = authViewModel,
                 onNavigateToMap = onNavigateToMap
             ),
             onDeleteAccount = authViewModel::onDeleteAccountRequested,
-            onUpdateUserProfile = authViewModel::onUpdateUserProfile
+            onUpdateUserProfile = authViewModel::onUpdateUserProfile,
+            onRouteCompleted = onRouteCompleted, // FUSIONADO GAMIFICACIÓN
+            onOpenPrize = onOpenPrize,
+            onDismissLevelUp = onDismissLevelUp,
+            onDismissPrize = onDismissPrize
         )
     }
 }
@@ -254,6 +295,7 @@ private fun HandleAuthNoticeEffect(
     onLogout: () -> Unit,
     onClearAuthNotice: (Long) -> Unit
 ) {
+    // FUSIONADO: Añadido pendingAccessDeniedSignOut de tu rama de usuarios
     LaunchedEffect(
         authUiState.authNotice?.id,
         authUiState.pendingDeleteAccountSignOut,
@@ -281,7 +323,7 @@ private fun SafeStepsBody(
     currentLanguage: AppLanguage,
     currentDestination: SafeStepsDestination,
     issuesRefreshTrigger: Int,
-    profileUiState: com.safesteps.profile.ProfileUiState,
+    profileUiState: ProfileUiState,
     onLanguageSelected: (AppLanguage) -> Unit,
     onFilterValueChange: (Int, Int) -> Unit,
     onFilterEnabledChange: (Int, Boolean) -> Unit,
@@ -291,7 +333,11 @@ private fun SafeStepsBody(
     onNavigateToCustomize: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: (UserInfo) -> Unit,
-    onUpdateUserProfile: (UserInfo) -> Unit
+    onUpdateUserProfile: (UserInfo) -> Unit,
+    onRouteCompleted: (RouteCompletionResponse) -> Unit,
+    onOpenPrize: () -> Unit,
+    onDismissLevelUp: () -> Unit,
+    onDismissPrize: () -> Unit
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         val currentUser = authUiState.currentUser
@@ -302,12 +348,28 @@ private fun SafeStepsBody(
                     ProfileScreen(
                         modifier = Modifier.fillMaxSize(),
                         user = currentUser,
+                        gamification = ProfileGamificationState(
+                            level = profileUiState.level,
+                            points = profileUiState.points,
+                            recompenses = profileUiState.recompenses,
+                            isLoading = profileUiState.isLoadingProfile,
+                            showLevelUpAnimation = profileUiState.showLevelUpAnimation,
+                            showPrizeAnimation = profileUiState.showPrizeAnimation,
+                            lastOpenedPrize = profileUiState.lastOpenedPrize
+                        ),
+                        gamificationCallbacks = ProfileGamificationCallbacks(
+                            onOpenPrize = onOpenPrize,
+                            onDismissLevelUp = onDismissLevelUp,
+                            onDismissPrize = onDismissPrize
+                        ),
+                        filterState = ProfileFilterState(
+                            values = profileUiState.filterValues,
+                            isLoading = profileUiState.isLoadingFilters,
+                            areEnabled = !profileUiState.isLoadingFilters
+                        ),
+                        onFilterValueChange = onFilterValueChange,
                         currentLanguage = currentLanguage,
                         onLanguageSelected = onLanguageSelected,
-                        filterValues = profileUiState.filterValues,
-                        onFilterValueChange = onFilterValueChange,
-                        isLoadingFilters = profileUiState.isLoadingFilters,
-                        areFiltersEnabled = !profileUiState.isLoadingFilters,
                         onBack = onNavigateToMap,
                         onLogout = onLogout,
                         onDeleteAccount = { onDeleteAccount(currentUser) },
@@ -318,6 +380,7 @@ private fun SafeStepsBody(
                     com.safesteps.profile.ProfileCustomizationScreen(
                         user = currentUser,
                         onBack = onNavigateToProfile,
+                        unlockedPremis = profileUiState.premis, // FUSIONADO GAMIFICACIÓN
                         onSave = onUpdateUserProfile,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -327,9 +390,10 @@ private fun SafeStepsBody(
                         modifier = Modifier.fillMaxSize(),
                         currentUser = currentUser,
                         currentLanguage = currentLanguage,
-                        issuesRefreshTrigger = issuesRefreshTrigger,
+                        issuesRefreshTrigger = issuesRefreshTrigger, // FUSIONADO INCIDENCIAS
                         onLoginClick = onLoginClick,
-                        onProfileClick = onNavigateToProfile
+                        onProfileClick = onNavigateToProfile,
+                        onRouteCompleted = onRouteCompleted // FUSIONADO GAMIFICACIÓN
                     )
                 }
             }
@@ -340,7 +404,12 @@ private fun SafeStepsBody(
                 currentLanguage = currentLanguage,
                 issuesRefreshTrigger = issuesRefreshTrigger,
                 onLoginClick = onLoginClick,
-                onProfileClick = {}
+                onProfileClick = {
+                    if (currentUser != null) {
+                        onNavigateToProfile()
+                    }
+                },
+                onRouteCompleted = onRouteCompleted
             )
         }
     }
@@ -364,8 +433,8 @@ private fun resolveAuthNoticeMessage(
     return when (message) {
         AuthNoticeMessage.LOGIN_SUCCESS -> noticeTexts.loginSuccess
         AuthNoticeMessage.REGISTER_SUCCESS -> noticeTexts.registerSuccess
-        AuthNoticeMessage.ACCOUNT_BANNED -> noticeTexts.accountBanned
-        AuthNoticeMessage.ACCOUNT_SUSPENDED -> noticeTexts.accountSuspended
+        AuthNoticeMessage.ACCOUNT_BANNED -> noticeTexts.accountBanned // FUSIONADO
+        AuthNoticeMessage.ACCOUNT_SUSPENDED -> noticeTexts.accountSuspended // FUSIONADO
         AuthNoticeMessage.SERVER_ERROR -> noticeTexts.serverError
         AuthNoticeMessage.DELETE_ACCOUNT_SUCCESS -> noticeTexts.deleteAccountSuccess
         AuthNoticeMessage.DELETE_ACCOUNT_ERROR -> noticeTexts.deleteAccountError
