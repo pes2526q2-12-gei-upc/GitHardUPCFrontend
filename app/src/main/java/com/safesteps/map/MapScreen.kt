@@ -7,6 +7,7 @@ import android.location.Location
 import android.location.LocationListener
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -56,12 +58,31 @@ import androidx.core.graphics.createBitmap
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import com.safesteps.data.IssueResponseDTO
 
 private data class MapScreenStrings(
@@ -298,30 +319,52 @@ fun MapLibreScreen(
             }
         )
 
-        MapFloatingActions(
-            uiState = uiState,
-            state = FloatingActionsState(
+        val isPlanningRoute = uiState.destinoSeleccionado != null && !uiState.modoRuta
+        val isActiveRoute = uiState.modoRuta
+
+        if (!isPlanningRoute && !isActiveRoute) {
+            MapFloatingActions(
+                uiState = uiState,
+                state = FloatingActionsState(
+                    bottomPadding = effectiveFloatingActionsBottomPadding,
+                    compactMode = floatingActionsLayout.compactMode,
+                    showPoiAction = floatingActionsLayout.showPoiAction,
+                    showMapStyleAction = floatingActionsLayout.showMapStyleAction,
+                    showMyLocationAction = floatingActionsLayout.showMyLocationAction
+                ),
+                labels = FloatingActionLabels(
+                    hideExtraInfoLabel = strings.hideExtraInfoLabel,
+                    showExtraInfoLabel = strings.showExtraInfoLabel,
+                    standardMapStyleLabel = strings.standardMapStyleLabel,
+                    satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
+                    myLocationLabel = strings.myLocationLabel
+                ),
+                callbacks = FloatingActionCallbacks(
+                    onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
+                    onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
+                    onMyLocationClick = onCenterCurrentLocation
+                ),
+                reportIssueLabel = strings.reportIssueLabel,
+                onReportIssueClick = { viewModel.toggleMenuIncidencies(true) }
+            )
+        }
+
+        if (isPlanningRoute || isActiveRoute) {
+            RouteModeFloatingActions(
+                uiState = uiState,
                 bottomPadding = effectiveFloatingActionsBottomPadding,
-                compactMode = floatingActionsLayout.compactMode,
-                showPoiAction = floatingActionsLayout.showPoiAction,
-                showMapStyleAction = floatingActionsLayout.showMapStyleAction,
-                showMyLocationAction = floatingActionsLayout.showMyLocationAction
-            ),
-            labels = FloatingActionLabels(
+                onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
+                onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
+                onMyLocationClick = onCenterCurrentLocation,
+                onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
                 hideExtraInfoLabel = strings.hideExtraInfoLabel,
                 showExtraInfoLabel = strings.showExtraInfoLabel,
                 standardMapStyleLabel = strings.standardMapStyleLabel,
                 satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
-                myLocationLabel = strings.myLocationLabel
-            ),
-            callbacks = FloatingActionCallbacks(
-                onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
-                onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
-                onMyLocationClick = onCenterCurrentLocation
-            ),
-            reportIssueLabel = strings.reportIssueLabel,
-            onReportIssueClick = { viewModel.toggleMenuIncidencies(true) }
-        )
+                myLocationLabel = strings.myLocationLabel,
+                reportIssueLabel = strings.reportIssueLabel
+            )
+        }
 
         CalculatingRouteOverlay(
             visible = uiState.calculantRuta,
@@ -338,27 +381,18 @@ fun MapLibreScreen(
             onDismiss = {
                 viewModel.toggleMenuIncidencies(false)
             },
-            onConfirm = { tipus, ubicacio, descripcio, coord ->
-                if (ubicacio == textMevaUbicacio) {
-                    val loc = uiState.ultimaUbicacion
-                    if (loc == null || !viewModel.isInsideBarcelonaArea(loc.latitude, loc.longitude)) {
-                        Toast.makeText(
-                            context,
-                            strings.reportIssueOutsideBarcelonaMessage,
-                            Toast.LENGTH_LONG
-                        ).show()
-                        return@ReportIssueDialog
-                    }
-                }
-                viewModel.reportIssue(
+            onConfirm = { tipus, ubicacio, descripcio, _ ->
+                handleNewIssueConfirm(
                     tipus = tipus,
-                    adrecaText = ubicacio,
+                    ubicacio = ubicacio,
                     descripcio = descripcio,
-                    textMevaUbicacio = textMevaUbicacio
+                    uiState = uiState,
+                    viewModel = viewModel,
+                    context = context,
+                    textMevaUbicacio = textMevaUbicacio,
+                    textExit = textExit,
+                    outsideBarcelonaMessage = strings.reportIssueOutsideBarcelonaMessage
                 )
-
-                viewModel.toggleMenuIncidencies(false)
-                Toast.makeText(context, textExit, Toast.LENGTH_SHORT).show()
             },
             onNavigateToLogin = onLoginClick,
             properties = DialogProperties(
@@ -390,22 +424,10 @@ fun MapLibreScreen(
             var adrecaTransformada by remember(incidencia) { mutableStateOf(strings.issueLoadingAddressLabel) }
 
             LaunchedEffect(incidencia) {
-                try {
-                    val response = com.safesteps.data.PhotonApi.service.reverseGeocode(
-                        lat = incidencia.coordinates.lat,
-                        lon = incidencia.coordinates.lon
-                    )
-
-                    val feature = response.features.firstOrNull()
-                    if (feature != null) {
-                        val adreca = feature.properties.getAddress()
-                        adrecaTransformada = adreca.ifBlank { strings.issueLocationFallbackLabel }
-                    } else {
-                        adrecaTransformada = strings.issueLocationFallbackLabel
-                    }
-                } catch (_: Exception) {
-                    adrecaTransformada = strings.issueLocationFallbackLabel
-                }
+                adrecaTransformada = resolveIssueAddressOrFallback(
+                    coordinates = incidencia.coordinates,
+                    fallback = strings.issueLocationFallbackLabel
+                )
             }
 
             ReportIssueDialog(
@@ -413,7 +435,7 @@ fun MapLibreScreen(
                 isLoggedIn = currentUser != null,
                 isEditMode = true,
                 defaultLocationText = adrecaTransformada,
-                initialType = try { IssueType.valueOf(incidencia.type.name) } catch (e: Exception) { IssueType.OBRES },
+                initialType = issueTypeFromApi(incidencia.type),
                 initialDescription = incidencia.description ?: "",
                 initialCoord = incidencia.coordinates,
                 onDismiss = { viewModel.cancelarEdicio() },
@@ -430,6 +452,97 @@ fun MapLibreScreen(
                     }
                 },
                 onNavigateToLogin = onLoginClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.RouteModeFloatingActions(
+    uiState: MapUiState,
+    bottomPadding: Dp,
+    onTogglePuntsInteres: () -> Unit,
+    onToggleMapStyle: () -> Unit,
+    onMyLocationClick: () -> Unit,
+    onReportIssueClick: () -> Unit,
+    hideExtraInfoLabel: String,
+    showExtraInfoLabel: String,
+    standardMapStyleLabel: String,
+    satelliteMapStyleLabel: String,
+    myLocationLabel: String,
+    reportIssueLabel: String
+) {
+    Row(
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(end = 16.dp, bottom = bottomPadding),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (uiState.puntsInteres.isNotEmpty()) {
+            CompactCircularMapAction(
+                onClick = onTogglePuntsInteres,
+                contentDescription = if (uiState.mostrarPuntsInteres) hideExtraInfoLabel else showExtraInfoLabel,
+                icon = Icons.Default.Place,
+                tint = if (uiState.mostrarPuntsInteres) Color(0xFF388E6C) else Color(0xFF6D7B75),
+                testTagId = "btn_places"
+            )
+        }
+        CompactCircularMapAction(
+            onClick = onToggleMapStyle,
+            contentDescription = if (uiState.estiloSatelite) standardMapStyleLabel else satelliteMapStyleLabel,
+            icon = Icons.Default.Layers,
+            tint = if (uiState.estiloSatelite) Color(0xFF2A5F8A) else Color(0xFF33413B),
+            testTagId = "btn_satellit"
+        )
+        CompactCircularMapAction(
+            onClick = onMyLocationClick,
+            contentDescription = myLocationLabel,
+            icon = Icons.Default.MyLocation,
+            tint = Color(0xFF2A5F8A),
+            testTagId = "btn_ubicacio_actual"
+        )
+        CompactCircularMapAction(
+            onClick = onReportIssueClick,
+            contentDescription = reportIssueLabel,
+            icon = Icons.Default.ReportProblem,
+            tint = Color.White,
+            backgroundColor = Color(0xFFC86A37),
+            testTagId = "btn_incidencies"
+        )
+    }
+}
+
+@Composable
+private fun CompactCircularMapAction(
+    onClick: () -> Unit,
+    contentDescription: String,
+    icon: ImageVector,
+    tint: Color = Color(0xFF33413B),
+    backgroundColor: Color = Color.White,
+    testTagId: String? = null
+) {
+    Surface(
+        shape = CircleShape,
+        modifier = Modifier.size(44.dp),
+        color = backgroundColor,
+        shadowElevation = 4.dp
+    ) {
+        IconButton(
+            onClick = onClick,
+            modifier = if (testTagId != null) {
+                Modifier
+                    .semantics(mergeDescendants = true) { testTag = testTagId }
+                    .testTag(testTagId)
+            } else {
+                Modifier
+            }
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(22.dp)
             )
         }
     }
@@ -1184,6 +1297,27 @@ private fun recenterOnCurrentLocation(
         return
     }
 
+    // If the user has confirmed a custom origin (e.g. during route planning),
+    // pressing my-location must NOT replace that origin. Just zoom on the
+    // current location and leave the route/origin untouched.
+    if (uiState.origenSeleccionado != null) {
+        activateLocationComponent(
+            mapView = mapView,
+            initialLocation = currentLocation
+        )
+
+        if (currentLocation == null) {
+            ScreenNotificationManager.showNotification(
+                notificationName = notificationTitle,
+                text = searchingGpsSignalMessage
+            )
+            return
+        }
+
+        centerMapOnLocation(mapView, currentLocation)
+        return
+    }
+
     viewModel.limpiarOrigen()
     activateLocationComponent(
         mapView = mapView,
@@ -1494,13 +1628,57 @@ fun createIssueIcon(context: Context, tipus: IssueApiType): org.maplibre.android
 }
 
 
+private fun handleNewIssueConfirm(
+    tipus: IssueType,
+    ubicacio: String,
+    descripcio: String,
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    context: Context,
+    textMevaUbicacio: String,
+    textExit: String,
+    outsideBarcelonaMessage: String
+) {
+    if (ubicacio == textMevaUbicacio && !isLocationInsideBarcelona(uiState, viewModel)) {
+        Toast.makeText(context, outsideBarcelonaMessage, Toast.LENGTH_LONG).show()
+        return
+    }
+    viewModel.reportIssue(
+        tipus = tipus,
+        adrecaText = ubicacio,
+        descripcio = descripcio,
+        textMevaUbicacio = textMevaUbicacio
+    )
+    viewModel.toggleMenuIncidencies(false)
+    Toast.makeText(context, textExit, Toast.LENGTH_SHORT).show()
+}
 
+private fun isLocationInsideBarcelona(
+    uiState: MapUiState,
+    viewModel: MapViewModel
+): Boolean {
+    val loc = uiState.ultimaUbicacion ?: return false
+    return viewModel.isInsideBarcelonaArea(loc.latitude, loc.longitude)
+}
 
+private suspend fun resolveIssueAddressOrFallback(
+    coordinates: Coord,
+    fallback: String
+): String {
+    return try {
+        val response = com.safesteps.data.PhotonApi.service.reverseGeocode(
+            lat = coordinates.lat,
+            lon = coordinates.lon
+        )
+        response.features.firstOrNull()
+            ?.properties?.getAddress()
+            ?.takeIf { it.isNotBlank() }
+            ?: fallback
+    } catch (_: Exception) {
+        fallback
+    }
+}
 
-
-
-
-
-
-
-
+private fun issueTypeFromApi(apiType: IssueApiType): IssueType {
+    return runCatching { IssueType.valueOf(apiType.name) }.getOrDefault(IssueType.OBRES)
+}

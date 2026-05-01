@@ -13,6 +13,8 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 
+private const val EMPTY_BODY_ERROR = "Resposta buida"
+
 enum class IssueApiType {
     OBRES,
     ACCESSIBILITAT,
@@ -158,7 +160,7 @@ suspend fun crearIncidencia(request: IssueRequestDTO): IssueResponseDTO {
     if (!response.isSuccessful) {
         throw IOException("Error creant l'incidència: ${response.code()}")
     }
-    return response.body() ?: throw IOException("Resposta buida")
+    return response.body() ?: throw IOException(EMPTY_BODY_ERROR)
 }
 
 suspend fun getAllIssues(): List<IssueResponseDTO> {
@@ -184,7 +186,7 @@ suspend fun votarIncidencia(idIncidencia: Long, request: VoteRequestDTO): VoteRe
         Log.e("INCIDENTS_API", "Vot fallit: code=${response.code()} body=$errorBody")
         throw IOException("Error al votar: ${response.code()} - $errorBody")
     }
-    return response.body() ?: throw IOException("Resposta buida")
+    return response.body() ?: throw IOException(EMPTY_BODY_ERROR)
 }
 suspend fun eliminarIncidencia(idIncidencia: Long) {
     val response = IssueBackend.service.deleteIssue(idIncidencia)
@@ -203,5 +205,5 @@ suspend fun actualitzarIncidencia(idIncidencia: Long, request: IssueRequestDTO):
     if (!response.isSuccessful) {
         throw IOException("Error actualitzant: ${response.code()}")
     }
-    return response.body() ?: throw IOException("Resposta buida")
+    return response.body() ?: throw IOException(EMPTY_BODY_ERROR)
 }

@@ -948,32 +948,44 @@ class MapViewModel(
         stepSize: Double = 0.0001,
         maxRadiusSteps: Int = 3
     ): Pair<Double, Double> {
-
-        val isOriginalFree = existingIssues.none {
-            it.coordinates.lat == desiredLat && it.coordinates.lon == desiredLon
+        if (isCoordinateFree(desiredLat, desiredLon, existingIssues)) {
+            return Pair(desiredLat, desiredLon)
         }
-        if (isOriginalFree) return Pair(desiredLat, desiredLon)
-
         for (radius in 1..maxRadiusSteps) {
-            for (dx in -radius..radius) {
-                for (dy in -radius..radius) {
-                    if (Math.abs(dx) == radius || Math.abs(dy) == radius) {
-                        val testLat = desiredLat + (dx * stepSize)
-                        val testLon = desiredLon + (dy * stepSize)
+            val freePoint = findFreeCoordinateAtRadius(
+                desiredLat, desiredLon, radius, stepSize, existingIssues
+            )
+            if (freePoint != null) return freePoint
+        }
+        return Pair(desiredLat, desiredLon)
+    }
 
-                        val isFree = existingIssues.none {
-                            it.coordinates.lat == testLat && it.coordinates.lon == testLon
-                        }
+    private fun isCoordinateFree(
+        lat: Double,
+        lon: Double,
+        existingIssues: List<IssueResponseDTO>
+    ): Boolean = existingIssues.none {
+        it.coordinates.lat == lat && it.coordinates.lon == lon
+    }
 
-                        if (isFree) {
-                            return Pair(testLat, testLon)
-                        }
-                    }
+    private fun findFreeCoordinateAtRadius(
+        desiredLat: Double,
+        desiredLon: Double,
+        radius: Int,
+        stepSize: Double,
+        existingIssues: List<IssueResponseDTO>
+    ): Pair<Double, Double>? {
+        for (dx in -radius..radius) {
+            for (dy in -radius..radius) {
+                if (Math.abs(dx) != radius && Math.abs(dy) != radius) continue
+                val testLat = desiredLat + (dx * stepSize)
+                val testLon = desiredLon + (dy * stepSize)
+                if (isCoordinateFree(testLat, testLon, existingIssues)) {
+                    return Pair(testLat, testLon)
                 }
             }
         }
-
-        return Pair(desiredLat, desiredLon)
+        return null
     }
 
     fun esborrarIncidencia(incidenciaId: Long) {
