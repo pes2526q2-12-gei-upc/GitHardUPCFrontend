@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAddAlt1
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -53,6 +54,7 @@ fun CommunityMenuScreen(
     onBack: () -> Unit,
     onProfileClick: () -> Unit,
     onFriendsClick: () -> Unit,
+    onRouteFiltersClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -103,6 +105,16 @@ fun CommunityMenuScreen(
                 title = appString(R.string.community_menu_friends_title),
                 description = appString(R.string.community_menu_friends_description),
                 onClick = onFriendsClick
+            )
+        }
+
+        item {
+            CommunityMenuCard(
+                icon = Icons.Default.Tune,
+                iconTint = Color(0xFF5B8C6F),
+                title = appString(R.string.community_menu_route_title),
+                description = appString(R.string.community_menu_route_description),
+                onClick = onRouteFiltersClick
             )
         }
 

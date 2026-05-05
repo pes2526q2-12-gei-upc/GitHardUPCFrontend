@@ -82,7 +82,7 @@
     <string name="route_priority_accessibility_description">Busca un trayecto m&#225;s c&#243;modo y f&#225;cil de caminar.</string>
     <string name="route_priority_heat_description">Reduce la exposici&#243;n al sol y al calor siempre que sea posible.</string>
     <string name="route_priority_personalized_description">Usa los pesos guardados en los filtros de tu perfil.</string>
-    <string name="route_priority_personalized_footer">Puedes cambiarlos en Perfil &gt; Filtros.</string>
+    <string name="route_priority_personalized_footer">Puedes cambiarlos en Comunidad &gt; Personaliza la ruta.</string>
     <string name="close">Cerrar</string>
     <string name="start_route">Iniciar ruta</string>
     <string name="location_permission_required">Se necesita el permiso de ubicaci&#243;n.</string>
@@ -174,9 +174,13 @@
     <!-- STRINGS RECUPERADOS DE LA FEATURE ANTIGUA -->
     <string name="profile_level">Nivel %1$d</string>
     <string name="profile_points">%1$d / %2$d pts</string>
-    <string name="profile_customize">Personalizar</string>
+    <string name="profile_customize">Personalizar perfil</string>
     <string name="profile_add_friends">Buscar amigos</string>
     <string name="customize_title">Personalizar Perfil</string>
+    <string name="route_filters_title">Personaliza tu ruta</string>
+    <string name="route_filters_subtitle">Decide que factores pesan mas cuando calculamos una ruta para ti.</string>
+    <string name="route_filters_sync_loading">Sincronizando</string>
+    <string name="route_filters_sync_ready">Sincronizado</string>
     <string name="customize_photo">Foto de perfil</string>
     <string name="customize_route_color">Color de ruta</string>
     <string name="customize_name_style">Estilo de usuario</string>
@@ -202,6 +206,8 @@
     <string name="community_menu_chat_description">Conversaciones directas con tus contactos.</string>
     <string name="community_menu_friends_title">Amigos</string>
     <string name="community_menu_friends_description">Consulta, chatea y gestiona a tus amigos.</string>
+    <string name="community_menu_route_title">Personaliza la ruta</string>
+    <string name="community_menu_route_description">Ajusta el peso de la seguridad, el confort y el clima en tus rutas.</string>
     <string name="community_menu_notifications_title">Notificaciones</string>
     <string name="community_menu_notifications_description">Consulta las &#250;ltimas alertas y actividad.</string>
     <string name="community_menu_soon_title">Pr&#243;ximamente</string>

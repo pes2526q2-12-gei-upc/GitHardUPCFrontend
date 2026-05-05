@@ -37,12 +37,14 @@ import com.safesteps.profile.FriendsScreen
 import com.safesteps.profile.ProfileScreen
 import com.safesteps.profile.ProfileUiState
 import com.safesteps.profile.ProfileViewModel
+import com.safesteps.profile.RouteFiltersScreen
 import com.safesteps.ui.notifications.ScreenNotificationManager
 
 private enum class SafeStepsDestination {
     MAP,
     MENU,
     FRIENDS,
+    ROUTE_FILTERS,
     PROFILE,
     CUSTOMIZE,
     FRIEND_SEARCH
@@ -101,6 +103,9 @@ fun SafeStepsApp(
     }
     val onNavigateToFriends = {
         currentDestination = SafeStepsDestination.FRIENDS
+    }
+    val onNavigateToRouteFilters = {
+        currentDestination = SafeStepsDestination.ROUTE_FILTERS
     }
     val onNavigateToProfileFromMap = {
         profileBackDestination = SafeStepsDestination.MAP
@@ -179,6 +184,9 @@ fun SafeStepsApp(
             SafeStepsDestination.FRIENDS -> {
                 currentDestination = SafeStepsDestination.MENU
             }
+            SafeStepsDestination.ROUTE_FILTERS -> {
+                currentDestination = SafeStepsDestination.MENU
+            }
             SafeStepsDestination.FRIEND_SEARCH -> {
                 currentDestination = SafeStepsDestination.FRIENDS
             }
@@ -204,6 +212,7 @@ fun SafeStepsApp(
         onNavigateToMap = onNavigateToMap,
         onNavigateToMenu = onNavigateToMenu,
         onNavigateToFriends = onNavigateToFriends,
+        onNavigateToRouteFilters = onNavigateToRouteFilters,
         onNavigateBackFromProfile = onNavigateBackFromProfile,
         onNavigateToProfileFromMap = onNavigateToProfileFromMap,
         onNavigateToProfileFromMenu = onNavigateToProfileFromMenu,
@@ -272,7 +281,7 @@ private fun HandleProfileFiltersRefreshEffect(
     onProfileOpened: () -> Unit
 ) {
     LaunchedEffect(currentDestination, currentUser?.googleId) {
-        if (isProfileDestination(currentDestination) && currentUser != null) {
+        if (currentDestination == SafeStepsDestination.ROUTE_FILTERS && currentUser != null) {
             onProfileOpened()
         }
     }
@@ -295,6 +304,7 @@ private fun SafeStepsLocalizedContent(
     onNavigateToMap: () -> Unit,
     onNavigateToMenu: () -> Unit,
     onNavigateToFriends: () -> Unit,
+    onNavigateToRouteFilters: () -> Unit,
     onNavigateBackFromProfile: () -> Unit,
     onNavigateToProfileFromMap: () -> Unit,
     onNavigateToProfileFromMenu: () -> Unit,
@@ -341,6 +351,7 @@ private fun SafeStepsLocalizedContent(
             onNavigateToMap = onNavigateToMap,
             onNavigateToMenu = onNavigateToMenu,
             onNavigateToFriends = onNavigateToFriends,
+            onNavigateToRouteFilters = onNavigateToRouteFilters,
             onNavigateBackFromProfile = onNavigateBackFromProfile,
             onNavigateToProfileFromMap = onNavigateToProfileFromMap,
             onNavigateToProfileFromMenu = onNavigateToProfileFromMenu,
@@ -405,6 +416,7 @@ private fun SafeStepsBody(
     onNavigateToMap: () -> Unit,
     onNavigateToMenu: () -> Unit,
     onNavigateToFriends: () -> Unit,
+    onNavigateToRouteFilters: () -> Unit,
     onNavigateBackFromProfile: () -> Unit,
     onNavigateToProfileFromMap: () -> Unit,
     onNavigateToProfileFromMenu: () -> Unit,
@@ -443,18 +455,25 @@ private fun SafeStepsBody(
                             onDismissLevelUp = onDismissLevelUp,
                             onDismissPrize = onDismissPrize
                         ),
-                        filterState = ProfileFilterState(
-                            values = profileUiState.filterValues,
-                            isLoading = profileUiState.isLoadingFilters,
-                            areEnabled = !profileUiState.isLoadingFilters
-                        ),
-                        onFilterValueChange = onFilterValueChange,
                         currentLanguage = currentLanguage,
                         onLanguageSelected = onLanguageSelected,
                         onBack = onNavigateBackFromProfile,
                         onLogout = onLogout,
                         onDeleteAccount = { onDeleteAccount(currentUser) },
                         onCustomizeClick = onNavigateToCustomize
+                    )
+                }
+                SafeStepsDestination.ROUTE_FILTERS -> {
+                    RouteFiltersScreen(
+                        filterState = ProfileFilterState(
+                            values = profileUiState.filterValues,
+                            isLoading = profileUiState.isLoadingFilters,
+                            isSaving = profileUiState.isSavingFilters,
+                            areEnabled = !profileUiState.isLoadingFilters
+                        ),
+                        onFilterValueChange = onFilterValueChange,
+                        onBack = onNavigateToMenu,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
                 SafeStepsDestination.CUSTOMIZE -> {
@@ -472,6 +491,7 @@ private fun SafeStepsBody(
                         onBack = onNavigateToMap,
                         onProfileClick = onNavigateToProfileFromMenu,
                         onFriendsClick = onNavigateToFriends,
+                        onRouteFiltersClick = onNavigateToRouteFilters,
                         modifier = Modifier.fillMaxSize()
                     )
                 }

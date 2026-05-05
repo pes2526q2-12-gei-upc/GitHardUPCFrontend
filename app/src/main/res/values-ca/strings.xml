@@ -82,7 +82,7 @@
     <string name="route_priority_accessibility_description">Busca un trajecte m&#233;s c&#242;mode i f&#224;cil de caminar.</string>
     <string name="route_priority_heat_description">Redueix l\'exposici&#243; al sol i a la calor sempre que sigui possible.</string>
     <string name="route_priority_personalized_description">Fa servir els pesos guardats als filtres del teu perfil.</string>
-    <string name="route_priority_personalized_footer">Els pots canviar a Perfil &gt; Filtres.</string>
+    <string name="route_priority_personalized_footer">Els pots canviar a Comunitat &gt; Personalitza la ruta.</string>
     <string name="close">Tanca</string>
     <string name="start_route">Inicia la ruta</string>
     <string name="location_permission_required">Cal el perm&#237;s d\'ubicaci&#243;.</string>
@@ -173,9 +173,13 @@
     <!-- STRINGS RECUPERADOS DE LA FEATURE ANTIGUA -->
     <string name="profile_level">Nivell %1$d</string>
     <string name="profile_points">%1$d / %2$d pts</string>
-    <string name="profile_customize">Personalitza</string>
+    <string name="profile_customize">Personalitza el perfil</string>
     <string name="profile_add_friends">Buscar amics</string>
     <string name="customize_title">Personalitzar Perfil</string>
+    <string name="route_filters_title">Personalitza la teva ruta</string>
+    <string name="route_filters_subtitle">Decideix quins factors pesen mes quan calculem una ruta per a tu.</string>
+    <string name="route_filters_sync_loading">Sincronitzant</string>
+    <string name="route_filters_sync_ready">Sincronitzat</string>
     <string name="customize_photo">Foto de perfil</string>
     <string name="customize_route_color">Color de ruta</string>
     <string name="customize_name_style">Estil d\'usuari</string>
@@ -201,6 +205,8 @@
     <string name="community_menu_chat_description">Converses directes amb els teus contactes.</string>
     <string name="community_menu_friends_title">Amics</string>
     <string name="community_menu_friends_description">Consulta, xateja i gestiona els teus amics.</string>
+    <string name="community_menu_route_title">Personalitza la ruta</string>
+    <string name="community_menu_route_description">Ajusta el pes de la seguretat, el confort i el clima a les teves rutes.</string>
     <string name="community_menu_notifications_title">Notificacions</string>
     <string name="community_menu_notifications_description">Consulta les darreres alertes i activitat.</string>
     <string name="community_menu_soon_title">Properament</string>
