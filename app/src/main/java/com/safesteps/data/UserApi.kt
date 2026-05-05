@@ -58,6 +58,13 @@ data class UserFilters(
     val qualitatAire: Double = 0.5
 )
 
+data class FriendSearchUser(
+    val googleId: String,
+    val username: String,
+    val email: String,
+    val photoUrl: String? = null
+)
+
 private data class UserRequest(
     val email: String,
     val username: String,
@@ -459,4 +466,52 @@ suspend fun abrirPremioEnBackend(googleId: String): PremiResponse? {
 
     Log.e("USER_API", "Error al abrir premio: ${response.code()} ${response.message()}")
     return null
+}
+
+suspend fun cargarAmigosUsuario(
+    requesterGoogleId: String
+): List<FriendSearchUser> {
+    if (requesterGoogleId.isBlank()) {
+        return emptyList()
+    }
+
+    // crida
+
+    return emptyList()
+}
+
+suspend fun buscarUsuariosParaAmistad(
+    query: String,
+    requesterGoogleId: String
+): List<FriendSearchUser> {
+    val normalizedQuery = query.trim()
+    if (normalizedQuery.isBlank()) {
+        return emptyList()
+    }
+
+    // crida
+
+    return emptyList()
+}
+
+suspend fun enviarSolicitudAmistad(
+    requesterGoogleId: String,
+    targetGoogleId: String
+) {
+    if (requesterGoogleId.isBlank() || targetGoogleId.isBlank()) {
+        return
+    }
+
+    // crida
+}
+
+suspend fun eliminarAmigoUsuario(
+    requesterGoogleId: String,
+    targetGoogleId: String
+) {
+    if (requesterGoogleId.isBlank() || targetGoogleId.isBlank()) {
+        return
+    }
+
+    // crida
 }

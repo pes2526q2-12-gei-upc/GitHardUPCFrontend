@@ -309,6 +309,7 @@ private fun MapScreenContent(
     actions: MapScreenActions,
     navigationHeadingDegrees: Float?,
     onLoginClick: () -> Unit,
+    onMenuClick: () -> Unit,
     onProfileClick: () -> Unit
 ) {
     var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
@@ -350,6 +351,7 @@ private fun MapScreenContent(
             accountActions = TopPanelAccountActions(
                 currentUser = currentUser,
                 onLoginClick = onLoginClick,
+                onMenuClick = onMenuClick,
                 onProfileClick = onProfileClick
             ),
             callbacks = TopSearchPanelCallbacks(
@@ -477,6 +479,7 @@ fun MapLibreScreen(
     currentLanguage: AppLanguage = AppLanguage.default,
     issuesRefreshTrigger: Int = 0,
     onLoginClick: () -> Unit = {},
+    onMenuClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onRouteCompleted: (RouteCompletionResponse) -> Unit = {}
 ) {
@@ -551,6 +554,7 @@ fun MapLibreScreen(
         actions = actions,
         navigationHeadingDegrees = navigationHeadingDegrees,
         onLoginClick = onLoginClick,
+        onMenuClick = onMenuClick,
         onProfileClick = onProfileClick
     )
 

@@ -93,6 +93,7 @@ private data class SearchBarConfig(
 internal data class TopPanelAccountActions(
     val currentUser: UserInfo?,
     val onLoginClick: () -> Unit,
+    val onMenuClick: () -> Unit,
     val onProfileClick: () -> Unit
 )
 
@@ -306,15 +307,26 @@ private fun DropdownSuggeriments(
 private fun TopPanelHeader(
     currentUser: UserInfo?,
     onLoginClick: () -> Unit,
+    onMenuClick: () -> Unit,
     onProfileClick: () -> Unit
 ) {
     val profilePhotoLabel = appString(R.string.profile_photo)
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(modifier = Modifier.size(34.dp), shape = CircleShape, color = Color(0xFFF4F6F5)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Menu, null, tint = Color(0xFF66716C), modifier = Modifier.size(18.dp))
+        if (currentUser != null) {
+            Surface(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clickable(onClick = onMenuClick),
+                shape = CircleShape,
+                color = Color(0xFFF4F6F5)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Menu, null, tint = Color(0xFF66716C), modifier = Modifier.size(18.dp))
+                }
             }
+        } else {
+            Spacer(modifier = Modifier.size(34.dp))
         }
         Spacer(modifier = Modifier.width(12.dp))
         Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
@@ -450,6 +462,7 @@ private fun TopSearchPanel(
             TopPanelHeader(
                 currentUser = accountActions.currentUser,
                 onLoginClick = accountActions.onLoginClick,
+                onMenuClick = accountActions.onMenuClick,
                 onProfileClick = accountActions.onProfileClick
             )
 

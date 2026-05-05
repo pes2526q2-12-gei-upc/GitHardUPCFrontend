@@ -27,10 +27,13 @@ import com.safesteps.i18n.LanguageViewModel
 import com.safesteps.i18n.LanguageViewModelFactory
 import com.safesteps.i18n.ProvideLocalizedStrings
 import com.safesteps.i18n.appString
+import com.safesteps.map.CommunityMenuScreen
 import com.safesteps.map.MapLibreScreen
 import com.safesteps.profile.ProfileFilterState
 import com.safesteps.profile.ProfileGamificationCallbacks
 import com.safesteps.profile.ProfileGamificationState
+import com.safesteps.profile.FriendSearchScreen
+import com.safesteps.profile.FriendsScreen
 import com.safesteps.profile.ProfileScreen
 import com.safesteps.profile.ProfileUiState
 import com.safesteps.profile.ProfileViewModel
@@ -38,8 +41,11 @@ import com.safesteps.ui.notifications.ScreenNotificationManager
 
 private enum class SafeStepsDestination {
     MAP,
+    MENU,
+    FRIENDS,
     PROFILE,
-    CUSTOMIZE
+    CUSTOMIZE,
+    FRIEND_SEARCH
 }
 
 private data class AuthNoticeTexts(
@@ -72,6 +78,9 @@ fun SafeStepsApp(
     var currentDestination by rememberSaveable {
         mutableStateOf(SafeStepsDestination.MAP)
     }
+    var profileBackDestination by rememberSaveable {
+        mutableStateOf(SafeStepsDestination.MAP)
+    }
 
     // FUSIONADO: Añadido trigger para recargar incidencias
     var issuesRefreshTrigger by rememberSaveable {
@@ -82,11 +91,52 @@ fun SafeStepsApp(
         onUserLoggedIn = authViewModel::onUserLoggedIn,
         onSessionRestored = authViewModel::restoreLoggedUser
     )
+    val onNavigateToMap = {
+        profileBackDestination = SafeStepsDestination.MAP
+        issuesRefreshTrigger += 1
+        currentDestination = SafeStepsDestination.MAP
+    }
+    val onNavigateToMenu = {
+        currentDestination = SafeStepsDestination.MENU
+    }
+    val onNavigateToFriends = {
+        currentDestination = SafeStepsDestination.FRIENDS
+    }
+    val onNavigateToProfileFromMap = {
+        profileBackDestination = SafeStepsDestination.MAP
+        currentDestination = SafeStepsDestination.PROFILE
+    }
+    val onNavigateToProfileFromMenu = {
+        profileBackDestination = SafeStepsDestination.MENU
+        currentDestination = SafeStepsDestination.PROFILE
+    }
+    val onNavigateToProfileFromFriendSearch = {
+        profileBackDestination = SafeStepsDestination.FRIEND_SEARCH
+        currentDestination = SafeStepsDestination.PROFILE
+    }
+    val onNavigateBackFromProfile = {
+        when (profileBackDestination) {
+            SafeStepsDestination.MENU -> {
+                currentDestination = SafeStepsDestination.MENU
+            }
+            SafeStepsDestination.FRIENDS -> {
+                currentDestination = SafeStepsDestination.FRIENDS
+            }
+            SafeStepsDestination.FRIEND_SEARCH -> {
+                currentDestination = SafeStepsDestination.FRIEND_SEARCH
+            }
+            else -> {
+                profileBackDestination = SafeStepsDestination.MAP
+                issuesRefreshTrigger += 1
+                currentDestination = SafeStepsDestination.MAP
+            }
+        }
+    }
 
     HandleProfileRedirectEffect(
         currentUser = authUiState.currentUser,
         currentDestination = currentDestination,
-        onNavigateToMap = { currentDestination = SafeStepsDestination.MAP }
+        onNavigateToMap = onNavigateToMap
     )
     HandleLanguageSyncEffect(
         currentUser = authUiState.currentUser,
@@ -115,18 +165,25 @@ fun SafeStepsApp(
         }
     }
 
-    // FUSIONADO: BackHandler que soporta CUSTOMIZE y recarga incidencias
+    // FUSIONADO: BackHandler que soporta pantallas secundarias de perfil
     BackHandler(
-        enabled = isProfileDestination(currentDestination) ||
-                currentDestination == SafeStepsDestination.CUSTOMIZE
+        enabled = currentDestination != SafeStepsDestination.MAP
     ) {
         when (currentDestination) {
             SafeStepsDestination.CUSTOMIZE -> {
                 currentDestination = SafeStepsDestination.PROFILE
             }
-            SafeStepsDestination.PROFILE -> {
-                issuesRefreshTrigger += 1 // REFRESCA INCIDENCIAS AL VOLVER
+            SafeStepsDestination.MENU -> {
                 currentDestination = SafeStepsDestination.MAP
+            }
+            SafeStepsDestination.FRIENDS -> {
+                currentDestination = SafeStepsDestination.MENU
+            }
+            SafeStepsDestination.FRIEND_SEARCH -> {
+                currentDestination = SafeStepsDestination.FRIENDS
+            }
+            SafeStepsDestination.PROFILE -> {
+                onNavigateBackFromProfile()
             }
             SafeStepsDestination.MAP -> Unit
         }
@@ -144,12 +201,16 @@ fun SafeStepsApp(
         onFilterValueChange = profileViewModel::onFilterValueChanged,
         onFilterEnabledChange = profileViewModel::onFilterEnabledChanged,
         onLoginClick = onLoginClick,
-        onNavigateToMap = {
-            issuesRefreshTrigger += 1
-            currentDestination = SafeStepsDestination.MAP
-        },
-        onNavigateToProfile = { currentDestination = SafeStepsDestination.PROFILE },
+        onNavigateToMap = onNavigateToMap,
+        onNavigateToMenu = onNavigateToMenu,
+        onNavigateToFriends = onNavigateToFriends,
+        onNavigateBackFromProfile = onNavigateBackFromProfile,
+        onNavigateToProfileFromMap = onNavigateToProfileFromMap,
+        onNavigateToProfileFromMenu = onNavigateToProfileFromMenu,
+        onNavigateToProfileFromFriendSearch = onNavigateToProfileFromFriendSearch,
+        onReturnToProfile = { currentDestination = SafeStepsDestination.PROFILE },
         onNavigateToCustomize = { currentDestination = SafeStepsDestination.CUSTOMIZE },
+        onNavigateToFriendSearch = { currentDestination = SafeStepsDestination.FRIEND_SEARCH },
         onRouteCompleted = { response -> profileViewModel.onRouteCompleted(response) },
         onOpenPrize = profileViewModel::openPrize,
         onDismissLevelUp = profileViewModel::dismissLevelUpAnimation,
@@ -177,8 +238,7 @@ private fun HandleProfileRedirectEffect(
     onNavigateToMap: () -> Unit
 ) {
     LaunchedEffect(currentUser, currentDestination) {
-        val needsLoggedUser = isProfileDestination(currentDestination) ||
-                currentDestination == SafeStepsDestination.CUSTOMIZE
+        val needsLoggedUser = currentDestination != SafeStepsDestination.MAP
         if (currentUser == null && needsLoggedUser) {
             onNavigateToMap()
         }
@@ -233,8 +293,15 @@ private fun SafeStepsLocalizedContent(
     onFilterEnabledChange: (Int, Boolean) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
-    onNavigateToProfile: () -> Unit,
+    onNavigateToMenu: () -> Unit,
+    onNavigateToFriends: () -> Unit,
+    onNavigateBackFromProfile: () -> Unit,
+    onNavigateToProfileFromMap: () -> Unit,
+    onNavigateToProfileFromMenu: () -> Unit,
+    onNavigateToProfileFromFriendSearch: () -> Unit,
+    onReturnToProfile: () -> Unit,
     onNavigateToCustomize: () -> Unit,
+    onNavigateToFriendSearch: () -> Unit,
     onRouteCompleted: (RouteCompletionResponse) -> Unit,
     onOpenPrize: () -> Unit,
     onDismissLevelUp: () -> Unit,
@@ -272,8 +339,15 @@ private fun SafeStepsLocalizedContent(
             onFilterEnabledChange = onFilterEnabledChange,
             onLoginClick = onLoginClick,
             onNavigateToMap = onNavigateToMap,
-            onNavigateToProfile = onNavigateToProfile,
+            onNavigateToMenu = onNavigateToMenu,
+            onNavigateToFriends = onNavigateToFriends,
+            onNavigateBackFromProfile = onNavigateBackFromProfile,
+            onNavigateToProfileFromMap = onNavigateToProfileFromMap,
+            onNavigateToProfileFromMenu = onNavigateToProfileFromMenu,
+            onNavigateToProfileFromFriendSearch = onNavigateToProfileFromFriendSearch,
+            onReturnToProfile = onReturnToProfile,
             onNavigateToCustomize = onNavigateToCustomize,
+            onNavigateToFriendSearch = onNavigateToFriendSearch,
             onLogout = rememberLogoutToMapAction(
                 authViewModel = authViewModel,
                 onNavigateToMap = onNavigateToMap
@@ -329,8 +403,15 @@ private fun SafeStepsBody(
     onFilterEnabledChange: (Int, Boolean) -> Unit,
     onLoginClick: () -> Unit,
     onNavigateToMap: () -> Unit,
-    onNavigateToProfile: () -> Unit,
+    onNavigateToMenu: () -> Unit,
+    onNavigateToFriends: () -> Unit,
+    onNavigateBackFromProfile: () -> Unit,
+    onNavigateToProfileFromMap: () -> Unit,
+    onNavigateToProfileFromMenu: () -> Unit,
+    onNavigateToProfileFromFriendSearch: () -> Unit,
+    onReturnToProfile: () -> Unit,
     onNavigateToCustomize: () -> Unit,
+    onNavigateToFriendSearch: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: (UserInfo) -> Unit,
     onUpdateUserProfile: (UserInfo) -> Unit,
@@ -370,7 +451,7 @@ private fun SafeStepsBody(
                         onFilterValueChange = onFilterValueChange,
                         currentLanguage = currentLanguage,
                         onLanguageSelected = onLanguageSelected,
-                        onBack = onNavigateToMap,
+                        onBack = onNavigateBackFromProfile,
                         onLogout = onLogout,
                         onDeleteAccount = { onDeleteAccount(currentUser) },
                         onCustomizeClick = onNavigateToCustomize
@@ -379,9 +460,34 @@ private fun SafeStepsBody(
                 SafeStepsDestination.CUSTOMIZE -> {
                     com.safesteps.profile.ProfileCustomizationScreen(
                         user = currentUser,
-                        onBack = onNavigateToProfile,
+                        onBack = onReturnToProfile,
                         unlockedPremis = profileUiState.premis, // FUSIONADO GAMIFICACIÓN
                         onSave = onUpdateUserProfile,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                SafeStepsDestination.MENU -> {
+                    CommunityMenuScreen(
+                        user = currentUser,
+                        onBack = onNavigateToMap,
+                        onProfileClick = onNavigateToProfileFromMenu,
+                        onFriendsClick = onNavigateToFriends,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                SafeStepsDestination.FRIENDS -> {
+                    FriendsScreen(
+                        user = currentUser,
+                        onBack = onNavigateToMenu,
+                        onAddFriendClick = onNavigateToFriendSearch,
+                        onChatClick = {},
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                SafeStepsDestination.FRIEND_SEARCH -> {
+                    FriendSearchScreen(
+                        user = currentUser,
+                        onBack = onNavigateToFriends,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -392,7 +498,8 @@ private fun SafeStepsBody(
                         currentLanguage = currentLanguage,
                         issuesRefreshTrigger = issuesRefreshTrigger, // FUSIONADO INCIDENCIAS
                         onLoginClick = onLoginClick,
-                        onProfileClick = onNavigateToProfile,
+                        onMenuClick = onNavigateToMenu,
+                        onProfileClick = onNavigateToProfileFromMap,
                         onRouteCompleted = onRouteCompleted // FUSIONADO GAMIFICACIÓN
                     )
                 }
@@ -404,11 +511,8 @@ private fun SafeStepsBody(
                 currentLanguage = currentLanguage,
                 issuesRefreshTrigger = issuesRefreshTrigger,
                 onLoginClick = onLoginClick,
-                onProfileClick = {
-                    if (currentUser != null) {
-                        onNavigateToProfile()
-                    }
-                },
+                onMenuClick = {},
+                onProfileClick = {},
                 onRouteCompleted = onRouteCompleted
             )
         }
