@@ -96,7 +96,10 @@ fun FriendSearchScreen(
                 isSearching = uiState.isSearching,
                 onQueryChange = viewModel::onQueryChanged,
                 onClearQuery = { viewModel.onQueryChanged("") },
-                onSearchAction = { focusManager.clearFocus() }
+                onSearchAction = {
+                    focusManager.clearFocus()
+                    viewModel.retrySearch()
+                }
             )
         }
 

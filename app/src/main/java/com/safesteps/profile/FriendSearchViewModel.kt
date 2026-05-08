@@ -37,7 +37,7 @@ data class FriendSearchUiState(
 
 class FriendSearchViewModel(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-    private val searchUsers: suspend (String, String) -> List<FriendSearchUser> =
+    private val searchUsers: suspend (String) -> List<FriendSearchUser> =
         ::buscarUsuariosParaAmistad,
     private val addFriend: suspend (String, String) -> Unit = ::enviarSolicitudAmistad
 ) : ViewModel() {
@@ -146,9 +146,8 @@ class FriendSearchViewModel(
         searchJob?.cancel()
         val query = _uiState.value.query
         val normalizedQuery = query.trim()
-        val requesterGoogleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
 
-        if (normalizedQuery.isBlank() || requesterGoogleId == null) {
+        if (normalizedQuery.isBlank()) {
             _uiState.update {
                 it.copy(
                     isSearching = false,
@@ -170,12 +169,11 @@ class FriendSearchViewModel(
                 }
 
                 val users = withContext(ioDispatcher) {
-                    searchUsers(normalizedQuery, requesterGoogleId)
+                    searchUsers(normalizedQuery)
                 }
 
                 if (
                     searchVersion != latestSearchVersion ||
-                    currentUser?.googleId != requesterGoogleId ||
                     _uiState.value.query.trim() != normalizedQuery
                 ) {
                     return@launch
@@ -186,7 +184,11 @@ class FriendSearchViewModel(
                         isSearching = false,
                         hasSearched = true,
                         searchFailed = false,
-                        results = users.map(::toUiState)
+                        results = users
+                            .filterNot { user ->
+                                user.email.equals(currentUser?.email, ignoreCase = true)
+                            }
+                            .map(::toUiState)
                     )
                 }
             } catch (error: CancellationException) {

@@ -17,7 +17,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40381/"
+private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40382/"
 private const val USERS_PATH = "api/v1/users"
 
 enum class UserSyncResult {
@@ -63,6 +63,12 @@ data class FriendSearchUser(
     val username: String,
     val email: String,
     val photoUrl: String? = null
+)
+
+private data class UserSearchResultResponse(
+    val username: String? = null,
+    val pictureUrl: String? = null,
+    val email: String? = null
 )
 
 private data class UserRequest(
@@ -124,6 +130,16 @@ private interface UserApiService {
     suspend fun getUserByGoogleId(
         @Path("googleId") googleId: String
     ): Response<UserResponse>
+
+    @GET("$USERS_PATH/search")
+    suspend fun getUserByEmail(
+        @Query("email") email: String
+    ): Response<UserResponse>
+
+    @GET("$USERS_PATH/search/username")
+    suspend fun searchUsersByUsername(
+        @Query("username") username: String
+    ): Response<List<UserSearchResultResponse>>
 
     @POST(USERS_PATH)
     suspend fun createUser(
@@ -481,17 +497,33 @@ suspend fun cargarAmigosUsuario(
 }
 
 suspend fun buscarUsuariosParaAmistad(
-    query: String,
-    requesterGoogleId: String
+    query: String
 ): List<FriendSearchUser> {
     val normalizedQuery = query.trim()
     if (normalizedQuery.isBlank()) {
         return emptyList()
     }
 
-    // crida
+    Log.d(
+        "USER_API",
+        "Buscando usuarios para amistad: username=$normalizedQuery"
+    )
 
-    return emptyList()
+    val response = UserBackend.service.searchUsersByUsername(normalizedQuery)
+    Log.d(
+        "USER_API",
+        "Respuesta HTTP al buscar usuarios por username: code=${response.code()} success=${response.isSuccessful}"
+    )
+    ensureSuccess(response, "buscando usuarios por username")
+
+    val resolvedUsers = buildList {
+        for (searchResult in response.body().orEmpty()) {
+            val resolvedUser = resolveFriendSearchUser(searchResult) ?: continue
+            add(resolvedUser)
+        }
+    }
+
+    return resolvedUsers.distinctBy(FriendSearchUser::googleId)
 }
 
 suspend fun enviarSolicitudAmistad(
@@ -514,4 +546,43 @@ suspend fun eliminarAmigoUsuario(
     }
 
     // crida
+}
+
+private suspend fun resolveFriendSearchUser(
+    searchResult: UserSearchResultResponse
+): FriendSearchUser? {
+    val resolvedEmail = searchResult.email?.trim().orEmpty()
+    if (resolvedEmail.isBlank()) {
+        return null
+    }
+
+    val response = UserBackend.service.getUserByEmail(resolvedEmail)
+    Log.d(
+        "USER_API",
+        "Respuesta HTTP al cargar usuario por email durante busqueda: code=${response.code()} success=${response.isSuccessful} email=$resolvedEmail"
+    )
+
+    if (!response.isSuccessful) {
+        if (response.code() == 404) {
+            return null
+        }
+        throw IOException(
+            "Error cargando usuario por email durante la busqueda: ${response.code()} ${response.message()}"
+        )
+    }
+
+    val user = response.body() ?: return null
+    val resolvedGoogleId = user.googleId?.trim().orEmpty()
+    val resolvedUsername = user.username?.trim().orEmpty()
+    val resolvedUserEmail = user.email?.trim().orEmpty()
+    if (resolvedGoogleId.isBlank() || resolvedUsername.isBlank() || resolvedUserEmail.isBlank()) {
+        return null
+    }
+
+    return FriendSearchUser(
+        googleId = resolvedGoogleId,
+        username = resolvedUsername,
+        email = resolvedUserEmail,
+        photoUrl = user.pictureUrl?.takeIf { it.isNotBlank() }
+    )
 }
