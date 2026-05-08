@@ -198,6 +198,7 @@
     <string name="friend_search_results_title">Resultats</string>
     <string name="friend_search_add_action">Afegir amic</string>
     <string name="friend_search_added">Afegit</string>
+    <string name="friend_search_request_sent">Sol&#183;licitud enviada</string>
     <string name="community_menu_title">Comunitat</string>
     <string name="community_menu_section_title">Seccions disponibles</string>
     <string name="community_menu_profile_hint">Obrir perfil</string>
@@ -219,8 +220,14 @@
     <string name="friends_empty_title">Encara no tens amics</string>
     <string name="friends_empty_description">Afegeix nous amics per comen&#231;ar a xatejar i gestionar-los des d\'aqu&#237;.</string>
     <string name="friends_add_new_action">Afegir amics</string>
+    <string name="friends_pending_title">Sol&#183;licituds pendents</string>
+    <string name="friends_accept_action">Acceptar</string>
+    <string name="friends_decline_action">Denegar</string>
     <string name="friends_chat_action">Xatejar</string>
     <string name="friends_remove_action">Eliminar</string>
+    <string name="friends_remove_confirm_action">Eliminar</string>
+    <string name="friends_remove_confirmation_title">Eliminar amistat</string>
+    <string name="friends_remove_confirmation_message">També s\'esborrarà el xat amb %1$s.</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d font</item>

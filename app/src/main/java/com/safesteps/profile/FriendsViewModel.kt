@@ -4,12 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.safesteps.auth.UserInfo
 import com.safesteps.data.FriendSearchUser
+import com.safesteps.data.aceptarSolicitudAmistad
 import com.safesteps.data.cargarAmigosUsuario
+import com.safesteps.data.cargarSolicitudesPendientesAmistad
+import com.safesteps.data.denegarSolicitudAmistad
 import com.safesteps.data.eliminarAmigoUsuario
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,15 +30,29 @@ data class FriendListItemUiState(
     val isRemoving: Boolean = false
 )
 
+data class PendingFriendRequestUiState(
+    val googleId: String,
+    val username: String,
+    val email: String,
+    val photoUrl: String? = null,
+    val isAccepting: Boolean = false,
+    val isDeclining: Boolean = false
+)
+
 data class FriendsUiState(
     val isLoading: Boolean = false,
     val loadFailed: Boolean = false,
+    val pendingRequests: List<PendingFriendRequestUiState> = emptyList(),
     val friends: List<FriendListItemUiState> = emptyList()
 )
 
 class FriendsViewModel(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val loadFriends: suspend (String) -> List<FriendSearchUser> = ::cargarAmigosUsuario,
+    private val loadPendingRequests: suspend (String) -> List<FriendSearchUser> =
+        ::cargarSolicitudesPendientesAmistad,
+    private val acceptFriendRequest: suspend (String, String) -> Unit = ::aceptarSolicitudAmistad,
+    private val declineFriendRequest: suspend (String, String) -> Unit = ::denegarSolicitudAmistad,
     private val removeFriend: suspend (String, String) -> Unit = ::eliminarAmigoUsuario
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(FriendsUiState(isLoading = true))
@@ -68,6 +87,108 @@ class FriendsViewModel(
 
     fun retryLoad() {
         onScreenOpened()
+    }
+
+    fun onAcceptFriendRequestClicked(senderGoogleId: String) {
+        val receiverGoogleId = currentUser?.googleId?.takeIf { it.isNotBlank() } ?: return
+        val request = _uiState.value.pendingRequests.firstOrNull { it.googleId == senderGoogleId } ?: return
+        if (request.isAccepting || request.isDeclining) {
+            return
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                pendingRequests = state.pendingRequests.map { pending ->
+                    if (pending.googleId == senderGoogleId) {
+                        pending.copy(isAccepting = true)
+                    } else {
+                        pending
+                    }
+                }
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) {
+                    acceptFriendRequest(receiverGoogleId, senderGoogleId)
+                }
+
+                val acceptedFriend = request.toFriendUiState()
+                _uiState.update { state ->
+                    state.copy(
+                        pendingRequests = state.pendingRequests
+                            .filterNot { pending -> pending.googleId == senderGoogleId },
+                        friends = (state.friends + acceptedFriend)
+                            .distinctBy(FriendListItemUiState::googleId)
+                            .sortedBy { friend -> friend.username.lowercase() }
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                _uiState.update { state ->
+                    state.copy(
+                        pendingRequests = state.pendingRequests.map { pending ->
+                            if (pending.googleId == senderGoogleId) {
+                                pending.copy(isAccepting = false)
+                            } else {
+                                pending
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    fun onDeclineFriendRequestClicked(senderGoogleId: String) {
+        val receiverGoogleId = currentUser?.googleId?.takeIf { it.isNotBlank() } ?: return
+        val request = _uiState.value.pendingRequests.firstOrNull { it.googleId == senderGoogleId } ?: return
+        if (request.isAccepting || request.isDeclining) {
+            return
+        }
+
+        _uiState.update { state ->
+            state.copy(
+                pendingRequests = state.pendingRequests.map { pending ->
+                    if (pending.googleId == senderGoogleId) {
+                        pending.copy(isDeclining = true)
+                    } else {
+                        pending
+                    }
+                }
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) {
+                    declineFriendRequest(receiverGoogleId, senderGoogleId)
+                }
+
+                _uiState.update { state ->
+                    state.copy(
+                        pendingRequests = state.pendingRequests
+                            .filterNot { pending -> pending.googleId == senderGoogleId }
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                _uiState.update { state ->
+                    state.copy(
+                        pendingRequests = state.pendingRequests.map { pending ->
+                            if (pending.googleId == senderGoogleId) {
+                                pending.copy(isDeclining = false)
+                            } else {
+                                pending
+                            }
+                        }
+                    )
+                }
+            }
+        }
     }
 
     fun onRemoveFriendClicked(targetGoogleId: String) {
@@ -129,8 +250,15 @@ class FriendsViewModel(
 
         loadJob = viewModelScope.launch {
             try {
-                val friends = withContext(ioDispatcher) {
-                    loadFriends(requesterGoogleId)
+                val friendshipLists = withContext(ioDispatcher) {
+                    coroutineScope {
+                        val friendsDeferred = async { loadFriends(requesterGoogleId) }
+                        val pendingDeferred = async { loadPendingRequests(requesterGoogleId) }
+                        FriendshipLists(
+                            friends = friendsDeferred.await(),
+                            pendingRequests = pendingDeferred.await()
+                        )
+                    }
                 }
 
                 if (loadVersion != latestLoadVersion || currentUser?.googleId != requesterGoogleId) {
@@ -141,7 +269,8 @@ class FriendsViewModel(
                     FriendsUiState(
                         isLoading = false,
                         loadFailed = false,
-                        friends = friends.map(::toUiState)
+                        pendingRequests = friendshipLists.pendingRequests.map(::toPendingUiState),
+                        friends = friendshipLists.friends.map(::toUiState)
                     )
                 }
             } catch (error: CancellationException) {
@@ -169,4 +298,27 @@ class FriendsViewModel(
             photoUrl = friend.photoUrl
         )
     }
+
+    private fun toPendingUiState(friend: FriendSearchUser): PendingFriendRequestUiState {
+        return PendingFriendRequestUiState(
+            googleId = friend.googleId,
+            username = friend.username,
+            email = friend.email,
+            photoUrl = friend.photoUrl
+        )
+    }
+
+    private fun PendingFriendRequestUiState.toFriendUiState(): FriendListItemUiState {
+        return FriendListItemUiState(
+            googleId = googleId,
+            username = username,
+            email = email,
+            photoUrl = photoUrl
+        )
+    }
+
+    private data class FriendshipLists(
+        val friends: List<FriendSearchUser>,
+        val pendingRequests: List<FriendSearchUser>
+    )
 }

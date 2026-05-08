@@ -5,11 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.safesteps.auth.UserInfo
 import com.safesteps.data.FriendSearchUser
 import com.safesteps.data.buscarUsuariosParaAmistad
+import com.safesteps.data.cargarAmigosUsuario
+import com.safesteps.data.cargarSolicitudesPendientesAmistad
 import com.safesteps.data.enviarSolicitudAmistad
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +29,7 @@ data class FriendSearchResultUiState(
     val email: String,
     val photoUrl: String? = null,
     val isAdded: Boolean = false,
+    val isRequestSent: Boolean = false,
     val isSubmittingRequest: Boolean = false
 )
 
@@ -39,6 +45,9 @@ class FriendSearchViewModel(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val searchUsers: suspend (String) -> List<FriendSearchUser> =
         ::buscarUsuariosParaAmistad,
+    private val loadFriends: suspend (String) -> List<FriendSearchUser> = ::cargarAmigosUsuario,
+    private val loadPendingRequests: suspend (String) -> List<FriendSearchUser> =
+        ::cargarSolicitudesPendientesAmistad,
     private val addFriend: suspend (String, String) -> Unit = ::enviarSolicitudAmistad
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(FriendSearchUiState())
@@ -47,7 +56,7 @@ class FriendSearchViewModel(
     private var currentUser: UserInfo? = null
     private var searchJob: Job? = null
     private var latestSearchVersion = 0L
-    private var addedFriendIds: Set<String> = emptySet()
+    private var pendingFriendRequestIds: Set<String> = emptySet()
 
     fun onCurrentUserChanged(user: UserInfo?) {
         val newGoogleId = user?.googleId?.takeIf { it.isNotBlank() }
@@ -60,7 +69,7 @@ class FriendSearchViewModel(
 
         searchJob?.cancel()
         latestSearchVersion += 1
-        addedFriendIds = emptySet()
+        pendingFriendRequestIds = emptySet()
         _uiState.value = FriendSearchUiState()
     }
 
@@ -88,7 +97,7 @@ class FriendSearchViewModel(
     fun onAddFriendClicked(targetGoogleId: String) {
         val requesterGoogleId = currentUser?.googleId?.takeIf { it.isNotBlank() } ?: return
         val targetUser = _uiState.value.results.firstOrNull { it.googleId == targetGoogleId } ?: return
-        if (targetUser.isAdded || targetUser.isSubmittingRequest) {
+        if (targetUser.isAdded || targetUser.isRequestSent || targetUser.isSubmittingRequest) {
             return
         }
 
@@ -109,13 +118,14 @@ class FriendSearchViewModel(
                 withContext(ioDispatcher) {
                     addFriend(requesterGoogleId, targetGoogleId)
                 }
-                addedFriendIds = addedFriendIds + targetGoogleId
+                pendingFriendRequestIds = pendingFriendRequestIds + targetGoogleId
                 _uiState.update { state ->
                     state.copy(
                         results = state.results.map { result ->
                             if (result.googleId == targetGoogleId) {
                                 result.copy(
-                                    isAdded = true,
+                                    isAdded = false,
+                                    isRequestSent = true,
                                     isSubmittingRequest = false
                                 )
                             } else {
@@ -169,7 +179,51 @@ class FriendSearchViewModel(
                 }
 
                 val users = withContext(ioDispatcher) {
-                    searchUsers(normalizedQuery)
+                    val requesterGoogleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
+                    if (requesterGoogleId == null) {
+                        SearchSnapshot(
+                            users = searchUsers(normalizedQuery),
+                            acceptedFriendIds = emptySet(),
+                            sentRequestIds = emptySet()
+                        )
+                    } else {
+                        coroutineScope {
+                            val usersDeferred = async { searchUsers(normalizedQuery) }
+                            val friendsDeferred = async { loadFriends(requesterGoogleId) }
+                            val searchedUsers = usersDeferred.await()
+                            val visibleUsers = searchedUsers.filterNot { user ->
+                                user.googleId == requesterGoogleId ||
+                                    user.email.equals(currentUser?.email, ignoreCase = true)
+                            }
+                            val acceptedFriendIds = friendsDeferred.await()
+                                .map(FriendSearchUser::googleId)
+                                .toSet()
+                            val sentRequestIds = visibleUsers
+                                .asSequence()
+                                .filterNot { user -> user.googleId in acceptedFriendIds }
+                                .map(FriendSearchUser::googleId)
+                                .distinct()
+                                .map { targetGoogleId ->
+                                    async {
+                                        val pendingRequests = loadPendingRequests(targetGoogleId)
+                                        targetGoogleId.takeIf {
+                                            pendingRequests.any { request ->
+                                                request.googleId == requesterGoogleId
+                                            }
+                                        }
+                                    }
+                                }
+                                .toList()
+                                .awaitAll()
+                                .filterNotNull()
+                                .toSet()
+                            SearchSnapshot(
+                                users = visibleUsers,
+                                acceptedFriendIds = acceptedFriendIds,
+                                sentRequestIds = sentRequestIds
+                            )
+                        }
+                    }
                 }
 
                 if (
@@ -179,16 +233,20 @@ class FriendSearchViewModel(
                     return@launch
                 }
 
+                pendingFriendRequestIds = users.sentRequestIds
                 _uiState.update {
                     it.copy(
                         isSearching = false,
                         hasSearched = true,
                         searchFailed = false,
-                        results = users
-                            .filterNot { user ->
-                                user.email.equals(currentUser?.email, ignoreCase = true)
+                        results = users.users
+                            .map {
+                                user -> toUiState(
+                                    user = user,
+                                    acceptedFriendIds = users.acceptedFriendIds,
+                                    sentRequestIds = users.sentRequestIds
+                                )
                             }
-                            .map(::toUiState)
                     )
                 }
             } catch (error: CancellationException) {
@@ -210,13 +268,25 @@ class FriendSearchViewModel(
         }
     }
 
-    private fun toUiState(user: FriendSearchUser): FriendSearchResultUiState {
+    private fun toUiState(
+        user: FriendSearchUser,
+        acceptedFriendIds: Set<String>,
+        sentRequestIds: Set<String>
+    ): FriendSearchResultUiState {
+        val isAdded = user.googleId in acceptedFriendIds
         return FriendSearchResultUiState(
             googleId = user.googleId,
             username = user.username,
             email = user.email,
             photoUrl = user.photoUrl,
-            isAdded = user.googleId in addedFriendIds
+            isAdded = isAdded,
+            isRequestSent = !isAdded && user.googleId in sentRequestIds
         )
     }
+
+    private data class SearchSnapshot(
+        val users: List<FriendSearchUser>,
+        val acceptedFriendIds: Set<String>,
+        val sentRequestIds: Set<String>
+    )
 }

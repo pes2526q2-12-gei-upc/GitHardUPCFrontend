@@ -17,7 +17,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40382/"
+private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40383/"
 private const val USERS_PATH = "api/v1/users"
 
 enum class UserSyncResult {
@@ -65,10 +65,16 @@ data class FriendSearchUser(
     val photoUrl: String? = null
 )
 
-private data class UserSearchResultResponse(
+private data class UserSummaryResponse(
+    val googleId: String? = null,
     val username: String? = null,
     val pictureUrl: String? = null,
     val email: String? = null
+)
+
+private data class FriendshipRequest(
+    val senderGoogleId: String,
+    val receiverGoogleId: String
 )
 
 private data class UserRequest(
@@ -131,15 +137,43 @@ private interface UserApiService {
         @Path("googleId") googleId: String
     ): Response<UserResponse>
 
-    @GET("$USERS_PATH/search")
-    suspend fun getUserByEmail(
-        @Query("email") email: String
-    ): Response<UserResponse>
-
     @GET("$USERS_PATH/search/username")
     suspend fun searchUsersByUsername(
         @Query("username") username: String
-    ): Response<List<UserSearchResultResponse>>
+    ): Response<List<UserSummaryResponse>>
+
+    @POST("api/v1/friendships")
+    suspend fun createFriendship(
+        @Body request: FriendshipRequest
+    ): Response<Unit>
+
+    @GET("api/v1/friendships/{googleId}/pending")
+    suspend fun getPendingFriendRequests(
+        @Path("googleId") googleId: String
+    ): Response<List<UserSummaryResponse>>
+
+    @GET("api/v1/friendships/{googleId}/accepted")
+    suspend fun getAcceptedFriends(
+        @Path("googleId") googleId: String
+    ): Response<List<UserSummaryResponse>>
+
+    @PATCH("api/v1/friendships/{receiverGoogleId}/accept/{senderGoogleId}")
+    suspend fun acceptFriendRequest(
+        @Path("receiverGoogleId") receiverGoogleId: String,
+        @Path("senderGoogleId") senderGoogleId: String
+    ): Response<Unit>
+
+    @DELETE("api/v1/friendships/{receiverGoogleId}/decline/{senderGoogleId}")
+    suspend fun declineFriendRequest(
+        @Path("receiverGoogleId") receiverGoogleId: String,
+        @Path("senderGoogleId") senderGoogleId: String
+    ): Response<Unit>
+
+    @DELETE("api/v1/friendships/{googleId}/friend/{friendGoogleId}")
+    suspend fun deleteFriend(
+        @Path("googleId") googleId: String,
+        @Path("friendGoogleId") friendGoogleId: String
+    ): Response<Unit>
 
     @POST(USERS_PATH)
     suspend fun createUser(
@@ -491,9 +525,33 @@ suspend fun cargarAmigosUsuario(
         return emptyList()
     }
 
-    // crida
+    Log.d("USER_API", "Cargando amigos aceptados: googleId=$requesterGoogleId")
 
-    return emptyList()
+    val response = UserBackend.service.getAcceptedFriends(requesterGoogleId)
+    ensureSuccess(response, "cargando los amigos aceptados")
+
+    return response.body()
+        .orEmpty()
+        .mapNotNull(UserSummaryResponse::toFriendSearchUser)
+        .sortedBy { it.username.lowercase(Locale.ROOT) }
+}
+
+suspend fun cargarSolicitudesPendientesAmistad(
+    receiverGoogleId: String
+): List<FriendSearchUser> {
+    if (receiverGoogleId.isBlank()) {
+        return emptyList()
+    }
+
+    Log.d("USER_API", "Cargando solicitudes pendientes de amistad: googleId=$receiverGoogleId")
+
+    val response = UserBackend.service.getPendingFriendRequests(receiverGoogleId)
+    ensureSuccess(response, "cargando las solicitudes pendientes de amistad")
+
+    return response.body()
+        .orEmpty()
+        .mapNotNull(UserSummaryResponse::toFriendSearchUser)
+        .sortedBy { it.username.lowercase(Locale.ROOT) }
 }
 
 suspend fun buscarUsuariosParaAmistad(
@@ -516,14 +574,10 @@ suspend fun buscarUsuariosParaAmistad(
     )
     ensureSuccess(response, "buscando usuarios por username")
 
-    val resolvedUsers = buildList {
-        for (searchResult in response.body().orEmpty()) {
-            val resolvedUser = resolveFriendSearchUser(searchResult) ?: continue
-            add(resolvedUser)
-        }
-    }
-
-    return resolvedUsers.distinctBy(FriendSearchUser::googleId)
+    return response.body()
+        .orEmpty()
+        .mapNotNull(UserSummaryResponse::toFriendSearchUser)
+        .distinctBy(FriendSearchUser::googleId)
 }
 
 suspend fun enviarSolicitudAmistad(
@@ -534,7 +588,52 @@ suspend fun enviarSolicitudAmistad(
         return
     }
 
-    // crida
+    Log.d(
+        "USER_API",
+        "Enviando solicitud de amistad: senderGoogleId=$requesterGoogleId receiverGoogleId=$targetGoogleId"
+    )
+
+    val response = UserBackend.service.createFriendship(
+        FriendshipRequest(
+            senderGoogleId = requesterGoogleId,
+            receiverGoogleId = targetGoogleId
+        )
+    )
+    ensureSuccess(response, "enviando la solicitud de amistad")
+}
+
+suspend fun aceptarSolicitudAmistad(
+    receiverGoogleId: String,
+    senderGoogleId: String
+) {
+    if (receiverGoogleId.isBlank() || senderGoogleId.isBlank()) {
+        return
+    }
+
+    Log.d(
+        "USER_API",
+        "Aceptando solicitud de amistad: receiverGoogleId=$receiverGoogleId senderGoogleId=$senderGoogleId"
+    )
+
+    val response = UserBackend.service.acceptFriendRequest(receiverGoogleId, senderGoogleId)
+    ensureSuccess(response, "aceptando la solicitud de amistad")
+}
+
+suspend fun denegarSolicitudAmistad(
+    receiverGoogleId: String,
+    senderGoogleId: String
+) {
+    if (receiverGoogleId.isBlank() || senderGoogleId.isBlank()) {
+        return
+    }
+
+    Log.d(
+        "USER_API",
+        "Denegando solicitud de amistad: receiverGoogleId=$receiverGoogleId senderGoogleId=$senderGoogleId"
+    )
+
+    val response = UserBackend.service.declineFriendRequest(receiverGoogleId, senderGoogleId)
+    ensureSuccess(response, "denegando la solicitud de amistad")
 }
 
 suspend fun eliminarAmigoUsuario(
@@ -545,44 +644,27 @@ suspend fun eliminarAmigoUsuario(
         return
     }
 
-    // crida
-}
-
-private suspend fun resolveFriendSearchUser(
-    searchResult: UserSearchResultResponse
-): FriendSearchUser? {
-    val resolvedEmail = searchResult.email?.trim().orEmpty()
-    if (resolvedEmail.isBlank()) {
-        return null
-    }
-
-    val response = UserBackend.service.getUserByEmail(resolvedEmail)
     Log.d(
         "USER_API",
-        "Respuesta HTTP al cargar usuario por email durante busqueda: code=${response.code()} success=${response.isSuccessful} email=$resolvedEmail"
+        "Eliminando amistad: googleId=$requesterGoogleId friendGoogleId=$targetGoogleId"
     )
 
-    if (!response.isSuccessful) {
-        if (response.code() == 404) {
-            return null
-        }
-        throw IOException(
-            "Error cargando usuario por email durante la busqueda: ${response.code()} ${response.message()}"
-        )
-    }
+    val response = UserBackend.service.deleteFriend(requesterGoogleId, targetGoogleId)
+    ensureSuccess(response, "eliminando la amistad")
+}
 
-    val user = response.body() ?: return null
-    val resolvedGoogleId = user.googleId?.trim().orEmpty()
-    val resolvedUsername = user.username?.trim().orEmpty()
-    val resolvedUserEmail = user.email?.trim().orEmpty()
-    if (resolvedGoogleId.isBlank() || resolvedUsername.isBlank() || resolvedUserEmail.isBlank()) {
+private fun UserSummaryResponse.toFriendSearchUser(): FriendSearchUser? {
+    val resolvedGoogleId = googleId?.trim().orEmpty()
+    val resolvedUsername = username?.trim().orEmpty()
+    val resolvedEmail = email?.trim().orEmpty()
+    if (resolvedGoogleId.isBlank() || resolvedUsername.isBlank() || resolvedEmail.isBlank()) {
         return null
     }
 
     return FriendSearchUser(
         googleId = resolvedGoogleId,
         username = resolvedUsername,
-        email = resolvedUserEmail,
-        photoUrl = user.pictureUrl?.takeIf { it.isNotBlank() }
+        email = resolvedEmail,
+        photoUrl = pictureUrl?.takeIf { it.isNotBlank() }
     )
 }

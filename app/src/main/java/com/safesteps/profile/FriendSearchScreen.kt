@@ -1,7 +1,7 @@
 package com.safesteps.profile
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -75,88 +75,95 @@ fun FriendSearchScreen(
         viewModel.onScreenOpened()
     }
 
-    LazyColumn(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF4F7F5))
-            .statusBarsPadding()
-            .navigationBarsPadding(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        item {
-            FriendSearchTopBar(
-                onBack = onBack
-            )
-        }
-
-        item {
-            FriendSearchInputCard(
-                query = uiState.query,
-                isSearching = uiState.isSearching,
-                onQueryChange = viewModel::onQueryChanged,
-                onClearQuery = { viewModel.onQueryChanged("") },
-                onSearchAction = {
-                    focusManager.clearFocus()
-                    viewModel.retrySearch()
-                }
-            )
-        }
-
-        when {
-            uiState.query.isBlank() -> {
-                item {
-                    FriendSearchMessageCard(
-                        title = appString(R.string.friend_search_empty_title),
-                        description = appString(R.string.friend_search_empty_description)
-                    )
-                }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            item {
+                FriendSearchTopBar(
+                    onBack = onBack
+                )
             }
 
-            uiState.isSearching -> {
-                item {
-                    FriendSearchLoadingCard()
-                }
+            item {
+                FriendSearchInputCard(
+                    query = uiState.query,
+                    isSearching = uiState.isSearching,
+                    onQueryChange = viewModel::onQueryChanged,
+                    onClearQuery = { viewModel.onQueryChanged("") },
+                    onSearchAction = {
+                        focusManager.clearFocus()
+                        viewModel.retrySearch()
+                    }
+                )
             }
 
-            uiState.searchFailed -> {
-                item {
-                    FriendSearchErrorCard(
-                        onRetry = {
-                            focusManager.clearFocus()
-                            viewModel.retrySearch()
-                        }
-                    )
-                }
-            }
-
-            uiState.hasSearched && uiState.results.isEmpty() -> {
-                item {
-                    FriendSearchMessageCard(
-                        title = appString(R.string.friend_search_no_results_title),
-                        description = appString(R.string.friend_search_no_results_description)
-                    )
-                }
-            }
-
-            else -> {
-                item {
-                    Text(
-                        text = appString(R.string.friend_search_results_title),
-                        color = Color(0xFF23333A),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
+            when {
+                uiState.query.isBlank() -> {
+                    item {
+                        FriendSearchMessageCard(
+                            title = appString(R.string.friend_search_empty_title),
+                            description = appString(R.string.friend_search_empty_description),
+                            icon = Icons.Default.Search,
+                            accent = Color(0xFF6A9A7E)
+                        )
+                    }
                 }
 
-                items(
-                    items = uiState.results,
-                    key = { result -> result.googleId }
-                ) { result ->
-                    FriendSearchResultCard(
-                        result = result,
-                        onAddFriend = { viewModel.onAddFriendClicked(result.googleId) }
-                    )
+                uiState.isSearching -> {
+                    item {
+                        FriendSearchLoadingCard()
+                    }
+                }
+
+                uiState.searchFailed -> {
+                    item {
+                        FriendSearchErrorCard(
+                            onRetry = {
+                                focusManager.clearFocus()
+                                viewModel.retrySearch()
+                            }
+                        )
+                    }
+                }
+
+                uiState.hasSearched && uiState.results.isEmpty() -> {
+                    item {
+                        FriendSearchMessageCard(
+                            title = appString(R.string.friend_search_no_results_title),
+                            description = appString(R.string.friend_search_no_results_description),
+                            icon = Icons.Default.PersonAdd,
+                            accent = Color(0xFF708C79)
+                        )
+                    }
+                }
+
+                else -> {
+                    item {
+                        FriendSearchSectionHeader(
+                            text = appString(R.string.friend_search_results_title),
+                            count = uiState.results.size
+                        )
+                    }
+
+                    items(
+                        items = uiState.results,
+                        key = { result -> result.googleId }
+                    ) { result ->
+                        FriendSearchResultCard(
+                            result = result,
+                            onAddFriend = { viewModel.onAddFriendClicked(result.googleId) }
+                        )
+                    }
                 }
             }
         }
@@ -175,32 +182,30 @@ private fun FriendSearchTopBar(
             modifier = Modifier.width(60.dp),
             contentAlignment = Alignment.CenterStart
         ) {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = CircleShape,
-                color = Color.White,
-                shadowElevation = 4.dp
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = appString(R.string.back),
-                        tint = Color(0xFF33413B)
-                    )
-                }
-            }
+            HeaderActionButton(
+                onClick = onBack,
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = appString(R.string.back)
+            )
         }
 
         Box(
             modifier = Modifier.weight(1f),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = appString(R.string.friend_search_title),
-                color = Color(0xFF23333A),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color.White.copy(alpha = 0.76f),
+                border = BorderStroke(1.dp, Color(0xFFE1EBE4))
+            ) {
+                Text(
+                    text = appString(R.string.friend_search_title),
+                    color = Color(0xFF23333A),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(60.dp))
@@ -215,10 +220,11 @@ private fun FriendSearchInputCard(
     onClearQuery: () -> Unit,
     onSearchAction: () -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    Surface(
+        shape = RoundedCornerShape(30.dp),
+        color = Color.White.copy(alpha = 0.96f),
+        border = BorderStroke(1.dp, Color(0xFFDCE8E0)),
+        shadowElevation = 10.dp
     ) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier
@@ -226,58 +232,86 @@ private fun FriendSearchInputCard(
                 .padding(horizontal = 20.dp, vertical = 22.dp)
         ) {
             Text(
-                text = appString(R.string.friend_search_input_title),
+                text = appString(R.string.friend_search_title),
                 color = Color(0xFF23333A),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
             )
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = appString(R.string.friend_search_input_description),
+                color = Color(0xFF61716A),
+                style = MaterialTheme.typography.bodyMedium
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null
-                    )
-                },
-                trailingIcon = {
-                    if (isSearching) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = Color(0xFF5E9F7A),
-                            strokeWidth = 2.dp
-                        )
-                    } else if (query.isNotBlank()) {
-                        IconButton(onClick = onClearQuery) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = appString(R.string.close)
-                            )
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = Color(0xFFF7FBF8),
+                border = BorderStroke(1.dp, Color(0xFFD5E4DB))
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    singleLine = true,
+                    leadingIcon = {
+                        Surface(
+                            modifier = Modifier.size(30.dp),
+                            shape = CircleShape,
+                            color = Color(0xFFE9F4ED)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = Color(0xFF5E9F7A),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
-                    }
-                },
-                placeholder = {
-                    Text(text = appString(R.string.friend_search_placeholder))
-                },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = { onSearchAction() }
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF5E9F7A),
-                    unfocusedBorderColor = Color(0xFFD7E5DC),
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    focusedLeadingIconColor = Color(0xFF5E9F7A),
-                    unfocusedLeadingIconColor = Color(0xFF7A8782)
+                    },
+                    trailingIcon = {
+                        if (isSearching) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color(0xFF5E9F7A),
+                                strokeWidth = 2.dp
+                            )
+                        } else if (query.isNotBlank()) {
+                            IconButton(onClick = onClearQuery) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = appString(R.string.close),
+                                    tint = Color(0xFF7A8782)
+                                )
+                            }
+                        }
+                    },
+                    placeholder = {
+                        Text(
+                            text = appString(R.string.friend_search_placeholder),
+                            color = Color(0xFF8A9791)
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = { onSearchAction() }
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        cursorColor = Color(0xFF5E9F7A)
+                    )
                 )
-            )
+            }
         }
     }
 }
@@ -285,13 +319,15 @@ private fun FriendSearchInputCard(
 @Composable
 private fun FriendSearchLoadingCard() {
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.96f)),
+        border = BorderStroke(1.dp, Color(0xFFDDE8E0)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
+                .padding(horizontal = 20.dp, vertical = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -300,11 +336,20 @@ private fun FriendSearchLoadingCard() {
                 color = Color(0xFF5E9F7A),
                 strokeWidth = 3.dp
             )
-            Text(
-                text = appString(R.string.friend_search_loading),
-                color = Color(0xFF4F5F58),
-                style = MaterialTheme.typography.bodyLarge
-            )
+            androidx.compose.foundation.layout.Column {
+                Text(
+                    text = appString(R.string.friend_search_loading),
+                    color = Color(0xFF23333A),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = appString(R.string.friend_search_input_description),
+                    color = Color(0xFF6A7973),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
         }
     }
 }
@@ -314,14 +359,33 @@ private fun FriendSearchErrorCard(
     onRetry: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.96f)),
+        border = BorderStroke(1.dp, Color(0xFFE8DAD4)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = Color(0xFFFFEDE6)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = null,
+                        tint = Color(0xFFD2684C),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
             Text(
                 text = appString(R.string.friend_search_error_title),
                 color = Color(0xFF23333A),
@@ -341,7 +405,7 @@ private fun FriendSearchErrorCard(
 
             Button(
                 onClick = onRetry,
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF5E9F7A),
                     contentColor = Color.White
@@ -356,17 +420,38 @@ private fun FriendSearchErrorCard(
 @Composable
 private fun FriendSearchMessageCard(
     title: String,
-    description: String
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color
 ) {
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.96f)),
+        border = BorderStroke(1.dp, Color(0xFFDDE8E0)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = accent.copy(alpha = 0.14f)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
             Text(
                 text = title,
                 color = Color(0xFF23333A),
@@ -391,9 +476,10 @@ private fun FriendSearchResultCard(
     onAddFriend: () -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.97f)),
+        border = BorderStroke(1.dp, Color(0xFFDDE8E0)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
     ) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier
@@ -444,16 +530,28 @@ private fun FriendSearchResultCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            val isActionDisabled = result.isAdded || result.isRequestSent || result.isSubmittingRequest
+            val buttonContainerColor = when {
+                result.isAdded -> Color(0xFFB7D7C3)
+                result.isRequestSent -> Color(0xFFDCE9E1)
+                else -> Color(0xFF5E9F7A)
+            }
+            val buttonContentColor = when {
+                result.isAdded -> Color(0xFF1E4F36)
+                result.isRequestSent -> Color(0xFF42614F)
+                else -> Color.White
+            }
+
             Button(
                 onClick = onAddFriend,
-                enabled = !result.isAdded && !result.isSubmittingRequest,
+                enabled = !isActionDisabled,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (result.isAdded) Color(0xFFB7D7C3) else Color(0xFF5E9F7A),
-                    contentColor = if (result.isAdded) Color(0xFF1E4F36) else Color.White,
-                    disabledContainerColor = if (result.isAdded) Color(0xFFB7D7C3) else Color(0xFFD7E5DC),
-                    disabledContentColor = if (result.isAdded) Color(0xFF1E4F36) else Color(0xFF66756F)
+                    containerColor = buttonContainerColor,
+                    contentColor = buttonContentColor,
+                    disabledContainerColor = buttonContainerColor,
+                    disabledContentColor = buttonContentColor
                 )
             ) {
                 if (result.isSubmittingRequest) {
@@ -464,20 +562,104 @@ private fun FriendSearchResultCard(
                     )
                 } else {
                     Icon(
-                        imageVector = if (result.isAdded) Icons.Default.Check else Icons.Default.PersonAdd,
+                        imageVector = if (result.isAdded || result.isRequestSent) {
+                            Icons.Default.Check
+                        } else {
+                            Icons.Default.PersonAdd
+                        },
                         contentDescription = null,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (result.isAdded) {
-                            appString(R.string.friend_search_added)
-                        } else {
-                            appString(R.string.friend_search_add_action)
+                        text = when {
+                            result.isAdded -> appString(R.string.friend_search_added)
+                            result.isRequestSent -> appString(R.string.friend_search_request_sent)
+                            else -> appString(R.string.friend_search_add_action)
                         },
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeaderActionButton(
+    onClick: () -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    tint: Color = Color(0xFF33413B)
+) {
+    Surface(
+        modifier = Modifier.size(46.dp),
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.88f),
+        border = BorderStroke(1.dp, Color(0xFFE1EBE4)),
+        shadowElevation = 8.dp
+    ) {
+        IconButton(onClick = onClick) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint
+            )
+        }
+    }
+}
+
+@Composable
+private fun FriendSearchSectionHeader(
+    text: String,
+    count: Int
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color.White.copy(alpha = 0.8f),
+        border = BorderStroke(1.dp, Color(0xFFE1EBE4))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(30.dp),
+                shape = CircleShape,
+                color = Color(0xFFEAF4EE)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = Color(0xFF6A9A7E),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = text,
+                color = Color(0xFF23333A),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFEAF4EE)
+            ) {
+                Text(
+                    text = count.toString(),
+                    color = Color(0xFF5E9F7A),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
             }
         }
     }
@@ -489,28 +671,47 @@ private fun FriendAvatar(
     username: String
 ) {
     if (!photoUrl.isNullOrBlank()) {
-        AsyncImage(
-            model = photoUrl,
-            contentDescription = username,
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-        )
+        Surface(
+            modifier = Modifier.size(62.dp),
+            shape = CircleShape,
+            color = Color.White.copy(alpha = 0.92f),
+            border = BorderStroke(1.dp, Color(0xFFDCE8E0)),
+            shadowElevation = 6.dp
+        ) {
+            AsyncImage(
+                model = photoUrl,
+                contentDescription = username,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .padding(3.dp)
+                    .clip(CircleShape)
+            )
+        }
         return
     }
 
     Surface(
-        modifier = Modifier.size(56.dp),
+        modifier = Modifier.size(62.dp),
         shape = CircleShape,
-        color = Color(0xFFE8F0EB)
+        color = Color.White.copy(alpha = 0.92f),
+        border = BorderStroke(1.dp, Color(0xFFDCE8E0)),
+        shadowElevation = 6.dp
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = Icons.Default.Person,
-                contentDescription = null,
-                tint = Color(0xFF5E9F7A),
-                modifier = Modifier.size(28.dp)
-            )
+        Surface(
+            modifier = Modifier
+                .padding(3.dp)
+                .clip(CircleShape),
+            shape = CircleShape,
+            color = Color(0xFFEAF3EE)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    tint = Color(0xFF5E9F7A),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
     }
 }

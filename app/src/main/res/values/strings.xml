@@ -196,6 +196,7 @@
     <string name="friend_search_results_title">Results</string>
     <string name="friend_search_add_action">Add friend</string>
     <string name="friend_search_added">Added</string>
+    <string name="friend_search_request_sent">Request sent</string>
     <string name="community_menu_title">Community</string>
     <string name="community_menu_section_title">Available sections</string>
     <string name="community_menu_profile_hint">Open profile</string>
@@ -217,8 +218,14 @@
     <string name="friends_empty_title">You still have no friends</string>
     <string name="friends_empty_description">Add new friends to start chatting and managing your contacts here.</string>
     <string name="friends_add_new_action">Add new friends</string>
+    <string name="friends_pending_title">Pending requests</string>
+    <string name="friends_accept_action">Accept</string>
+    <string name="friends_decline_action">Decline</string>
     <string name="friends_chat_action">Chat</string>
     <string name="friends_remove_action">Unfollow</string>
+    <string name="friends_remove_confirm_action">Remove</string>
+    <string name="friends_remove_confirmation_title">Remove friendship</string>
+    <string name="friends_remove_confirmation_message">The chat with %1$s will also be removed.</string>
 
 
     <plurals name="poi_fountains">
