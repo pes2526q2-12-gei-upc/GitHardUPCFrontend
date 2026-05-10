@@ -20,14 +20,14 @@ import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.data.RouteCoordinatesRequest
 import com.safesteps.data.RouteType
 import com.safesteps.data.VoteRequestDTO
-import com.safesteps.data.VotesCache
 import com.safesteps.data.actualitzarIncidencia
 import com.safesteps.data.completarRutaEnBackend
 import com.safesteps.data.crearIncidencia
 import com.safesteps.data.eliminarIncidencia
-import com.safesteps.data.eliminarVot
+import com.safesteps.data.eliminarVotPerId
 import com.safesteps.data.getAllIssues
 import com.safesteps.data.obtenirCoordenadesRuta
+import com.safesteps.data.obtenirVotsUsuari
 import com.safesteps.data.votarIncidencia
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
@@ -91,8 +91,7 @@ internal fun proportionalRemainingDurationMinutes(
 }
 
 class MapViewModel(
-    private val textProvider: MapTextProvider,
-    private val votesCache: VotesCache
+    private val textProvider: MapTextProvider
 ) : ViewModel() {
 
     private companion object {
@@ -113,6 +112,7 @@ class MapViewModel(
     private var lastNavigationProgressMeters: Double = 0.0
     private var lastAutomaticRecalculationAtMs: Long = 0L
     private var currentGoogleId: String? = null
+    private var userVoteIds: Map<Long, Long> = emptyMap()
 
     // NOU: Guardar resultats de gamificació
     var routeResult by mutableStateOf<RouteCompletionResponse?>(null)
@@ -138,10 +138,16 @@ class MapViewModel(
         currentGoogleId = user?.googleId?.takeIf { it.isNotBlank() }
         val gid = currentGoogleId
         if (gid != null) {
-            val cached = votesCache.load(gid)
-            _uiState.update { it.copy(userVotes = cached) }
+            // Buidem mentre arriba la resposta
+            _uiState.update { it.copy(userVotes = emptyMap()) }
+            userVoteIds = emptyMap()
+
+            viewModelScope.launch {
+                refreshUserVotesFromBackend(gid)
+            }
         } else {
             _uiState.update { it.copy(userVotes = emptyMap()) }
+            userVoteIds = emptyMap()
         }
         _uiState.update { it.copy(routeColor = user?.routeColor) }
     }
@@ -905,15 +911,17 @@ class MapViewModel(
                     voteScoreValid = true
                 )
 
-                votarIncidencia(incidenciaId, request)
+                Log.d("VOTES", "Enviant POST vot: incidenciaId=$incidenciaId, score=$score, googleId=$googleId")
+                val resposta = votarIncidencia(incidenciaId, request)
+                Log.d("VOTES", "POST OK: response=$resposta")
+
+                userVoteIds = userVoteIds + (incidenciaId to resposta.id)
 
                 val totesSenseDuplicats = getAllIssues()
                     .groupBy { Pair(it.coordinates.lat, it.coordinates.lon) }
                     .map { (_, issuesEnAquestPunt) ->
                         issuesEnAquestPunt.minByOrNull { it.createdAt } ?: issuesEnAquestPunt.first()
                     }
-
-                votesCache.update(googleId, incidenciaId, score)
 
                 _uiState.update { currentState ->
                     val incidenciaObertaActualitzada = totesSenseDuplicats.find { it.id == incidenciaId }
@@ -928,7 +936,8 @@ class MapViewModel(
                     )
                 }
             } catch (e: Exception) {
-                Log.e("MapViewModel", "Error al votar la incidència: ${e.message}")
+                Log.e("VOTES", "Error al votar: ${e.message}", e)
+                refreshUserVotesFromBackend(googleId)
             }
         }
     }
@@ -938,15 +947,40 @@ class MapViewModel(
 
         viewModelScope.launch {
             try {
-                eliminarVot(idIncidencia, googleId)
+                // Resolem el voteId — refresquem del backend si no el tenim
+                var voteId = userVoteIds[idIncidencia]
+                if (voteId == null) {
+                    Log.d("VOTES", "voteId desconegut per incidencia=$idIncidencia, refrescant")
+                    refreshUserVotesFromBackend(googleId)
+                    voteId = userVoteIds[idIncidencia]
+                }
 
-                votesCache.update(googleId, idIncidencia, null)
+                if (voteId == null) {
+                    Log.w("VOTES", "No s'ha pogut trobar voteId per incidencia=$idIncidencia")
+                    return@launch
+                }
+
+                Log.d("VOTES", "Enviant DELETE per voteId=$voteId (incidenciaId=$idIncidencia)")
+                eliminarVotPerId(voteId)
+                Log.d("VOTES", "DELETE OK")
+
+                userVoteIds = userVoteIds - idIncidencia
+
+                val totesActualitzades = try {
+                    getAllIssues()
+                        .groupBy { Pair(it.coordinates.lat, it.coordinates.lon) }
+                        .map { (_, issuesEnAquestPunt) ->
+                            issuesEnAquestPunt.minByOrNull { it.createdAt } ?: issuesEnAquestPunt.first()
+                        }
+                } catch (_: Exception) {
+                    null
+                }
 
                 _uiState.update { currentState ->
                     val nousVots = currentState.userVotes.toMutableMap()
                     nousVots.remove(idIncidencia)
 
-                    val issuesActualitzades = currentState.issues.map {
+                    val novesIssues = totesActualitzades ?: currentState.issues.map {
                         if (it.id == idIncidencia) {
                             if (votActual == 1) it.copy(positiveVotes = (it.positiveVotes - 1).coerceAtLeast(0))
                             else it.copy(negativeVotes = (it.negativeVotes - 1).coerceAtLeast(0))
@@ -955,13 +989,36 @@ class MapViewModel(
 
                     currentState.copy(
                         userVotes = nousVots,
-                        issues = issuesActualitzades,
-                        incidenciaSeleccionada = issuesActualitzades.find { it.id == idIncidencia }
+                        issues = novesIssues,
+                        incidenciaSeleccionada = novesIssues.find { it.id == idIncidencia }
                     )
                 }
             } catch (e: Exception) {
-                Log.e("MapViewModel", "Error al desfer vot: ${e.message}")
+                Log.e("VOTES", "Error al desfer vot: ${e.message}", e)
+                refreshUserVotesFromBackend(googleId)
             }
+        }
+    }
+
+    private suspend fun refreshUserVotesFromBackend(googleId: String) {
+        try {
+            val rawVotes = obtenirVotsUsuari(googleId)
+            val backendVotes = rawVotes.mapNotNull { vote ->
+                val direction = when {
+                    vote.score > 0 -> 1
+                    vote.score < 0 -> -1
+                    else -> null
+                }
+                direction?.let { vote.incidenceId to it }
+            }.toMap()
+
+            userVoteIds = rawVotes.associate { it.incidenceId to it.id }
+
+            Log.d("VOTES", "Refresh des del backend: $backendVotes")
+            Log.d("VOTES", "VoteIds: $userVoteIds")
+            _uiState.update { it.copy(userVotes = backendVotes) }
+        } catch (e: Exception) {
+            Log.w("VOTES", "No s'ha pogut refrescar vots del backend: ${e.message}")
         }
     }
 

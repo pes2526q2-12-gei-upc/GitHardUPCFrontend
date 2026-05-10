@@ -252,6 +252,7 @@ private fun MapScreenDialogs(
         showIssueDialog(
             incidencia = incidencia,
             isOwner = isOwner,
+            isLoggedIn = currentUser != null,
             miVot = miVot,
             onDismiss = { viewModel.selectIssue(null) },
             onConfirmar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, true, it) } },
