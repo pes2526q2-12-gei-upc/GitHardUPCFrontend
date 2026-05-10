@@ -114,7 +114,6 @@ class MapViewModel(
     private var currentGoogleId: String? = null
     private var userVoteIds: Map<Long, Long> = emptyMap()
 
-    // NOU: Guardar resultats de gamificació
     var routeResult by mutableStateOf<RouteCompletionResponse?>(null)
         private set
 
@@ -138,7 +137,6 @@ class MapViewModel(
         currentGoogleId = user?.googleId?.takeIf { it.isNotBlank() }
         val gid = currentGoogleId
         if (gid != null) {
-            // Buidem mentre arriba la resposta
             _uiState.update { it.copy(userVotes = emptyMap()) }
             userVoteIds = emptyMap()
 
@@ -684,7 +682,6 @@ class MapViewModel(
                 progress.instruction.remainingDistanceMeters <= ARRIVAL_DISTANCE_METERS
     }
 
-    // AQUESTA ÉS LA FUNCIÓ MAGICA QUE ENVIA ELS PUNTS (DE LA DRETA)
     private fun completeRoute(progress: NavigationProgressResult) {
         val routeSummary = currentRouteSummary
         val totalDistanceMeters = routeSummary?.totalDistanceMeters
@@ -694,7 +691,6 @@ class MapViewModel(
         val totalDurationMinutes = routeSummary?.totalDurationMinutes ?: 0
         lastNavigationProgressMeters = navigationRoute?.totalDistanceMeters ?: progress.progressMeters
 
-        // 1. Actualizamos la UI para mostrar que la ruta ha terminado
         _uiState.update {
             it.copy(
                 navigationCameraFollowing = false,
@@ -713,7 +709,6 @@ class MapViewModel(
             )
         }
 
-        // 2. ENVIAMOS LOS DATOS AL BACKEND
         val googleId = currentGoogleId
         Log.d("ROUTE_VM", "googleId=$currentGoogleId, totalDistanceMeters=$totalDistanceMeters")
         if (!googleId.isNullOrBlank() && totalDistanceMeters > 0.0) {
@@ -795,7 +790,6 @@ class MapViewModel(
         val totalDistanceMeters: Double
     )
 
-    // --- A PARTIR D'AQUÍ, TOTES LES FUNCIONS D'INCIDÈNCIES DE L'ESQUERRA ---
 
     fun toggleMenuIncidencies(show: Boolean) {
         _uiState.update { it.copy(mostrarIncidencies = show) }
@@ -947,7 +941,6 @@ class MapViewModel(
 
         viewModelScope.launch {
             try {
-                // Resolem el voteId — refresquem del backend si no el tenim
                 var voteId = userVoteIds[idIncidencia]
                 if (voteId == null) {
                     Log.d("VOTES", "voteId desconegut per incidencia=$idIncidencia, refrescant")

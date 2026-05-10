@@ -96,23 +96,19 @@ class ProfileViewModel(
             return
         }
 
-        // 1. Cargamos los filtros (lo que ya hacía)
         startLoadingFilters(
             googleId = googleId,
             preserveCurrentValues = false
         )
 
-        // 2. ¡NUEVO! Cargamos los datos de gamificación
         loadUserProfile(googleId)
     }
 
-    // Añade esta nueva función justo debajo de onCurrentUserChanged:
     private fun loadUserProfile(googleId: String) {
         _uiState.update { it.copy(isLoadingProfile = true) }
 
         viewModelScope.launch {
             try {
-                // Importa cargarPerfilDeUsuario si te lo pide Android Studio
                 val userProfile = withContext(ioDispatcher) {
                     com.safesteps.data.cargarPerfilDeUsuario(googleId)
                 }
