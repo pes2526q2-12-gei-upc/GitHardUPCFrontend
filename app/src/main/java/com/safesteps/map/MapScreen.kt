@@ -252,6 +252,7 @@ private fun MapScreenDialogs(
         showIssueDialog(
             incidencia = incidencia,
             isOwner = isOwner,
+            isLoggedIn = currentUser != null,
             miVot = miVot,
             onDismiss = { viewModel.selectIssue(null) },
             onConfirmar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, true, it) } },
@@ -1406,9 +1407,6 @@ private fun recenterOnCurrentLocation(
         return
     }
 
-    // If the user has confirmed a custom origin (e.g. during route planning),
-    // pressing my-location must NOT replace that origin. Just zoom on the
-    // current location and leave the route/origin untouched.
     if (uiState.origenSeleccionado != null) {
         activateLocationComponent(
             mapView = mapView,

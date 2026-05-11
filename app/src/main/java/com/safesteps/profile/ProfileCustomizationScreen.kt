@@ -301,7 +301,6 @@ private fun ColorSelectionSection(
         parseColorFromPremiId(premi.id)
     }
 
-    // Todos los colores posibles de la tabla prizes
     val allPrizeColors = listOf(
         Color(0x00, 0xFF, 0x00),   // R001 - verde
         Color(0xFF, 0xC0, 0xCB),   // R002 - rosa
@@ -314,7 +313,6 @@ private fun ColorSelectionSection(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(horizontal = 4.dp)
         ) {
-            // Azul siempre disponible
             item {
                 ColorItem(
                     color = defaultColor,
@@ -323,7 +321,6 @@ private fun ColorSelectionSection(
                     onClick = { onColorSelected(defaultColor) }
                 )
             }
-            // Colores de premios
             items(allPrizeColors) { prizeColor ->
                 val isUnlocked = unlockedColors.any { isSameColor(it, prizeColor) }
                 ColorItem(

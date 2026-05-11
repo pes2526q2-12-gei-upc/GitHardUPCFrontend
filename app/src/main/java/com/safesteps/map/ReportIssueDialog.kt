@@ -737,14 +737,12 @@ private fun DialogActionRow(
     }
 }
 
-// ============================================================================
-// showIssueDialog (entry point)
-// ============================================================================
 
 @Composable
 fun showIssueDialog(
     incidencia: IssueResponseDTO,
     isOwner: Boolean,
+    isLoggedIn: Boolean = true,
     miVot: Int? = null,
     onDismiss: () -> Unit,
     onConfirmar: () -> Unit,
@@ -789,21 +787,38 @@ fun showIssueDialog(
             )
         },
         confirmButton = {
-            ConfirmActionButton(
-                isOwner = isOwner,
-                miVot = miVot,
-                onEditar = onEditar,
-                onConfirmar = onConfirmar
-            )
+            if (isLoggedIn) {
+                ConfirmActionButton(
+                    isOwner = isOwner,
+                    miVot = miVot,
+                    onEditar = onEditar,
+                    onConfirmar = onConfirmar
+                )
+            } else {
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF455A64)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = appString(R.string.close),
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            }
         },
         dismissButton = {
-            DismissActionButton(
-                isOwner = isOwner,
-                miVot = miVot,
-                deleteLabel = labels.deleteLabel,
-                onEsborrar = onEsborrar,
-                onRebutjar = onRebutjar
-            )
+            if (isLoggedIn) {
+                DismissActionButton(
+                    isOwner = isOwner,
+                    miVot = miVot,
+                    deleteLabel = labels.deleteLabel,
+                    onEsborrar = onEsborrar,
+                    onRebutjar = onRebutjar
+                )
+            }
         }
     )
 }

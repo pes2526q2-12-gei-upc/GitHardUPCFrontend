@@ -109,9 +109,9 @@ private interface VotesApiService {
     suspend fun countVotes(@Path("id") id: Long): Response<VoteCountDTO>
 
     @GET("api/v1/incidents/votes/users/{googleId}")
-    suspend fun getVotedIssuesByUser(
+    suspend fun getVotesByUser(
         @Path("googleId") googleId: String
-    ): Response<List<IssueResponseDTO>>
+    ): Response<List<VoteResponseDTO>>
 
     @DELETE("api/v1/incidents/{incidenceId}/users/{googleId}/vote")
     suspend fun deleteUserVoteFromIssue(
@@ -198,6 +198,21 @@ suspend fun eliminarVot(idIncidencia: Long, googleId: String) {
     if (!response.isSuccessful) {
         throw IOException("Error esborrant vot: ${response.code()}")
     }
+}
+
+suspend fun eliminarVotPerId(voteId: Long) {
+    val response = VotesBackend.service.deleteVoteById(voteId)
+    if (!response.isSuccessful) {
+        throw IOException("Error esborrant vot per id: ${response.code()}")
+    }
+}
+
+suspend fun obtenirVotsUsuari(googleId: String): List<VoteResponseDTO> {
+    val response = VotesBackend.service.getVotesByUser(googleId)
+    if (!response.isSuccessful) {
+        throw IOException("Error obtenint vots de l'usuari: ${response.code()}")
+    }
+    return response.body() ?: emptyList()
 }
 
 suspend fun actualitzarIncidencia(idIncidencia: Long, request: IssueRequestDTO): IssueResponseDTO {

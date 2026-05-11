@@ -84,7 +84,6 @@ fun SafeStepsApp(
         mutableStateOf(SafeStepsDestination.MAP)
     }
 
-    // FUSIONADO: Añadido trigger para recargar incidencias
     var issuesRefreshTrigger by rememberSaveable {
         mutableStateOf(0)
     }
@@ -170,7 +169,6 @@ fun SafeStepsApp(
         }
     }
 
-    // FUSIONADO: BackHandler que soporta pantallas secundarias de perfil
     BackHandler(
         enabled = currentDestination != SafeStepsDestination.MAP
     ) {
@@ -203,7 +201,7 @@ fun SafeStepsApp(
         currentLanguage = languageUiState.currentLanguage,
         authViewModel = authViewModel,
         currentDestination = currentDestination,
-        issuesRefreshTrigger = issuesRefreshTrigger, // FUSIONADO
+        issuesRefreshTrigger = issuesRefreshTrigger,
         profileUiState = profileUiState,
         onLanguageSelected = onLanguageSelected,
         onFilterValueChange = profileViewModel::onFilterValueChanged,
@@ -324,8 +322,8 @@ private fun SafeStepsLocalizedContent(
                 title = appString(R.string.notification_title_auth),
                 loginSuccess = appString(R.string.auth_banner_login_success),
                 registerSuccess = appString(R.string.auth_banner_register_success),
-                accountBanned = appString(R.string.auth_banner_account_banned), // FUSIONADO
-                accountSuspended = appString(R.string.auth_banner_account_suspended), // FUSIONADO
+                accountBanned = appString(R.string.auth_banner_account_banned),
+                accountSuspended = appString(R.string.auth_banner_account_suspended),
                 serverError = appString(R.string.auth_banner_server_error),
                 deleteAccountSuccess = appString(R.string.delete_account_success),
                 deleteAccountError = appString(R.string.delete_account_error)
@@ -342,7 +340,7 @@ private fun SafeStepsLocalizedContent(
             authUiState = authUiState,
             currentLanguage = currentLanguage,
             currentDestination = currentDestination,
-            issuesRefreshTrigger = issuesRefreshTrigger, // FUSIONADO
+            issuesRefreshTrigger = issuesRefreshTrigger,
             profileUiState = profileUiState,
             onLanguageSelected = onLanguageSelected,
             onFilterValueChange = onFilterValueChange,
@@ -365,7 +363,7 @@ private fun SafeStepsLocalizedContent(
             ),
             onDeleteAccount = authViewModel::onDeleteAccountRequested,
             onUpdateUserProfile = authViewModel::onUpdateUserProfile,
-            onRouteCompleted = onRouteCompleted, // FUSIONADO GAMIFICACIÓN
+            onRouteCompleted = onRouteCompleted,
             onOpenPrize = onOpenPrize,
             onDismissLevelUp = onDismissLevelUp,
             onDismissPrize = onDismissPrize
@@ -380,7 +378,6 @@ private fun HandleAuthNoticeEffect(
     onLogout: () -> Unit,
     onClearAuthNotice: (Long) -> Unit
 ) {
-    // FUSIONADO: Añadido pendingAccessDeniedSignOut de tu rama de usuarios
     LaunchedEffect(
         authUiState.authNotice?.id,
         authUiState.pendingDeleteAccountSignOut,
@@ -516,11 +513,11 @@ private fun SafeStepsBody(
                         modifier = Modifier.fillMaxSize(),
                         currentUser = currentUser,
                         currentLanguage = currentLanguage,
-                        issuesRefreshTrigger = issuesRefreshTrigger, // FUSIONADO INCIDENCIAS
+                        issuesRefreshTrigger = issuesRefreshTrigger,
                         onLoginClick = onLoginClick,
                         onMenuClick = onNavigateToMenu,
                         onProfileClick = onNavigateToProfileFromMap,
-                        onRouteCompleted = onRouteCompleted // FUSIONADO GAMIFICACIÓN
+                        onRouteCompleted = onRouteCompleted
                     )
                 }
             }
@@ -557,8 +554,8 @@ private fun resolveAuthNoticeMessage(
     return when (message) {
         AuthNoticeMessage.LOGIN_SUCCESS -> noticeTexts.loginSuccess
         AuthNoticeMessage.REGISTER_SUCCESS -> noticeTexts.registerSuccess
-        AuthNoticeMessage.ACCOUNT_BANNED -> noticeTexts.accountBanned // FUSIONADO
-        AuthNoticeMessage.ACCOUNT_SUSPENDED -> noticeTexts.accountSuspended // FUSIONADO
+        AuthNoticeMessage.ACCOUNT_BANNED -> noticeTexts.accountBanned
+        AuthNoticeMessage.ACCOUNT_SUSPENDED -> noticeTexts.accountSuspended
         AuthNoticeMessage.SERVER_ERROR -> noticeTexts.serverError
         AuthNoticeMessage.DELETE_ACCOUNT_SUCCESS -> noticeTexts.deleteAccountSuccess
         AuthNoticeMessage.DELETE_ACCOUNT_ERROR -> noticeTexts.deleteAccountError
