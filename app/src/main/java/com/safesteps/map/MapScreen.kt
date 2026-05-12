@@ -2,9 +2,11 @@
 
 import android.Manifest
 import android.content.Context
-import android.widget.Toast
 import android.location.Location
 import android.location.LocationListener
+import android.os.Build
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.BoxScope
@@ -24,6 +26,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -43,9 +47,11 @@ import com.safesteps.data.IssueApiType
 import com.safesteps.data.PuntInteres
 import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.data.cargarContactosEmergenciaUsuario
+import com.safesteps.data.enviarNotificacionEmergenciaUsuario
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
+import com.safesteps.notifications.hasNotificationPermission
 import org.maplibre.android.annotations.IconFactory
 import com.safesteps.ui.notifications.ScreenNotificationManager
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -88,6 +94,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import com.safesteps.data.IssueResponseDTO
+import kotlinx.coroutines.launch
 
 private data class MapScreenStrings(
     val mapNotificationTitle: String,
@@ -105,6 +112,10 @@ private data class MapScreenStrings(
     val calculatingBestRouteLabel: String,
     val reportIssueLabel: String,
     val emergencyActionLabel: String,
+    val emergencyNotificationTitle: String,
+    val emergencyNotificationSentMessage: String,
+    val emergencyNotificationFailedMessage: String,
+    val emergencyNotificationPermissionNoticeMessage: String,
     val reportIssueOutsideBarcelonaMessage: String,
     val issueLoadingAddressLabel: String,
     val issueLocationFallbackLabel: String,
@@ -316,6 +327,7 @@ private fun MapScreenContent(
     strings: MapScreenStrings,
     actions: MapScreenActions,
     navigationHeadingDegrees: Float?,
+    onEmergencyClick: () -> Unit,
     onLoginClick: () -> Unit,
     onMenuClick: () -> Unit,
     onProfileClick: () -> Unit
@@ -448,7 +460,7 @@ private fun MapScreenContent(
                 reportIssueLabel = strings.reportIssueLabel,
                 emergencyActionLabel = strings.emergencyActionLabel,
                 onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
-                onEmergencyClick = {}
+                onEmergencyClick = onEmergencyClick
             )
         }
 
@@ -468,7 +480,7 @@ private fun MapScreenContent(
                 reportIssueLabel = strings.reportIssueLabel,
                 emergencyActionLabel = strings.emergencyActionLabel,
                 showEmergencyAction = showEmergencyAction,
-                onEmergencyClick = {}
+                onEmergencyClick = onEmergencyClick
             )
         }
 
@@ -522,6 +534,10 @@ fun MapLibreScreen(
         }
     }
     val strings = mapScreenStrings()
+    val onEmergencyClick = rememberEmergencyNotificationAction(
+        currentUser = currentUser,
+        strings = strings
+    )
     var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
 
     val actions = rememberMapScreenActions(
@@ -571,6 +587,11 @@ fun MapLibreScreen(
             onNavigationHeadingChanged = { navigationHeadingDegrees = it }
         )
     )
+    EmergencyNotificationPermissionEffect(
+        currentUser = currentUser,
+        actionLabel = strings.emergencyActionLabel,
+        permissionNoticeMessage = strings.emergencyNotificationPermissionNoticeMessage
+    )
 
     MapScreenContent(
         modifier = modifier,
@@ -582,6 +603,7 @@ fun MapLibreScreen(
         strings = strings,
         actions = actions,
         navigationHeadingDegrees = navigationHeadingDegrees,
+        onEmergencyClick = onEmergencyClick,
         onLoginClick = onLoginClick,
         onMenuClick = onMenuClick,
         onProfileClick = onProfileClick
@@ -721,11 +743,88 @@ private fun mapScreenStrings(): MapScreenStrings {
         calculatingBestRouteLabel = appString(R.string.calculating_best_route),
         reportIssueLabel = appString(R.string.report_issue),
         emergencyActionLabel = appString(R.string.map_emergency_action),
+        emergencyNotificationTitle = appString(R.string.emergency_notification_received_title),
+        emergencyNotificationSentMessage = appString(R.string.emergency_notification_sent),
+        emergencyNotificationFailedMessage = appString(R.string.emergency_notification_failed),
+        emergencyNotificationPermissionNoticeMessage = appString(R.string.emergency_notification_permission_denied),
         reportIssueOutsideBarcelonaMessage = appString(R.string.issue_report_outside_barcelona),
         issueLoadingAddressLabel = appString(R.string.issue_loading_address),
         issueLocationFallbackLabel = appString(R.string.issue_location_fallback),
         mapLocationSelectionRestrictedMessage = appString(R.string.map_location_selection_restricted)
     )
+}
+
+@Composable
+private fun rememberEmergencyNotificationAction(
+    currentUser: UserInfo?,
+    strings: MapScreenStrings
+): () -> Unit {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val latestUser = rememberUpdatedState(currentUser)
+    val latestStrings = rememberUpdatedState(strings)
+
+    return remember(context, coroutineScope) {
+        {
+            coroutineScope.launch {
+                val resolvedUser = latestUser.value ?: return@launch
+                val googleId = resolvedUser.googleId.takeIf { it.isNotBlank() } ?: return@launch
+                val senderName = resolvedUser.username.takeIf { it.isNotBlank() }
+                    ?: context.getString(R.string.app_name)
+                val body = context.getString(R.string.emergency_notification_remote_body, senderName)
+
+                runCatching {
+                    enviarNotificacionEmergenciaUsuario(
+                        googleId = googleId,
+                        title = latestStrings.value.emergencyNotificationTitle,
+                        body = body
+                    )
+                }.onSuccess {
+                    ScreenNotificationManager.showNotification(
+                        notificationName = latestStrings.value.emergencyActionLabel,
+                        text = latestStrings.value.emergencyNotificationSentMessage
+                    )
+                }.onFailure {
+                    ScreenNotificationManager.showNotification(
+                        notificationName = latestStrings.value.emergencyActionLabel,
+                        text = latestStrings.value.emergencyNotificationFailedMessage
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmergencyNotificationPermissionEffect(
+    currentUser: UserInfo?,
+    actionLabel: String,
+    permissionNoticeMessage: String
+) {
+    val context = LocalContext.current
+    var hasRequestedPermission by rememberSaveable(currentUser?.googleId) { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            ScreenNotificationManager.showNotification(
+                notificationName = actionLabel,
+                text = permissionNoticeMessage
+            )
+        }
+    }
+
+    LaunchedEffect(currentUser?.googleId, hasRequestedPermission) {
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !hasRequestedPermission &&
+            !hasNotificationPermission(context)
+        ) {
+            hasRequestedPermission = true
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 }
 
 @Composable

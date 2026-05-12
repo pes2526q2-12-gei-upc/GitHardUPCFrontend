@@ -1,5 +1,6 @@
 ﻿package com.safesteps
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +30,8 @@ import com.safesteps.i18n.ProvideLocalizedStrings
 import com.safesteps.i18n.appString
 import com.safesteps.map.CommunityMenuScreen
 import com.safesteps.map.MapLibreScreen
+import com.safesteps.notifications.persistEmergencyNotificationUser
+import com.safesteps.notifications.syncCurrentFcmTokenForUser
 import com.safesteps.profile.ProfileFilterState
 import com.safesteps.profile.ProfileGamificationCallbacks
 import com.safesteps.profile.ProfileGamificationState
@@ -150,6 +153,7 @@ fun SafeStepsApp(
         currentUser = authUiState.currentUser,
         onUserChanged = profileViewModel::onCurrentUserChanged
     )
+    HandleEmergencyNotificationRegistrationEffect(currentUser = authUiState.currentUser)
     HandleProfileFiltersRefreshEffect(
         currentUser = authUiState.currentUser,
         currentDestination = currentDestination,
@@ -269,6 +273,39 @@ private fun HandleProfileFiltersSyncEffect(
 ) {
     LaunchedEffect(currentUser?.googleId) {
         onUserChanged(currentUser)
+    }
+}
+
+@Composable
+private fun HandleEmergencyNotificationRegistrationEffect(
+    currentUser: UserInfo?
+) {
+    val context = LocalContext.current
+
+    LaunchedEffect(currentUser?.googleId) {
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
+        persistEmergencyNotificationUser(context, googleId)
+        Log.i(
+            "EMERGENCY_NOTIFICATIONS",
+            "Registro de notificaciones evaluado para googleId=${googleId ?: "null"}"
+        )
+
+        if (googleId != null) {
+            runCatching {
+                syncCurrentFcmTokenForUser(context, googleId)
+            }.onSuccess {
+                Log.i(
+                    "EMERGENCY_NOTIFICATIONS",
+                    "Sincronizacion FCM completada desde SafeStepsApp: googleId=$googleId"
+                )
+            }.onFailure { error ->
+                Log.w(
+                    "EMERGENCY_NOTIFICATIONS",
+                    "Sincronizacion FCM fallida desde SafeStepsApp: googleId=$googleId",
+                    error
+                )
+            }
+        }
     }
 }
 

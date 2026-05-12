@@ -1,0 +1,228 @@
+package com.safesteps.notifications
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import com.google.firebase.messaging.FirebaseMessaging
+import com.safesteps.data.sincronizarTokenFcmUsuario
+import com.safesteps.MainActivity
+import com.safesteps.R
+import com.safesteps.auth.UserInfo
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+
+private const val EmergencyChannelId = "emergency_alerts"
+private const val EmergencyNotificationId = 2_401
+private const val EmergencyNotificationsTag = "EMERGENCY_NOTIFICATIONS"
+private const val EmergencyNotificationsPrefs = "emergency_notifications"
+private const val CurrentGoogleIdKey = "current_google_id"
+
+private val emergencyNotificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+fun initializeEmergencyMessaging(context: Context) {
+    Log.i(EmergencyNotificationsTag, "Inicializando Firebase Messaging")
+    ensureEmergencyNotificationChannel(context)
+    FirebaseMessaging.getInstance().isAutoInitEnabled = true
+
+    FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+        if (!task.isSuccessful) {
+            Log.w(
+                EmergencyNotificationsTag,
+                "No se pudo inicializar Firebase Messaging",
+                task.exception
+            )
+            return@addOnCompleteListener
+        }
+
+        val tokenPreview = task.result
+            ?.takeIf { it.isNotBlank() }
+            ?.let { token -> "${token.take(12)}..." }
+            ?: "unknown"
+        Log.i(EmergencyNotificationsTag, "FCM token obtenido en arranque: $tokenPreview")
+    }
+}
+
+fun hasNotificationPermission(context: Context): Boolean {
+    return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+}
+
+fun persistEmergencyNotificationUser(
+    context: Context,
+    googleId: String?
+) {
+    context.applicationContext
+        .getSharedPreferences(EmergencyNotificationsPrefs, Context.MODE_PRIVATE)
+        .edit()
+        .putString(CurrentGoogleIdKey, googleId?.takeIf { it.isNotBlank() })
+        .apply()
+}
+
+suspend fun syncCurrentFcmTokenForUser(
+    context: Context,
+    googleId: String
+) {
+    val resolvedGoogleId = googleId.takeIf { it.isNotBlank() } ?: return
+    persistEmergencyNotificationUser(context, resolvedGoogleId)
+    Log.i(
+        EmergencyNotificationsTag,
+        "Solicitando token FCM para sincronizar: googleId=$resolvedGoogleId"
+    )
+
+    val token = FirebaseMessaging.getInstance().token.await()
+    val tokenPreview = token.takeIf { it.isNotBlank() }
+        ?.let { value -> "${value.take(12)}..." }
+        ?: "unknown"
+    Log.i(
+        EmergencyNotificationsTag,
+        "Token FCM recuperado para sincronizacion: googleId=$resolvedGoogleId token=$tokenPreview"
+    )
+    sincronizarTokenFcmUsuario(resolvedGoogleId, token)
+    Log.i(
+        EmergencyNotificationsTag,
+        "Token FCM sincronizado correctamente: googleId=$resolvedGoogleId"
+    )
+}
+
+fun syncStoredUserWithNewFcmToken(
+    context: Context,
+    token: String
+) {
+    val resolvedToken = token.takeIf { it.isNotBlank() } ?: return
+    val googleId = context.applicationContext
+        .getSharedPreferences(EmergencyNotificationsPrefs, Context.MODE_PRIVATE)
+        .getString(CurrentGoogleIdKey, null)
+        ?.takeIf { it.isNotBlank() }
+        ?: run {
+            Log.w(
+                EmergencyNotificationsTag,
+                "Token FCM nuevo recibido, pero no hay googleId persistido para sincronizarlo"
+            )
+            return
+        }
+
+    emergencyNotificationScope.launch {
+        runCatching {
+            val tokenPreview = resolvedToken.take(12) + "..."
+            Log.i(
+                EmergencyNotificationsTag,
+                "Sincronizando token FCM actualizado: googleId=$googleId token=$tokenPreview"
+            )
+            sincronizarTokenFcmUsuario(googleId, resolvedToken)
+            Log.i(
+                EmergencyNotificationsTag,
+                "Token FCM actualizado sincronizado correctamente: googleId=$googleId"
+            )
+        }.onFailure { error ->
+            Log.w(
+                EmergencyNotificationsTag,
+                "No se pudo sincronizar el token FCM actualizado",
+                error
+            )
+        }
+    }
+}
+
+fun showTriggeredEmergencyNotification(
+    context: Context,
+    currentUser: UserInfo?
+) {
+    val senderName = currentUser?.username?.takeIf(String::isNotBlank)
+        ?: context.getString(R.string.app_name)
+    val title = context.getString(R.string.emergency_notification_triggered_title)
+    val body = context.getString(R.string.emergency_notification_triggered_body, senderName)
+
+    showEmergencyNotification(
+        context = context,
+        title = title,
+        body = body
+    )
+}
+
+fun showIncomingEmergencyNotification(
+    context: Context,
+    title: String?,
+    body: String?
+) {
+    showEmergencyNotification(
+        context = context,
+        title = title?.takeIf(String::isNotBlank)
+            ?: context.getString(R.string.emergency_notification_received_title),
+        body = body?.takeIf(String::isNotBlank)
+            ?: context.getString(R.string.emergency_notification_received_body)
+    )
+}
+
+private fun ensureEmergencyNotificationChannel(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+        return
+    }
+
+    val notificationManager = context.getSystemService(NotificationManager::class.java) ?: return
+    if (notificationManager.getNotificationChannel(EmergencyChannelId) != null) {
+        return
+    }
+
+    val channel = NotificationChannel(
+        EmergencyChannelId,
+        context.getString(R.string.emergency_notification_channel_name),
+        NotificationManager.IMPORTANCE_HIGH
+    ).apply {
+        description = context.getString(R.string.emergency_notification_channel_description)
+        enableVibration(true)
+    }
+
+    notificationManager.createNotificationChannel(channel)
+}
+
+@SuppressLint("MissingPermission")
+private fun showEmergencyNotification(
+    context: Context,
+    title: String,
+    body: String
+) {
+    ensureEmergencyNotificationChannel(context)
+    if (!hasNotificationPermission(context)) {
+        Log.d(EmergencyNotificationsTag, "Notificacion omitida: permiso no concedido")
+        return
+    }
+
+    val contentIntent = PendingIntent.getActivity(
+        context,
+        0,
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    val notification = NotificationCompat.Builder(context, EmergencyChannelId)
+        .setSmallIcon(R.drawable.ic_emergency_notification)
+        .setContentTitle(title)
+        .setContentText(body)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setCategory(NotificationCompat.CATEGORY_ALARM)
+        .setColor(0xFFB71C3B.toInt())
+        .setContentIntent(contentIntent)
+        .setAutoCancel(true)
+        .build()
+
+    NotificationManagerCompat.from(context).notify(EmergencyNotificationId, notification)
+}
