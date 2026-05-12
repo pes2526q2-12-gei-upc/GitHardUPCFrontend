@@ -228,6 +228,10 @@
     <string name="friends_remove_confirm_action">Eliminar</string>
     <string name="friends_remove_confirmation_title">Eliminar amistat</string>
     <string name="friends_remove_confirmation_message">També s\'esborrarà el xat amb %1$s.</string>
+    <string name="friends_emergency_summary">%1$d contactes d\'emerg&#232;ncia actius</string>
+    <string name="friends_emergency_contact_title">Contacte d\'emerg&#232;ncia</string>
+    <string name="friends_emergency_mark_action">Marcar com a contacte d\'emerg&#232;ncia</string>
+    <string name="friends_emergency_unmark_action">Treure contacte d\'emerg&#232;ncia</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d font</item>

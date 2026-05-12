@@ -226,6 +226,10 @@
     <string name="friends_remove_confirm_action">Remove</string>
     <string name="friends_remove_confirmation_title">Remove friendship</string>
     <string name="friends_remove_confirmation_message">The chat with %1$s will also be removed.</string>
+    <string name="friends_emergency_summary">%1$d emergency contacts active</string>
+    <string name="friends_emergency_contact_title">Emergency contact</string>
+    <string name="friends_emergency_mark_action">Mark as emergency contact</string>
+    <string name="friends_emergency_unmark_action">Remove emergency contact</string>
 
 
     <plurals name="poi_fountains">

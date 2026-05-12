@@ -96,7 +96,8 @@ fun FriendsScreen(
                     onBack = onBack,
                     onAddFriendClick = onAddFriendClick,
                     pendingCount = uiState.pendingRequests.size,
-                    friendCount = uiState.friends.size
+                    friendCount = uiState.friends.size,
+                    emergencyContactCount = uiState.friends.count(FriendListItemUiState::isEmergencyContact)
                 )
             }
 
@@ -158,6 +159,9 @@ fun FriendsScreen(
                         ) { friend ->
                             FriendItemCard(
                                 friend = friend,
+                                onEmergencyContactToggleClick = {
+                                    viewModel.onEmergencyContactToggleClicked(friend.googleId)
+                                },
                                 onChatClick = { onChatClick(friend) },
                                 onRemoveClick = { friendPendingRemoval = friend }
                             )
@@ -186,7 +190,8 @@ private fun FriendsTopBar(
     onBack: () -> Unit,
     onAddFriendClick: () -> Unit,
     pendingCount: Int,
-    friendCount: Int
+    friendCount: Int,
+    emergencyContactCount: Int
 ) {
     androidx.compose.foundation.layout.Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -269,6 +274,14 @@ private fun FriendsTopBar(
                     color = Color(0xFF61716A),
                     style = MaterialTheme.typography.bodyMedium
                 )
+
+                if (friendCount > 0) {
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    EmergencyContactsSummaryChip(
+                        count = emergencyContactCount
+                    )
+                }
 
                 if (pendingCount > 0 || friendCount > 0) {
                     Spacer(modifier = Modifier.height(18.dp))
@@ -580,9 +593,12 @@ private fun PendingFriendRequestCard(
 @Composable
 private fun FriendItemCard(
     friend: FriendListItemUiState,
+    onEmergencyContactToggleClick: () -> Unit,
     onChatClick: () -> Unit,
     onRemoveClick: () -> Unit
 ) {
+    val isBusy = friend.isRemoving || friend.isUpdatingEmergencyContact
+
     Card(
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.97f)),
@@ -638,6 +654,20 @@ private fun FriendItemCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            if (friend.isEmergencyContact) {
+                EmergencyContactBadge()
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            EmergencyContactActionButton(
+                isEmergencyContact = friend.isEmergencyContact,
+                enabled = !isBusy,
+                isLoading = friend.isUpdatingEmergencyContact,
+                onClick = onEmergencyContactToggleClick
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -645,14 +675,14 @@ private fun FriendItemCard(
             ) {
                 NegativeActionButton(
                     onClick = onRemoveClick,
-                    enabled = !friend.isRemoving,
+                    enabled = !isBusy,
                     isLoading = friend.isRemoving,
                     text = appString(R.string.friends_remove_action)
                 )
 
                 OutlinedButton(
                     onClick = onChatClick,
-                    enabled = !friend.isRemoving,
+                    enabled = !isBusy,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(18.dp),
                     border = BorderStroke(1.dp, Color(0xFFD3E4DA)),
@@ -673,6 +703,146 @@ private fun FriendItemCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EmergencyContactsSummaryChip(
+    count: Int
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFFEAF4EE),
+        border = BorderStroke(1.dp, Color(0xFFD7E7DC))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(24.dp),
+                shape = CircleShape,
+                color = Color(0xFFD8ECDC)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color(0xFF4F7D66),
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = appString(R.string.friends_emergency_summary, count),
+                color = Color(0xFF3F5D4D),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmergencyContactBadge() {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFFEAF4EE),
+        border = BorderStroke(1.dp, Color(0xFFD8E8DE))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(22.dp),
+                shape = CircleShape,
+                color = Color(0xFFD7EBDC)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Color(0xFF4F7D66),
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = appString(R.string.friends_emergency_contact_title),
+                color = Color(0xFF3C5A4A),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmergencyContactActionButton(
+    isEmergencyContact: Boolean,
+    enabled: Boolean,
+    isLoading: Boolean,
+    onClick: () -> Unit
+) {
+    if (isEmergencyContact) {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, Color(0xFFD3E4DA)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = Color(0xFFF7FBF8),
+                contentColor = Color(0xFF3C5A4A),
+                disabledContainerColor = Color(0xFFF0F5F1),
+                disabledContentColor = Color(0xFF8AA091)
+            )
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    color = Color(0xFF4F7D66),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(
+                    text = appString(R.string.friends_emergency_unmark_action),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+        return
+    }
+
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF5E9F7A),
+            contentColor = Color.White,
+            disabledContainerColor = Color(0xFFD7E5DC),
+            disabledContentColor = Color(0xFF66756F)
+        )
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = Color.White,
+                strokeWidth = 2.dp
+            )
+        } else {
+            Text(
+                text = appString(R.string.friends_emergency_mark_action),
+                fontWeight = FontWeight.SemiBold
+            )
         }
     }
 }
