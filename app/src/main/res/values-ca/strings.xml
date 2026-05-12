@@ -1,4 +1,4 @@
-﻿<resources>
+﻿﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="change_language">Canvia l\'idioma</string>
     <string name="log_in">Inicia sessi&#243;</string>

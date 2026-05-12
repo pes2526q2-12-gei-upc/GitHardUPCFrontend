@@ -27,7 +27,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -51,7 +50,8 @@ import com.safesteps.data.enviarNotificacionEmergenciaUsuario
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
-import com.safesteps.notifications.hasNotificationPermission
+import com.safesteps.notifications.persistEmergencyNotificationUser
+import com.safesteps.notifications.syncCurrentFcmTokenForUser
 import org.maplibre.android.annotations.IconFactory
 import com.safesteps.ui.notifications.ScreenNotificationManager
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -564,6 +564,22 @@ fun MapLibreScreen(
 
     LaunchedEffect(currentUser?.googleId) {
         val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
+        persistEmergencyNotificationUser(context, googleId)
+        if (googleId != null) {
+            runCatching {
+                syncCurrentFcmTokenForUser(context, googleId)
+            }.onFailure { error ->
+                Log.w(
+                    "EMERGENCY_NOTIFICATIONS",
+                    "No se pudo sincronizar el token FCM del usuario actual",
+                    error
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(currentUser?.googleId) {
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
         hasEmergencyContacts = if (googleId == null) {
             false
         } else {
@@ -586,11 +602,6 @@ fun MapLibreScreen(
             requestLocationPermissions = actions.requestLocationPermissions,
             onNavigationHeadingChanged = { navigationHeadingDegrees = it }
         )
-    )
-    EmergencyNotificationPermissionEffect(
-        currentUser = currentUser,
-        actionLabel = strings.emergencyActionLabel,
-        permissionNoticeMessage = strings.emergencyNotificationPermissionNoticeMessage
     )
 
     MapScreenContent(
@@ -791,38 +802,6 @@ private fun rememberEmergencyNotificationAction(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun EmergencyNotificationPermissionEffect(
-    currentUser: UserInfo?,
-    actionLabel: String,
-    permissionNoticeMessage: String
-) {
-    val context = LocalContext.current
-    var hasRequestedPermission by rememberSaveable(currentUser?.googleId) { mutableStateOf(false) }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (!granted) {
-            ScreenNotificationManager.showNotification(
-                notificationName = actionLabel,
-                text = permissionNoticeMessage
-            )
-        }
-    }
-
-    LaunchedEffect(currentUser?.googleId, hasRequestedPermission) {
-        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
-        if (
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            !hasRequestedPermission &&
-            !hasNotificationPermission(context)
-        ) {
-            hasRequestedPermission = true
-            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }

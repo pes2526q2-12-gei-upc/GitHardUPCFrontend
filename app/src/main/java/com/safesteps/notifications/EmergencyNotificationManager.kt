@@ -10,14 +10,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessaging
-import com.safesteps.data.sincronizarTokenFcmUsuario
 import com.safesteps.MainActivity
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
+import com.safesteps.data.sincronizarTokenFcmUsuario
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,9 +34,7 @@ private const val CurrentGoogleIdKey = "current_google_id"
 private val emergencyNotificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 fun initializeEmergencyMessaging(context: Context) {
-    Log.i(EmergencyNotificationsTag, "Inicializando Firebase Messaging")
     ensureEmergencyNotificationChannel(context)
-    FirebaseMessaging.getInstance().isAutoInitEnabled = true
 
     FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
         if (!task.isSuccessful) {
@@ -51,7 +50,7 @@ fun initializeEmergencyMessaging(context: Context) {
             ?.takeIf { it.isNotBlank() }
             ?.let { token -> "${token.take(12)}..." }
             ?: "unknown"
-        Log.i(EmergencyNotificationsTag, "FCM token obtenido en arranque: $tokenPreview")
+        Log.d(EmergencyNotificationsTag, "FCM token listo: $tokenPreview")
     }
 }
 
@@ -80,24 +79,9 @@ suspend fun syncCurrentFcmTokenForUser(
 ) {
     val resolvedGoogleId = googleId.takeIf { it.isNotBlank() } ?: return
     persistEmergencyNotificationUser(context, resolvedGoogleId)
-    Log.i(
-        EmergencyNotificationsTag,
-        "Solicitando token FCM para sincronizar: googleId=$resolvedGoogleId"
-    )
 
     val token = FirebaseMessaging.getInstance().token.await()
-    val tokenPreview = token.takeIf { it.isNotBlank() }
-        ?.let { value -> "${value.take(12)}..." }
-        ?: "unknown"
-    Log.i(
-        EmergencyNotificationsTag,
-        "Token FCM recuperado para sincronizacion: googleId=$resolvedGoogleId token=$tokenPreview"
-    )
     sincronizarTokenFcmUsuario(resolvedGoogleId, token)
-    Log.i(
-        EmergencyNotificationsTag,
-        "Token FCM sincronizado correctamente: googleId=$resolvedGoogleId"
-    )
 }
 
 fun syncStoredUserWithNewFcmToken(
@@ -109,26 +93,11 @@ fun syncStoredUserWithNewFcmToken(
         .getSharedPreferences(EmergencyNotificationsPrefs, Context.MODE_PRIVATE)
         .getString(CurrentGoogleIdKey, null)
         ?.takeIf { it.isNotBlank() }
-        ?: run {
-            Log.w(
-                EmergencyNotificationsTag,
-                "Token FCM nuevo recibido, pero no hay googleId persistido para sincronizarlo"
-            )
-            return
-        }
+        ?: return
 
     emergencyNotificationScope.launch {
         runCatching {
-            val tokenPreview = resolvedToken.take(12) + "..."
-            Log.i(
-                EmergencyNotificationsTag,
-                "Sincronizando token FCM actualizado: googleId=$googleId token=$tokenPreview"
-            )
             sincronizarTokenFcmUsuario(googleId, resolvedToken)
-            Log.i(
-                EmergencyNotificationsTag,
-                "Token FCM actualizado sincronizado correctamente: googleId=$googleId"
-            )
         }.onFailure { error ->
             Log.w(
                 EmergencyNotificationsTag,

@@ -1,4 +1,4 @@
-﻿<resources>
+﻿﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="change_language">Cambiar idioma</string>
     <string name="log_in">Iniciar sesi&#243;n</string>
