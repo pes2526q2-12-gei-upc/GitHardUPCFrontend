@@ -8,6 +8,8 @@ private const val EmergencyNotificationsTag = "EMERGENCY_NOTIFICATIONS"
 
 class SafeStepsFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
+        syncStoredUserWithNewFcmToken(applicationContext, token)
+
         val tokenPreview = token.takeIf { it.isNotBlank() }
             ?.let { value -> "${value.take(12)}..." }
             ?: "unknown"
