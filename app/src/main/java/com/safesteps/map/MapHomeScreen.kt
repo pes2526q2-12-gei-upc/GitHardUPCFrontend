@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -259,6 +260,8 @@ private fun DropdownSuggeriments(
     adrecesSuggerides: List<Feature>,
     onAdrecaSeleccionada: (Feature) -> Unit
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     AnimatedVisibility(visible = adrecesSuggerides.isNotEmpty()) {
         Column(
             modifier = Modifier
@@ -272,7 +275,10 @@ private fun DropdownSuggeriments(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onAdrecaSeleccionada(feature) }
+                        .clickable {
+                            keyboardController?.hide()
+                            onAdrecaSeleccionada(feature)
+                        }
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import com.safesteps.data.Coord
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 
 private val DIALOG_ACCENT_ORANGE = Color(0xFFF57C00)
 
@@ -343,12 +344,26 @@ private fun LoggedInReportDialogContent(
     val effectiveMyLocationText = myLocationText ?: defaultLocationText
     val effectiveMyLocationCoord = myLocationCoord ?: initialCoord
 
-    Text(
-        text = appString(R.string.report_issue_title),
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
-        color = Color.Black
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = appString(R.string.report_issue_title),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.Black,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onDismiss) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = appString(R.string.close),
+                tint = Color(0xFF6B7280)
+            )
+        }
+    }
     Text(
         appString(R.string.report_type_label),
         style = MaterialTheme.typography.titleMedium,
@@ -534,6 +549,7 @@ private fun EditableLocationSection(
     onErrorReset: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
     var localSuggestions by remember { mutableStateOf<List<Feature>>(emptyList()) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
 
@@ -579,6 +595,7 @@ private fun EditableLocationSection(
                 },
                 onClear = resetSearch,
                 onMyLocationSelected = {
+                    keyboardController?.hide()
                     onUserModified()
                     onUbicacioTextChange(effectiveMyLocationText)
                     onCoordChange(effectiveMyLocationCoord)
@@ -587,6 +604,7 @@ private fun EditableLocationSection(
                     localSuggestions = emptyList()
                 },
                 onSuggestionSelected = { feature ->
+                    keyboardController?.hide()
                     onUserModified()
                     onUbicacioTextChange(feature.properties.getAddress())
                     onCoordChange(Coord(feature.geometry.latitud, feature.geometry.longitud))
@@ -769,12 +787,26 @@ fun showIssueDialog(
         shape = RoundedCornerShape(28.dp),
         modifier = Modifier.fillMaxWidth(0.92f).padding(16.dp),
         title = {
-            Text(
-                text = labels.issueDetailsLabel,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color(0xFF1A1C1E)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = labels.issueDetailsLabel,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF1A1C1E),
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = appString(R.string.close),
+                        tint = Color(0xFF6B7280)
+                    )
+                }
+            }
         },
         text = {
             IssueDialogBody(
@@ -791,6 +823,9 @@ fun showIssueDialog(
                 ConfirmActionButton(
                     isOwner = isOwner,
                     miVot = miVot,
+                    editLabel = labels.editLabel,
+                    confirmLabel = labels.confirmLabel,
+                    confirmedDoneLabel = labels.confirmedDoneLabel,
                     onEditar = onEditar,
                     onConfirmar = onConfirmar
                 )
@@ -815,6 +850,8 @@ fun showIssueDialog(
                     isOwner = isOwner,
                     miVot = miVot,
                     deleteLabel = labels.deleteLabel,
+                    reportFalseLabel = labels.reportFalseLabel,
+                    reportedFalseDoneLabel = labels.reportedFalseDoneLabel,
                     onEsborrar = onEsborrar,
                     onRebutjar = onRebutjar
                 )
@@ -842,7 +879,12 @@ private data class ShowIssueDialogLabels(
     val falseReportVoteLabel: String,
     val issueDetailsLabel: String,
     val unknownAddressLabel: String,
-    val deleteLabel: String
+    val deleteLabel: String,
+    val editLabel: String,
+    val confirmLabel: String,
+    val confirmedDoneLabel: String,
+    val reportFalseLabel: String,
+    val reportedFalseDoneLabel: String
 )
 
 @Composable
@@ -872,7 +914,12 @@ private fun rememberShowIssueDialogLabels(
         falseReportVoteLabel = appString(R.string.issue_vote_reported_false),
         issueDetailsLabel = appString(R.string.issue_details_title),
         unknownAddressLabel = appString(R.string.issue_unknown_address),
-        deleteLabel = appString(R.string.delete_action)
+        deleteLabel = appString(R.string.delete_action),
+        editLabel = appString(R.string.edit_action),
+        confirmLabel = appString(R.string.confirm_action),
+        confirmedDoneLabel = appString(R.string.issue_confirmed_done_action),
+        reportFalseLabel = appString(R.string.issue_report_false_action),
+        reportedFalseDoneLabel = appString(R.string.issue_reported_false_done_action)
     )
 }
 
@@ -1179,28 +1226,41 @@ private fun UserVoteFeedbackBar(
 private fun ConfirmActionButton(
     isOwner: Boolean,
     miVot: Int?,
+    editLabel: String,
+    confirmLabel: String,
+    confirmedDoneLabel: String,
     onEditar: () -> Unit,
     onConfirmar: () -> Unit
 ) {
     if (isOwner) {
-        OwnerEditButton(onClick = onEditar)
+        OwnerEditButton(label = editLabel, onClick = onEditar)
     } else {
-        VoteConfirmButton(miVot = miVot, onClick = onConfirmar)
+        VoteConfirmButton(
+            confirmLabel = confirmLabel,
+            confirmedDoneLabel = confirmedDoneLabel,
+            miVot = miVot,
+            onClick = onConfirmar
+        )
     }
 }
 
 @Composable
-private fun OwnerEditButton(onClick: () -> Unit) {
+private fun OwnerEditButton(label: String, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().height(48.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
         shape = RoundedCornerShape(12.dp)
-    ) { Text("Editar", fontWeight = FontWeight.Bold, color = Color.White) }
+    ) { Text(label, fontWeight = FontWeight.Bold, color = Color.White) }
 }
 
 @Composable
-private fun VoteConfirmButton(miVot: Int?, onClick: () -> Unit) {
+private fun VoteConfirmButton(
+    confirmLabel: String,
+    confirmedDoneLabel: String,
+    miVot: Int?,
+    onClick: () -> Unit
+) {
     val jaConfirmat = miVot == 1
     Button(
         onClick = onClick,
@@ -1213,7 +1273,7 @@ private fun VoteConfirmButton(miVot: Int?, onClick: () -> Unit) {
         shape = RoundedCornerShape(12.dp)
     ) {
         Text(
-            text = if (jaConfirmat) "Confirmada ✓" else "Confirmar",
+            text = if (jaConfirmat) confirmedDoneLabel else confirmLabel,
             fontWeight = FontWeight.Bold,
             color = Color.White
         )
@@ -1225,13 +1285,20 @@ private fun DismissActionButton(
     isOwner: Boolean,
     miVot: Int?,
     deleteLabel: String,
+    reportFalseLabel: String,
+    reportedFalseDoneLabel: String,
     onEsborrar: () -> Unit,
     onRebutjar: () -> Unit
 ) {
     if (isOwner) {
         OwnerDeleteButton(label = deleteLabel, onClick = onEsborrar)
     } else {
-        VoteRejectButton(miVot = miVot, onClick = onRebutjar)
+        VoteRejectButton(
+            reportFalseLabel = reportFalseLabel,
+            reportedFalseDoneLabel = reportedFalseDoneLabel,
+            miVot = miVot,
+            onClick = onRebutjar
+        )
     }
 }
 
@@ -1246,7 +1313,12 @@ private fun OwnerDeleteButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun VoteRejectButton(miVot: Int?, onClick: () -> Unit) {
+private fun VoteRejectButton(
+    reportFalseLabel: String,
+    reportedFalseDoneLabel: String,
+    miVot: Int?,
+    onClick: () -> Unit
+) {
     val jaRebutjat = miVot == -1
     Button(
         onClick = onClick,
@@ -1259,7 +1331,7 @@ private fun VoteRejectButton(miVot: Int?, onClick: () -> Unit) {
         shape = RoundedCornerShape(12.dp)
     ) {
         Text(
-            text = if (jaRebutjat) "Reportada ✓" else "Reportar com a fals",
+            text = if (jaRebutjat) reportedFalseDoneLabel else reportFalseLabel,
             fontWeight = FontWeight.Bold,
             color = Color.White
         )

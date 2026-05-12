@@ -117,6 +117,8 @@
     <string name="issue_type_accessibility">Accessibility</string>
     <string name="issue_type_security">Security</string>
     <string name="report_issue_failed_label">Restricted action</string>
+    <string name="issue_confirmed_done_action">Confirmed &#10003;</string>
+    <string name="issue_reported_false_done_action">Reported&#10003;</string>
     <string name="report_issue_failed_text">Only users can report issue for security reasons</string>
     <string name="report_issue_title">Report Issue</string>
     <string name="report_location_placeholder">Ex: Carrer d\'arago, 20</string>
