@@ -230,9 +230,10 @@
     <string name="friends_remove_confirmation_title">Eliminar amistad</string>
     <string name="friends_remove_confirmation_message">También se borrará el chat con %1$s.</string>
     <string name="friends_emergency_summary">%1$d contactos de emergencia activos</string>
+    <string name="friends_emergency_summary_empty">No tienes contactos de emergencia</string>
     <string name="friends_emergency_contact_title">Contacto de emergencia</string>
-    <string name="friends_emergency_mark_action">Marcar como contacto de emergencia</string>
-    <string name="friends_emergency_unmark_action">Quitar contacto de emergencia</string>
+    <string name="friends_emergency_mark_action">Añadir a emergencia</string>
+    <string name="friends_emergency_unmark_action">Quitar de emergencia</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d fuente</item>
