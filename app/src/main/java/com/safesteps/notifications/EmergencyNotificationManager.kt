@@ -25,7 +25,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-private const val EmergencyChannelId = "safesteps_channel"
+private const val EmergencyChannelId = "emergency_alerts"
 private const val EmergencyNotificationId = 2_401
 private const val EmergencyNotificationsTag = "EMERGENCY_NOTIFICATIONS"
 private const val EmergencyNotificationsPrefs = "emergency_notifications"

@@ -96,7 +96,6 @@
     <string name="map_emergency_action">Emergency</string>
     <string name="emergency_notification_channel_name">Emergency alerts</string>
     <string name="emergency_notification_channel_description">Notifications related to emergency contact alerts.</string>
-    <string name="fcm_default_notification_channel_id" translatable="false">safesteps_channel</string>
     <string name="emergency_notification_triggered_title">Emergency alert activated</string>
     <string name="emergency_notification_triggered_body">%1$s activated the emergency button.</string>
     <string name="emergency_notification_received_title">Emergency alert</string>

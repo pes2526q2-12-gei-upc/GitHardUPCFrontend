@@ -17,10 +17,6 @@
         android:roundIcon="@mipmap/safesteps_launchapp_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SafeSteps">
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="@string/fcm_default_notification_channel_id" />
-
         <service
             android:name="com.safesteps.notifications.SafeStepsFirebaseMessagingService"
             android:exported="false">
