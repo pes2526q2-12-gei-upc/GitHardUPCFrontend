@@ -93,6 +93,7 @@
     <string name="change_map_style">Canvia l\'estil del mapa</string>
     <string name="map_style_standard">Est&#224;ndard</string>
     <string name="map_style_satellite">Sat&#232;l&#183;lit</string>
+    <string name="map_emergency_action">Emerg&#232;ncia</string>
     <string name="calculating_best_route">Calculant la millor ruta&#8230;</string>
     <string name="notification_title_auth">Autenticaci&#243;</string>
     <string name="notification_title_map">Mapa</string>

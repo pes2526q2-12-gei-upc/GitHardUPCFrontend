@@ -94,6 +94,7 @@
     <string name="change_map_style">Change map style</string>
     <string name="map_style_standard">Standard</string>
     <string name="map_style_satellite">Satellite</string>
+    <string name="map_emergency_action">Emergency</string>
     <string name="calculating_best_route">Calculating the best route&#8230;</string>
     <string name="notification_title_auth">Authentication</string>
     <string name="notification_title_map">Map</string>
