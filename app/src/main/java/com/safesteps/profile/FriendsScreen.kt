@@ -654,14 +654,13 @@ private fun FriendItemCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Row(modifier = Modifier.fillMaxWidth()) {
-                EmergencyContactActionButton(
-                    isEmergencyContact = friend.isEmergencyContact,
-                    enabled = !isBusy,
-                    isLoading = friend.isUpdatingEmergencyContact,
-                    onClick = onEmergencyContactToggleClick
-                )
-            }
+            EmergencyContactActionButton(
+                modifier = Modifier.fillMaxWidth(),
+                isEmergencyContact = friend.isEmergencyContact,
+                enabled = !isBusy,
+                isLoading = friend.isUpdatingEmergencyContact,
+                onClick = onEmergencyContactToggleClick
+            )
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -756,6 +755,7 @@ private fun EmergencyContactsSummaryChip(
 
 @Composable
 private fun EmergencyContactActionButton(
+    modifier: Modifier = Modifier,
     isEmergencyContact: Boolean,
     enabled: Boolean,
     isLoading: Boolean,
@@ -776,6 +776,7 @@ private fun EmergencyContactActionButton(
     val iconContainerColor = if (isEmergencyContact) Color(0xFFD9EBDD) else Color(0xFFE4EFE8)
 
     Surface(
+        modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),
@@ -784,6 +785,7 @@ private fun EmergencyContactActionButton(
         TextButton(
             onClick = onClick,
             enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
             colors = ButtonDefaults.textButtonColors(
                 containerColor = Color.Transparent,
