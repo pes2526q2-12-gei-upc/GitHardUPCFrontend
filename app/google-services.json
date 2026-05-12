@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "684891970021",
+    "project_id": "safesteps-githardupc",
+    "storage_bucket": "safesteps-githardupc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:684891970021:android:692f3ed5363f21a060770c",
+        "android_client_info": {
+          "package_name": "com.safesteps"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCAtR2lr7uDmb2ScT9TExEXhxhg5gMDrGY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
