@@ -22,7 +22,7 @@
             android:value="@string/fcm_default_notification_channel_id" />
 
         <service
-            android:name=".notifications.SafeStepsFirebaseMessagingService"
+            android:name="com.safesteps.notifications.SafeStepsFirebaseMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
