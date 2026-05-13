@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -120,7 +121,9 @@ internal data class FloatingActionsState(
     val compactMode: Boolean,
     val showPoiAction: Boolean,
     val showMapStyleAction: Boolean,
-    val showMyLocationAction: Boolean
+    val showMyLocationAction: Boolean,
+    val showReportIssueAction: Boolean,
+    val showEmergencyAction: Boolean
 )
 
 internal data class FloatingActionLabels(
@@ -623,6 +626,8 @@ private fun MapActionCircleButton(
     iconTint: Color,
     onClick: () -> Unit,
     compactMode: Boolean,
+    backgroundColor: Color = Color.White,
+    borderColor: Color = Color(0xFFE2E7E4),
     modifier: Modifier = Modifier
 ) {
     val buttonSize = if (compactMode) 46.dp else 54.dp
@@ -635,13 +640,13 @@ private fun MapActionCircleButton(
             .shadow(12.dp, CircleShape, clip = false)
             .clip(CircleShape)
             .clickable(onClick = onClick),
-        color = Color.White,
+        color = backgroundColor,
         shape = CircleShape
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .border(1.dp, Color(0xFFE2E7E4), CircleShape),
+                .border(1.dp, borderColor, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -658,7 +663,9 @@ private fun MapActionCircleButton(
 internal fun BoxScope.MapFloatingActions(
     uiState: MapUiState,
     reportIssueLabel: String,
+    emergencyActionLabel: String,
     onReportIssueClick: () -> Unit,
+    onEmergencyClick: () -> Unit,
     state: FloatingActionsState,
     labels: FloatingActionLabels,
     callbacks: FloatingActionCallbacks
@@ -697,7 +704,7 @@ internal fun BoxScope.MapFloatingActions(
                 onClick = callbacks.onToggleMapStyle
             )
 
-            AnimatedVisibility(visible = !uiState.modoRuta) {
+            AnimatedVisibility(visible = state.showReportIssueAction && !uiState.modoRuta) {
                 MapActionCircleButton(
                     icon = Icons.Default.ReportProblem,
                     contentDescription = reportIssueLabel,
@@ -705,6 +712,19 @@ internal fun BoxScope.MapFloatingActions(
                     onClick = onReportIssueClick,
                     compactMode = state.compactMode,
                     modifier = Modifier.testTag("btn_incidencies")
+                )
+            }
+
+            AnimatedVisibility(visible = state.showEmergencyAction && !uiState.modoRuta) {
+                MapActionCircleButton(
+                    icon = Icons.Default.NotificationsActive,
+                    contentDescription = emergencyActionLabel,
+                    iconTint = Color.White,
+                    onClick = onEmergencyClick,
+                    compactMode = state.compactMode,
+                    backgroundColor = Color(0xFFB71C3B),
+                    borderColor = Color(0xFFFFC8D4),
+                    modifier = Modifier.testTag("btn_emergency")
                 )
             }
 
@@ -719,7 +739,11 @@ internal fun BoxScope.MapFloatingActions(
 }
 
 private fun hasVisibleFloatingActions(state: FloatingActionsState): Boolean {
-    return state.showPoiAction || state.showMapStyleAction || state.showMyLocationAction
+    return state.showPoiAction ||
+        state.showMapStyleAction ||
+        state.showMyLocationAction ||
+        state.showReportIssueAction ||
+        state.showEmergencyAction
 }
 
 @Composable

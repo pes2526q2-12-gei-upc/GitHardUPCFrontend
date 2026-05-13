@@ -1,6 +1,5 @@
 ﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
-    <string name="server_client_id" translatable="false">48435478487-tupu01hq8mjcjgvrm1ckh32ak4heff8q.apps.googleusercontent.com</string>
     <string name="change_language">Change language</string>
     <string name="log_in">Log in</string>
     <string name="log_out">Log out</string>
@@ -94,6 +93,17 @@
     <string name="change_map_style">Change map style</string>
     <string name="map_style_standard">Standard</string>
     <string name="map_style_satellite">Satellite</string>
+    <string name="map_emergency_action">Emergency</string>
+    <string name="emergency_notification_channel_name">Emergency alerts</string>
+    <string name="emergency_notification_channel_description">Notifications related to emergency contact alerts.</string>
+    <string name="emergency_notification_triggered_title">Emergency alert activated</string>
+    <string name="emergency_notification_triggered_body">%1$s activated the emergency button.</string>
+    <string name="emergency_notification_received_title">Emergency alert</string>
+    <string name="emergency_notification_received_body">One of your emergency contacts has requested help.</string>
+    <string name="emergency_notification_remote_body">%1$s needs help. Open SafeSteps.</string>
+    <string name="emergency_notification_permission_denied">Enable notifications to receive emergency alerts on this device.</string>
+    <string name="emergency_notification_sent">Emergency alert request sent.</string>
+    <string name="emergency_notification_failed">The emergency alert could not be sent.</string>
     <string name="calculating_best_route">Calculating the best route&#8230;</string>
     <string name="notification_title_auth">Authentication</string>
     <string name="notification_title_map">Map</string>
@@ -228,6 +238,11 @@
     <string name="friends_remove_confirm_action">Remove</string>
     <string name="friends_remove_confirmation_title">Remove friendship</string>
     <string name="friends_remove_confirmation_message">The chat with %1$s will also be removed.</string>
+    <string name="friends_emergency_summary">%1$d emergency contacts active</string>
+    <string name="friends_emergency_summary_empty">You have no emergency contacts</string>
+    <string name="friends_emergency_contact_title">Emergency contact</string>
+    <string name="friends_emergency_mark_action">Add to emergency</string>
+    <string name="friends_emergency_unmark_action">Remove from emergency</string>
 
 
     <plurals name="poi_fountains">

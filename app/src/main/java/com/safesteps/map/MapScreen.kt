@@ -2,9 +2,11 @@
 
 import android.Manifest
 import android.content.Context
-import android.widget.Toast
 import android.location.Location
 import android.location.LocationListener
+import android.os.Build
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.BoxScope
@@ -24,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -42,9 +45,13 @@ import com.safesteps.data.Feature
 import com.safesteps.data.IssueApiType
 import com.safesteps.data.PuntInteres
 import com.safesteps.data.RouteCompletionResponse
+import com.safesteps.data.cargarContactosEmergenciaUsuario
+import com.safesteps.data.enviarNotificacionEmergenciaUsuario
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
+import com.safesteps.notifications.persistEmergencyNotificationUser
+import com.safesteps.notifications.syncCurrentFcmTokenForUser
 import org.maplibre.android.annotations.IconFactory
 import com.safesteps.ui.notifications.ScreenNotificationManager
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -67,6 +74,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.ui.Alignment
@@ -81,10 +89,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import com.safesteps.data.IssueResponseDTO
+import kotlinx.coroutines.launch
 
 private data class MapScreenStrings(
     val mapNotificationTitle: String,
@@ -101,6 +111,11 @@ private data class MapScreenStrings(
     val myLocationLabel: String,
     val calculatingBestRouteLabel: String,
     val reportIssueLabel: String,
+    val emergencyActionLabel: String,
+    val emergencyNotificationTitle: String,
+    val emergencyNotificationSentMessage: String,
+    val emergencyNotificationFailedMessage: String,
+    val emergencyNotificationPermissionNoticeMessage: String,
     val reportIssueOutsideBarcelonaMessage: String,
     val issueLoadingAddressLabel: String,
     val issueLocationFallbackLabel: String,
@@ -111,7 +126,9 @@ private data class FloatingActionsLayout(
     val compactMode: Boolean,
     val showPoiAction: Boolean,
     val showMapStyleAction: Boolean,
-    val showMyLocationAction: Boolean
+    val showMyLocationAction: Boolean,
+    val showReportIssueAction: Boolean,
+    val showEmergencyAction: Boolean
 )
 
 private data class MapScreenEffectCallbacks(
@@ -306,9 +323,11 @@ private fun MapScreenContent(
     viewModel: MapViewModel,
     mapView: MapView,
     currentUser: UserInfo?,
+    showEmergencyAction: Boolean,
     strings: MapScreenStrings,
     actions: MapScreenActions,
     navigationHeadingDegrees: Float?,
+    onEmergencyClick: () -> Unit,
     onLoginClick: () -> Unit,
     onMenuClick: () -> Unit,
     onProfileClick: () -> Unit
@@ -337,7 +356,8 @@ private fun MapScreenContent(
         val floatingActionsLayout = resolveFloatingActionsLayout(
             freeHeightPx = availableHeightPx,
             density = density,
-            hasPoiAction = uiState.puntsInteres.isNotEmpty()
+            hasPoiAction = uiState.puntsInteres.isNotEmpty(),
+            hasEmergencyAction = showEmergencyAction
         )
 
         MapViewSurface(
@@ -421,7 +441,9 @@ private fun MapScreenContent(
                     compactMode = floatingActionsLayout.compactMode,
                     showPoiAction = floatingActionsLayout.showPoiAction,
                     showMapStyleAction = floatingActionsLayout.showMapStyleAction,
-                    showMyLocationAction = floatingActionsLayout.showMyLocationAction
+                    showMyLocationAction = floatingActionsLayout.showMyLocationAction,
+                    showReportIssueAction = floatingActionsLayout.showReportIssueAction,
+                    showEmergencyAction = floatingActionsLayout.showEmergencyAction && showEmergencyAction
                 ),
                 labels = FloatingActionLabels(
                     hideExtraInfoLabel = strings.hideExtraInfoLabel,
@@ -436,7 +458,9 @@ private fun MapScreenContent(
                     onMyLocationClick = actions.onCenterCurrentLocation
                 ),
                 reportIssueLabel = strings.reportIssueLabel,
-                onReportIssueClick = { viewModel.toggleMenuIncidencies(true) }
+                emergencyActionLabel = strings.emergencyActionLabel,
+                onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
+                onEmergencyClick = onEmergencyClick
             )
         }
 
@@ -453,7 +477,10 @@ private fun MapScreenContent(
                 standardMapStyleLabel = strings.standardMapStyleLabel,
                 satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
                 myLocationLabel = strings.myLocationLabel,
-                reportIssueLabel = strings.reportIssueLabel
+                reportIssueLabel = strings.reportIssueLabel,
+                emergencyActionLabel = strings.emergencyActionLabel,
+                showEmergencyAction = showEmergencyAction,
+                onEmergencyClick = onEmergencyClick
             )
         }
 
@@ -494,6 +521,7 @@ fun MapLibreScreen(
     val routeCompletionResult = viewModel.routeResult
     var showLevelUpOverlay by remember { mutableStateOf(false) }
     var levelUpLevel by remember { mutableStateOf(1L) }
+    var hasEmergencyContacts by remember(currentUser?.googleId) { mutableStateOf(false) }
 
     LaunchedEffect(routeCompletionResult) {
         if (routeCompletionResult != null) {
@@ -506,6 +534,10 @@ fun MapLibreScreen(
         }
     }
     val strings = mapScreenStrings()
+    val onEmergencyClick = rememberEmergencyNotificationAction(
+        currentUser = currentUser,
+        strings = strings
+    )
     var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
 
     val actions = rememberMapScreenActions(
@@ -530,6 +562,33 @@ fun MapLibreScreen(
         viewModel.onCurrentUserChanged(currentUser)
     }
 
+    LaunchedEffect(currentUser?.googleId) {
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
+        persistEmergencyNotificationUser(context, googleId)
+        if (googleId != null) {
+            runCatching {
+                syncCurrentFcmTokenForUser(context, googleId)
+            }.onFailure { error ->
+                Log.w(
+                    "EMERGENCY_NOTIFICATIONS",
+                    "No se pudo sincronizar el token FCM del usuario actual",
+                    error
+                )
+            }
+        }
+    }
+
+    LaunchedEffect(currentUser?.googleId) {
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
+        hasEmergencyContacts = if (googleId == null) {
+            false
+        } else {
+            runCatching {
+                cargarContactosEmergenciaUsuario(googleId).isNotEmpty()
+            }.getOrDefault(false)
+        }
+    }
+
     LaunchedEffect(issuesRefreshTrigger) {
         viewModel.loadIssuesMap()
     }
@@ -551,9 +610,11 @@ fun MapLibreScreen(
         viewModel = viewModel,
         mapView = mapView,
         currentUser = currentUser,
+        showEmergencyAction = hasEmergencyContacts,
         strings = strings,
         actions = actions,
         navigationHeadingDegrees = navigationHeadingDegrees,
+        onEmergencyClick = onEmergencyClick,
         onLoginClick = onLoginClick,
         onMenuClick = onMenuClick,
         onProfileClick = onProfileClick
@@ -575,12 +636,15 @@ private fun BoxScope.RouteModeFloatingActions(
     onToggleMapStyle: () -> Unit,
     onMyLocationClick: () -> Unit,
     onReportIssueClick: () -> Unit,
+    onEmergencyClick: () -> Unit,
     hideExtraInfoLabel: String,
     showExtraInfoLabel: String,
     standardMapStyleLabel: String,
     satelliteMapStyleLabel: String,
     myLocationLabel: String,
-    reportIssueLabel: String
+    reportIssueLabel: String,
+    emergencyActionLabel: String,
+    showEmergencyAction: Boolean
 ) {
     Row(
         modifier = Modifier
@@ -620,6 +684,17 @@ private fun BoxScope.RouteModeFloatingActions(
             backgroundColor = Color(0xFFC86A37),
             testTagId = "btn_incidencies"
         )
+        if (showEmergencyAction) {
+            CompactCircularMapAction(
+                onClick = onEmergencyClick,
+                contentDescription = emergencyActionLabel,
+                icon = Icons.Default.NotificationsActive,
+                tint = Color.White,
+                backgroundColor = Color(0xFFB71C3B),
+                borderColor = Color(0xFFFFC8D4),
+                testTagId = "btn_emergency"
+            )
+        }
     }
 }
 
@@ -630,11 +705,14 @@ private fun CompactCircularMapAction(
     icon: ImageVector,
     tint: Color = Color(0xFF33413B),
     backgroundColor: Color = Color.White,
+    borderColor: Color = Color.Transparent,
     testTagId: String? = null
 ) {
     Surface(
         shape = CircleShape,
-        modifier = Modifier.size(44.dp),
+        modifier = Modifier
+            .size(44.dp)
+            .border(1.dp, borderColor, CircleShape),
         color = backgroundColor,
         shadowElevation = 4.dp
     ) {
@@ -675,11 +753,57 @@ private fun mapScreenStrings(): MapScreenStrings {
         myLocationLabel = appString(R.string.my_location),
         calculatingBestRouteLabel = appString(R.string.calculating_best_route),
         reportIssueLabel = appString(R.string.report_issue),
+        emergencyActionLabel = appString(R.string.map_emergency_action),
+        emergencyNotificationTitle = appString(R.string.emergency_notification_received_title),
+        emergencyNotificationSentMessage = appString(R.string.emergency_notification_sent),
+        emergencyNotificationFailedMessage = appString(R.string.emergency_notification_failed),
+        emergencyNotificationPermissionNoticeMessage = appString(R.string.emergency_notification_permission_denied),
         reportIssueOutsideBarcelonaMessage = appString(R.string.issue_report_outside_barcelona),
         issueLoadingAddressLabel = appString(R.string.issue_loading_address),
         issueLocationFallbackLabel = appString(R.string.issue_location_fallback),
         mapLocationSelectionRestrictedMessage = appString(R.string.map_location_selection_restricted)
     )
+}
+
+@Composable
+private fun rememberEmergencyNotificationAction(
+    currentUser: UserInfo?,
+    strings: MapScreenStrings
+): () -> Unit {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val latestUser = rememberUpdatedState(currentUser)
+    val latestStrings = rememberUpdatedState(strings)
+
+    return remember(context, coroutineScope) {
+        {
+            coroutineScope.launch {
+                val resolvedUser = latestUser.value ?: return@launch
+                val googleId = resolvedUser.googleId.takeIf { it.isNotBlank() } ?: return@launch
+                val senderName = resolvedUser.username.takeIf { it.isNotBlank() }
+                    ?: context.getString(R.string.app_name)
+                val body = context.getString(R.string.emergency_notification_remote_body, senderName)
+
+                runCatching {
+                    enviarNotificacionEmergenciaUsuario(
+                        googleId = googleId,
+                        title = latestStrings.value.emergencyNotificationTitle,
+                        body = body
+                    )
+                }.onSuccess {
+                    ScreenNotificationManager.showNotification(
+                        notificationName = latestStrings.value.emergencyActionLabel,
+                        text = latestStrings.value.emergencyNotificationSentMessage
+                    )
+                }.onFailure {
+                    ScreenNotificationManager.showNotification(
+                        notificationName = latestStrings.value.emergencyActionLabel,
+                        text = latestStrings.value.emergencyNotificationFailedMessage
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -943,47 +1067,80 @@ private fun MapStyleRenderingEffect(
 private fun resolveFloatingActionsLayout(
     freeHeightPx: Float,
     density: androidx.compose.ui.unit.Density,
-    hasPoiAction: Boolean
+    hasPoiAction: Boolean,
+    hasEmergencyAction: Boolean
 ): FloatingActionsLayout {
     val safeFreeHeightPx = (freeHeightPx - with(density) { 24.dp.toPx() }).coerceAtLeast(0f)
-    val layoutCandidates = floatingActionsLayoutCandidates(hasPoiAction)
+    val layoutCandidates = floatingActionsLayoutCandidates(
+        hasPoiAction = hasPoiAction,
+        hasEmergencyAction = hasEmergencyAction
+    )
 
     return layoutCandidates.firstOrNull { layout ->
         safeFreeHeightPx >= with(density) { estimatedFloatingActionsHeight(layout).toPx() }
     } ?: layoutCandidates.last()
 }
 
-private fun floatingActionsLayoutCandidates(hasPoiAction: Boolean): List<FloatingActionsLayout> {
+private fun floatingActionsLayoutCandidates(
+    hasPoiAction: Boolean,
+    hasEmergencyAction: Boolean
+): List<FloatingActionsLayout> {
     return listOf(
         FloatingActionsLayout(
             compactMode = false,
             showPoiAction = hasPoiAction,
             showMapStyleAction = true,
-            showMyLocationAction = true
+            showMyLocationAction = true,
+            showReportIssueAction = true,
+            showEmergencyAction = hasEmergencyAction
         ),
         FloatingActionsLayout(
             compactMode = true,
             showPoiAction = hasPoiAction,
             showMapStyleAction = true,
-            showMyLocationAction = true
+            showMyLocationAction = true,
+            showReportIssueAction = true,
+            showEmergencyAction = hasEmergencyAction
         ),
         FloatingActionsLayout(
             compactMode = true,
             showPoiAction = false,
             showMapStyleAction = true,
-            showMyLocationAction = true
+            showMyLocationAction = true,
+            showReportIssueAction = true,
+            showEmergencyAction = hasEmergencyAction
         ),
         FloatingActionsLayout(
             compactMode = true,
             showPoiAction = false,
             showMapStyleAction = false,
-            showMyLocationAction = true
+            showMyLocationAction = true,
+            showReportIssueAction = true,
+            showEmergencyAction = hasEmergencyAction
         ),
         FloatingActionsLayout(
             compactMode = true,
             showPoiAction = false,
             showMapStyleAction = false,
-            showMyLocationAction = false
+            showMyLocationAction = true,
+            showReportIssueAction = false,
+            showEmergencyAction = hasEmergencyAction
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = false,
+            showMapStyleAction = false,
+            showMyLocationAction = false,
+            showReportIssueAction = false,
+            showEmergencyAction = hasEmergencyAction
+        ),
+        FloatingActionsLayout(
+            compactMode = true,
+            showPoiAction = false,
+            showMapStyleAction = false,
+            showMyLocationAction = false,
+            showReportIssueAction = false,
+            showEmergencyAction = false
         )
     )
 }
@@ -992,6 +1149,8 @@ private fun estimatedFloatingActionsHeight(layout: FloatingActionsLayout): Dp {
     val itemHeights = listOfNotNull(
         floatingActionHeightOrNull(layout.showPoiAction, layout.compactMode, compactHeight = 34.dp, expandedHeight = 40.dp),
         floatingActionHeightOrNull(layout.showMapStyleAction, layout.compactMode, compactHeight = 34.dp, expandedHeight = 40.dp),
+        floatingActionHeightOrNull(layout.showReportIssueAction, layout.compactMode, compactHeight = 46.dp, expandedHeight = 54.dp),
+        floatingActionHeightOrNull(layout.showEmergencyAction, layout.compactMode, compactHeight = 46.dp, expandedHeight = 54.dp),
         floatingActionHeightOrNull(layout.showMyLocationAction, layout.compactMode, compactHeight = 46.dp, expandedHeight = 54.dp)
     )
 
