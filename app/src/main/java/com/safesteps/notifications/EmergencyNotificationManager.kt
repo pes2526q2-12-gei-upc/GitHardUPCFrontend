@@ -10,7 +10,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
-import androidx.annotation.VisibleForTesting
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -26,7 +25,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 private const val EmergencyChannelId = "emergency_alerts"
+private const val ActivityChannelId = "activity_alerts"
 private const val EmergencyNotificationId = 2_401
+private const val MessageNotificationId = 2_402
+private const val FriendRequestNotificationId = 2_403
+private const val LocationNotificationId = 2_404
 private const val EmergencyNotificationsTag = "EMERGENCY_NOTIFICATIONS"
 private const val EmergencyNotificationsPrefs = "emergency_notifications"
 private const val CurrentGoogleIdKey = "current_google_id"
@@ -35,6 +38,7 @@ private val emergencyNotificationScope = CoroutineScope(SupervisorJob() + Dispat
 
 fun initializeEmergencyMessaging(context: Context) {
     ensureEmergencyNotificationChannel(context)
+    ensureActivityNotificationChannel(context)
 
     FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
         if (!task.isSuccessful) {
@@ -138,6 +142,69 @@ fun showIncomingEmergencyNotification(
     )
 }
 
+fun showIncomingMessageNotification(
+    context: Context,
+    title: String?,
+    body: String?
+) {
+    showActivityNotification(
+        context = context,
+        notificationId = MessageNotificationId,
+        title = title?.takeIf(String::isNotBlank)
+            ?: context.getString(R.string.message_notification_received_title),
+        body = body?.takeIf(String::isNotBlank)
+            ?: context.getString(R.string.message_notification_received_body),
+        category = NotificationCompat.CATEGORY_MESSAGE,
+        color = 0xFF1F6F78.toInt()
+    )
+}
+
+fun showIncomingFriendRequestNotification(
+    context: Context,
+    title: String?,
+    body: String?
+) {
+    showActivityNotification(
+        context = context,
+        notificationId = FriendRequestNotificationId,
+        title = title?.takeIf(String::isNotBlank)
+            ?: context.getString(R.string.friend_request_notification_received_title),
+        body = body?.takeIf(String::isNotBlank)
+            ?: context.getString(R.string.friend_request_notification_received_body),
+        category = NotificationCompat.CATEGORY_SOCIAL,
+        color = 0xFF2F855A.toInt()
+    )
+}
+
+fun showIncomingLocationNotification(
+    context: Context,
+    title: String?,
+    body: String?,
+    latitude: Double? = null,
+    longitude: Double? = null
+) {
+    val resolvedBody = body?.takeIf(String::isNotBlank)
+        ?: if (latitude != null && longitude != null) {
+            context.getString(
+                R.string.location_notification_received_body_with_coords,
+                latitude,
+                longitude
+            )
+        } else {
+            context.getString(R.string.location_notification_received_body)
+        }
+
+    showActivityNotification(
+        context = context,
+        notificationId = LocationNotificationId,
+        title = title?.takeIf(String::isNotBlank)
+            ?: context.getString(R.string.location_notification_received_title),
+        body = resolvedBody,
+        category = NotificationCompat.CATEGORY_STATUS,
+        color = 0xFF2B6CB0.toInt()
+    )
+}
+
 private fun ensureEmergencyNotificationChannel(context: Context) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
         return
@@ -154,6 +221,28 @@ private fun ensureEmergencyNotificationChannel(context: Context) {
         NotificationManager.IMPORTANCE_HIGH
     ).apply {
         description = context.getString(R.string.emergency_notification_channel_description)
+        enableVibration(true)
+    }
+
+    notificationManager.createNotificationChannel(channel)
+}
+
+private fun ensureActivityNotificationChannel(context: Context) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+        return
+    }
+
+    val notificationManager = context.getSystemService(NotificationManager::class.java) ?: return
+    if (notificationManager.getNotificationChannel(ActivityChannelId) != null) {
+        return
+    }
+
+    val channel = NotificationChannel(
+        ActivityChannelId,
+        context.getString(R.string.notification_channel_activity_name),
+        NotificationManager.IMPORTANCE_DEFAULT
+    ).apply {
+        description = context.getString(R.string.notification_channel_activity_description)
         enableVibration(true)
     }
 
@@ -194,4 +283,43 @@ private fun showEmergencyNotification(
         .build()
 
     NotificationManagerCompat.from(context).notify(EmergencyNotificationId, notification)
+}
+
+@SuppressLint("MissingPermission")
+private fun showActivityNotification(
+    context: Context,
+    notificationId: Int,
+    title: String,
+    body: String,
+    category: String,
+    color: Int
+) {
+    ensureActivityNotificationChannel(context)
+    if (!hasNotificationPermission(context)) {
+        Log.d(EmergencyNotificationsTag, "Notificacion omitida: permiso no concedido")
+        return
+    }
+
+    val contentIntent = PendingIntent.getActivity(
+        context,
+        notificationId,
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    val notification = NotificationCompat.Builder(context, ActivityChannelId)
+        .setSmallIcon(R.drawable.ic_emergency_notification)
+        .setContentTitle(title)
+        .setContentText(body)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        .setCategory(category)
+        .setColor(color)
+        .setContentIntent(contentIntent)
+        .setAutoCancel(true)
+        .build()
+
+    NotificationManagerCompat.from(context).notify(notificationId, notification)
 }

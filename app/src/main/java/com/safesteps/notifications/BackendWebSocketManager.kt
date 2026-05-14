@@ -16,14 +16,31 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
 
-private const val EmergencyWebSocketTag = "EMERGENCY_WS"
-private const val EmergencyWebSocketEndpoint = "ws://nattech.fib.upc.edu:40385/ws-safesteps"
-private const val EmergencyDestination = "/user/queue/emergency"
-private const val EmergencySubscriptionId = "emergency-subscription"
-private const val EmergencyReconnectDelayMillis = 5_000L
-private const val EmergencyStompNull = '\u0000'
+private const val BackendWebSocketTag = "BACKEND_WS"
+private const val BackendWebSocketEndpoint = "ws://nattech.fib.upc.edu:40385/ws-safesteps"
+private const val BackendReconnectDelayMillis = 5_000L
+private const val BackendStompNull = '\u0000'
 
-object EmergencyWebSocketManager {
+private const val MessageDestination = "/user/queue/messages"
+private const val EmergencyDestination = "/user/queue/emergency"
+private const val FriendRequestDestination = "/user/queue/requests"
+private const val LocationDestination = "/user/queue/location"
+
+private const val MessageTitleKey = "NEW_MESSAGE_TITLE"
+private const val MessageBodyKey = "NEW_MESSAGE_BODY"
+private const val EmergencyTitleKey = "EMERGENCY_TITLE"
+private const val EmergencyBodyKey = "EMERGENCY_BODY"
+private const val FriendRequestTitleKey = "FRIEND_REQ_TITLE"
+private const val FriendRequestBodyKey = "FRIEND_REQ_BODY"
+
+private val BackendSubscriptions = linkedMapOf(
+    MessageDestination to "messages-subscription",
+    EmergencyDestination to "emergency-subscription",
+    FriendRequestDestination to "friend-requests-subscription",
+    LocationDestination to "location-subscription"
+)
+
+object BackendWebSocketManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val client = OkHttpClient.Builder()
         .retryOnConnectionFailure(true)
@@ -66,7 +83,7 @@ object EmergencyWebSocketManager {
             socketToClose = clearCurrentSocketLocked()
         }
 
-        socketToClose?.close(1000, "Switching emergency websocket session")
+        socketToClose?.close(1000, "Switching backend websocket session")
         openSocket(normalizedGoogleId)
     }
 
@@ -82,27 +99,27 @@ object EmergencyWebSocketManager {
 
         socketToClose?.apply {
             send(buildDisconnectFrame())
-            close(1000, "Emergency websocket disconnected")
+            close(1000, "Backend websocket disconnected")
         }
     }
 
     private fun openSocket(googleId: String) {
         val request = Request.Builder()
-            .url(buildEmergencySocketUrl(googleId))
+            .url(buildSocketUrl(googleId))
             .addHeader("Sec-WebSocket-Protocol", "v12.stomp")
             .build()
 
-        val socket = client.newWebSocket(request, EmergencySocketListener(googleId))
+        val socket = client.newWebSocket(request, BackendSocketListener(googleId))
         synchronized(stateLock) {
             activeGoogleId = googleId
             webSocket = socket
             stompConnected = false
         }
-        Log.d(EmergencyWebSocketTag, "Abriendo websocket de emergencia para $googleId")
+        Log.d(BackendWebSocketTag, "Abriendo websocket backend para $googleId")
     }
 
-    private fun buildEmergencySocketUrl(googleId: String): String {
-        return "$EmergencyWebSocketEndpoint?googleId=${Uri.encode(googleId)}"
+    private fun buildSocketUrl(googleId: String): String {
+        return "$BackendWebSocketEndpoint?googleId=${Uri.encode(googleId)}"
     }
 
     private fun clearCurrentSocketLocked(): WebSocket? {
@@ -117,7 +134,7 @@ object EmergencyWebSocketManager {
         synchronized(stateLock) {
             reconnectJob?.cancel()
             reconnectJob = scope.launch {
-                delay(EmergencyReconnectDelayMillis)
+                delay(BackendReconnectDelayMillis)
 
                 val shouldReconnect = synchronized(stateLock) {
                     !intentionalDisconnect &&
@@ -129,7 +146,7 @@ object EmergencyWebSocketManager {
                     return@launch
                 }
 
-                Log.d(EmergencyWebSocketTag, "Reintentando websocket de emergencia para $googleId")
+                Log.d(BackendWebSocketTag, "Reintentando websocket backend para $googleId")
                 openSocket(googleId)
             }
         }
@@ -143,12 +160,12 @@ object EmergencyWebSocketManager {
             webSocket == socket && activeGoogleId == googleId
         }
         if (!isCurrentSocket) {
-            socket.close(1000, "Ignoring stale emergency websocket")
+            socket.close(1000, "Ignoring stale backend websocket")
             return
         }
 
         socket.send(buildConnectFrame(googleId))
-        Log.d(EmergencyWebSocketTag, "Handshake websocket abierto para $googleId")
+        Log.d(BackendWebSocketTag, "Handshake websocket abierto para $googleId")
     }
 
     private fun onSocketMessage(
@@ -159,8 +176,8 @@ object EmergencyWebSocketManager {
         parseStompFrames(message).forEach { frame ->
             when (frame.command) {
                 "CONNECTED" -> handleConnectedFrame(socket, googleId)
-                "MESSAGE" -> handleEmergencyFrame(socket, frame)
-                "ERROR" -> Log.e(EmergencyWebSocketTag, "Frame STOMP ERROR para $googleId: ${frame.body}")
+                "MESSAGE" -> handleBackendFrame(socket, frame)
+                "ERROR" -> Log.e(BackendWebSocketTag, "Frame STOMP ERROR para $googleId: ${frame.body}")
             }
         }
     }
@@ -177,11 +194,18 @@ object EmergencyWebSocketManager {
             webSocket
         } ?: return
 
-        currentSocket.send(buildSubscribeFrame())
-        Log.d(EmergencyWebSocketTag, "Suscrito a $EmergencyDestination para $googleId")
+        BackendSubscriptions.forEach { (destination, subscriptionId) ->
+            currentSocket.send(
+                buildSubscribeFrame(
+                    destination = destination,
+                    subscriptionId = subscriptionId
+                )
+            )
+        }
+        Log.d(BackendWebSocketTag, "Suscripciones websocket activas para $googleId")
     }
 
-    private fun handleEmergencyFrame(
+    private fun handleBackendFrame(
         socket: WebSocket,
         frame: StompFrame
     ) {
@@ -192,56 +216,59 @@ object EmergencyWebSocketManager {
             return
         }
 
+        val destination = frame.headers["destination"]
         val context = appContext ?: return
-        val payload = parsePayload(frame.body)
-        val title = payload.resolveTitle()
-        val body = payload.resolveBody()
+        val payload = BackendPayload.parse(frame.body)
+
+        when (destination) {
+            MessageDestination -> {
+                showIncomingMessageNotification(
+                    context = context,
+                    title = payload.resolveTitle(MessageTitleKey),
+                    body = payload.resolveBody(MessageBodyKey)
+                )
+            }
+
+            EmergencyDestination -> {
+                showIncomingEmergencyNotification(
+                    context = context,
+                    title = payload.resolveTitle(EmergencyTitleKey),
+                    body = payload.resolveBody(EmergencyBodyKey)
+                )
+            }
+
+            FriendRequestDestination -> {
+                showIncomingFriendRequestNotification(
+                    context = context,
+                    title = payload.resolveTitle(FriendRequestTitleKey),
+                    body = payload.resolveBody(FriendRequestBodyKey)
+                )
+            }
+
+            LocationDestination -> {
+                val coordinates = payload.extractCoordinates()
+                showIncomingLocationNotification(
+                    context = context,
+                    title = payload.resolveTitle(null),
+                    body = payload.resolveBody(null),
+                    latitude = coordinates?.latitude,
+                    longitude = coordinates?.longitude
+                )
+            }
+
+            else -> {
+                Log.w(
+                    BackendWebSocketTag,
+                    "Destino websocket no gestionado: ${destination ?: "sin destino"}"
+                )
+                return
+            }
+        }
 
         Log.d(
-            EmergencyWebSocketTag,
-            "Notificacion de emergencia recibida en ${frame.headers["destination"] ?: EmergencyDestination}"
+            BackendWebSocketTag,
+            "Evento websocket recibido en ${destination ?: "unknown"}"
         )
-
-        showIncomingEmergencyNotification(
-            context = context,
-            title = title,
-            body = body
-        )
-    }
-
-    private fun parsePayload(rawBody: String): JSONObject? {
-        val normalizedBody = rawBody.trim()
-        if (normalizedBody.isBlank()) {
-            return null
-        }
-
-        return runCatching { JSONObject(normalizedBody) }
-            .onFailure { error ->
-                Log.w(EmergencyWebSocketTag, "No se pudo parsear el payload de emergencia", error)
-            }
-            .getOrNull()
-    }
-
-    private fun JSONObject?.resolveTitle(): String? {
-        val directTitle = this?.optString("title")
-            ?.takeIf { it.isNotBlank() }
-        if (directTitle != null) {
-            return directTitle
-        }
-
-        return this?.optString("titleKey")
-            ?.takeIf { it.isNotBlank() && it != "EMERGENCY_TITLE" }
-    }
-
-    private fun JSONObject?.resolveBody(): String? {
-        val directBody = this?.optString("body")
-            ?.takeIf { it.isNotBlank() }
-        if (directBody != null) {
-            return directBody
-        }
-
-        return this?.optString("bodyKey")
-            ?.takeIf { it.isNotBlank() && it != "EMERGENCY_BODY" }
     }
 
     private fun handleSocketEnded(
@@ -258,7 +285,7 @@ object EmergencyWebSocketManager {
             !intentionalDisconnect && desiredGoogleId == googleId
         }
 
-        Log.d(EmergencyWebSocketTag, reason)
+        Log.d(BackendWebSocketTag, reason)
 
         if (shouldReconnect) {
             scheduleReconnect(googleId)
@@ -273,18 +300,21 @@ object EmergencyWebSocketManager {
             append("heart-beat:0,0\n")
             append("googleId:$googleId\n")
             append("\n")
-            append(EmergencyStompNull)
+            append(BackendStompNull)
         }
     }
 
-    private fun buildSubscribeFrame(): String {
+    private fun buildSubscribeFrame(
+        destination: String,
+        subscriptionId: String
+    ): String {
         return buildString {
             append("SUBSCRIBE\n")
-            append("id:$EmergencySubscriptionId\n")
-            append("destination:$EmergencyDestination\n")
+            append("id:$subscriptionId\n")
+            append("destination:$destination\n")
             append("ack:auto\n")
             append("\n")
-            append(EmergencyStompNull)
+            append(BackendStompNull)
         }
     }
 
@@ -292,13 +322,13 @@ object EmergencyWebSocketManager {
         return buildString {
             append("DISCONNECT\n")
             append("\n")
-            append(EmergencyStompNull)
+            append(BackendStompNull)
         }
     }
 
     private fun parseStompFrames(rawMessage: String): List<StompFrame> {
         return rawMessage
-            .split(EmergencyStompNull)
+            .split(BackendStompNull)
             .mapNotNull { chunk ->
                 val normalizedChunk = chunk.trim('\n', '\r')
                 if (normalizedChunk.isBlank()) {
@@ -355,21 +385,117 @@ object EmergencyWebSocketManager {
         val body: String
     )
 
-    private class EmergencySocketListener(
+    private data class Coordinates(
+        val latitude: Double,
+        val longitude: Double
+    )
+
+    private data class BackendPayload(
+        val root: JSONObject?
+    ) {
+        private val dataObject: JSONObject?
+            get() = root?.optJSONObject("data")
+
+        fun resolveTitle(defaultKey: String?): String? {
+            val directTitle = sequenceOf(root, dataObject)
+                .mapNotNull { objectNode ->
+                    objectNode?.optString("title")
+                        ?.takeIf { it.isNotBlank() }
+                }
+                .firstOrNull()
+            if (directTitle != null) {
+                return directTitle
+            }
+
+            val titleKey = root?.optString("titleKey")
+                ?.takeIf { it.isNotBlank() }
+                ?: return null
+
+            return titleKey.takeUnless { it == defaultKey }
+        }
+
+        fun resolveBody(defaultKey: String?): String? {
+            val directBody = sequenceOf(root, dataObject)
+                .mapNotNull { objectNode ->
+                    objectNode?.optString("body")
+                        ?.takeIf { it.isNotBlank() }
+                }
+                .firstOrNull()
+            if (directBody != null) {
+                return directBody
+            }
+
+            val bodyKey = root?.optString("bodyKey")
+                ?.takeIf { it.isNotBlank() }
+                ?: return null
+
+            return bodyKey.takeUnless { it == defaultKey }
+        }
+
+        fun extractCoordinates(): Coordinates? {
+            val candidates = listOfNotNull(
+                dataObject,
+                root?.optJSONObject("coords"),
+                root?.optJSONObject("location"),
+                root
+            )
+
+            for (candidate in candidates) {
+                parseCoordinates(candidate)?.let { return it }
+            }
+
+            return null
+        }
+
+        private fun parseCoordinates(objectNode: JSONObject): Coordinates? {
+            return listOf(
+                "lat" to "lon",
+                "lat" to "lng",
+                "latitude" to "longitude"
+            ).firstNotNullOfOrNull { (latitudeKey, longitudeKey) ->
+                val latitude = objectNode.optDouble(latitudeKey, Double.NaN)
+                val longitude = objectNode.optDouble(longitudeKey, Double.NaN)
+                if (latitude.isNaN() || longitude.isNaN()) {
+                    null
+                } else {
+                    Coordinates(latitude = latitude, longitude = longitude)
+                }
+            }
+        }
+
+        companion object {
+            fun parse(rawBody: String): BackendPayload {
+                val normalizedBody = rawBody.trim()
+                if (normalizedBody.isBlank()) {
+                    return BackendPayload(root = null)
+                }
+
+                val jsonObject = runCatching { JSONObject(normalizedBody) }
+                    .onFailure { error ->
+                        Log.w(BackendWebSocketTag, "No se pudo parsear el payload websocket", error)
+                    }
+                    .getOrNull()
+
+                return BackendPayload(root = jsonObject)
+            }
+        }
+    }
+
+    private class BackendSocketListener(
         private val googleId: String
     ) : WebSocketListener() {
         override fun onOpen(
             webSocket: WebSocket,
             response: Response
         ) {
-            EmergencyWebSocketManager.onSocketReady(webSocket, googleId)
+            BackendWebSocketManager.onSocketReady(webSocket, googleId)
         }
 
         override fun onMessage(
             webSocket: WebSocket,
             text: String
         ) {
-            EmergencyWebSocketManager.onSocketMessage(webSocket, googleId, text)
+            BackendWebSocketManager.onSocketMessage(webSocket, googleId, text)
         }
 
         override fun onClosed(
@@ -377,10 +503,10 @@ object EmergencyWebSocketManager {
             code: Int,
             reason: String
         ) {
-            EmergencyWebSocketManager.handleSocketEnded(
+            BackendWebSocketManager.handleSocketEnded(
                 socket = webSocket,
                 googleId = googleId,
-                reason = "Websocket de emergencia cerrado ($code): $reason"
+                reason = "Websocket backend cerrado ($code): $reason"
             )
         }
 
@@ -390,7 +516,7 @@ object EmergencyWebSocketManager {
             response: Response?
         ) {
             val failureReason = buildString {
-                append("Fallo en websocket de emergencia para ")
+                append("Fallo en websocket backend para ")
                 append(googleId)
                 append(": ")
                 append(t.message ?: "sin detalle")
@@ -401,8 +527,8 @@ object EmergencyWebSocketManager {
                 }
             }
 
-            Log.e(EmergencyWebSocketTag, failureReason, t)
-            EmergencyWebSocketManager.handleSocketEnded(webSocket, googleId, failureReason)
+            Log.e(BackendWebSocketTag, failureReason, t)
+            BackendWebSocketManager.handleSocketEnded(webSocket, googleId, failureReason)
         }
     }
 }
