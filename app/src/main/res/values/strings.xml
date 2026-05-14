@@ -185,6 +185,16 @@
     <string name="profile_issue_deleted_success">Issue deleted successfully.</string>
     <string name="profile_issue_updated_success">Issue updated successfully.</string>
     <string name="profile_issue_action_error">The action could not be completed.</string>
+    <string name="profile_socket_settings_title">Manage notifications</string>
+    <string name="profile_socket_settings_subtitle">Turn on or off the notifications you want to receive on this device.</string>
+    <string name="profile_socket_messages_title">Messages</string>
+    <string name="profile_socket_messages_description">Receive notifications when your friends send you messages.</string>
+    <string name="profile_socket_emergency_title">Emergency alerts</string>
+    <string name="profile_socket_emergency_description">Receive a notification when a friend who has you saved as an emergency contact asks for help.</string>
+    <string name="profile_socket_friend_requests_title">Friend activity</string>
+    <string name="profile_socket_friend_requests_description">Receive notifications about friend requests and friendship updates.</string>
+    <string name="profile_socket_location_title">Real-time location</string>
+    <string name="profile_socket_location_description">Receive the real-time location of a contact who has you saved as an emergency contact when they ask for help.</string>
     <string name="retry_action">Retry</string>
     <string name="edit_action">Edit</string>
     <string name="delete_action">Delete</string>

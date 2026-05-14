@@ -161,7 +161,7 @@ fun SafeStepsApp(
         currentDestination = currentDestination,
         onProfileOpened = profileViewModel::onProfileScreenOpened
     )
-    HandleEmergencyWebSocketEffect(currentUser = authUiState.currentUser)
+    HandleBackendWebSocketEffect(currentUser = authUiState.currentUser)
     val onLanguageSelected: (AppLanguage) -> Unit = remember(languageViewModel, authViewModel) {
         { language ->
             languageViewModel.onLanguageSelected(
@@ -255,7 +255,7 @@ private fun HandleProfileRedirectEffect(
 }
 
 @Composable
-private fun HandleEmergencyWebSocketEffect(currentUser: UserInfo?) {
+private fun HandleBackendWebSocketEffect(currentUser: UserInfo?) {
     val appContext = LocalContext.current.applicationContext
     val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
 

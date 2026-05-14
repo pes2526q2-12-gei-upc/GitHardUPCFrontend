@@ -42,9 +42,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +79,9 @@ import com.safesteps.i18n.appPlural
 import com.safesteps.i18n.appString
 import com.safesteps.map.IssueType
 import com.safesteps.map.ReportIssueDialog
+import com.safesteps.notifications.SocketChannelPreference
+import com.safesteps.notifications.SocketChannelPreferences
+import com.safesteps.notifications.SocketChannelSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -291,9 +296,14 @@ fun ProfileScreen(
     modifier: Modifier = Modifier
 ) {
     var isIssuesSectionExpanded by rememberSaveable { mutableStateOf(false) }
+    var isNotificationSettingsExpanded by rememberSaveable { mutableStateOf(false) }
     var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
 
+    val appContext = LocalContext.current.applicationContext
     val issuesState = rememberProfileIssuesState(userGoogleId = user.googleId)
+    val socketChannelSettings by remember(appContext) {
+        SocketChannelPreferences.settings(appContext)
+    }.collectAsState()
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -319,6 +329,10 @@ fun ProfileScreen(
                 gamificationCallbacks = gamificationCallbacks,
                 isIssuesSectionExpanded = isIssuesSectionExpanded,
                 onIssuesSectionExpandedChange = { isIssuesSectionExpanded = !isIssuesSectionExpanded },
+                isNotificationSettingsExpanded = isNotificationSettingsExpanded,
+                onNotificationSettingsExpandedChange = {
+                    isNotificationSettingsExpanded = !isNotificationSettingsExpanded
+                },
                 onCustomizeClick = onCustomizeClick,
                 onLogout = onLogout,
                 onDeleteAccount = onDeleteAccount,
@@ -330,7 +344,15 @@ fun ProfileScreen(
                 issueLoadFailed = issuesState.issueLoadFailed,
                 onRetryIssues = { issuesState.scope.launch { issuesState.loadUserIssues() } },
                 onEditIssue = { issuesState.issueBeingEdited = it },
-                onDeleteIssue = { issue -> issuesState.deleteIssue(issue) }
+                onDeleteIssue = { issue -> issuesState.deleteIssue(issue) },
+                socketChannelSettings = socketChannelSettings,
+                onSocketChannelEnabledChange = { channel, enabled ->
+                    SocketChannelPreferences.setChannelEnabled(
+                        context = appContext,
+                        channel = channel,
+                        enabled = enabled
+                    )
+                }
             )
         }
 
@@ -404,6 +426,8 @@ private fun ProfileContentCard(
     gamificationCallbacks: ProfileGamificationCallbacks,
     isIssuesSectionExpanded: Boolean,
     onIssuesSectionExpandedChange: () -> Unit,
+    isNotificationSettingsExpanded: Boolean,
+    onNotificationSettingsExpandedChange: () -> Unit,
     onCustomizeClick: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit,
@@ -415,7 +439,9 @@ private fun ProfileContentCard(
     issueLoadFailed: Boolean,
     onRetryIssues: () -> Unit,
     onEditIssue: (IssueResponseDTO) -> Unit,
-    onDeleteIssue: (IssueResponseDTO) -> Unit
+    onDeleteIssue: (IssueResponseDTO) -> Unit,
+    socketChannelSettings: SocketChannelSettings,
+    onSocketChannelEnabledChange: (SocketChannelPreference, Boolean) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -467,6 +493,15 @@ private fun ProfileContentCard(
                 onDelete = onDeleteIssue
             )
 
+            Spacer(modifier = Modifier.height(20.dp))
+
+            ProfileSocketSettingsSection(
+                settings = socketChannelSettings,
+                expanded = isNotificationSettingsExpanded,
+                onExpandedChange = onNotificationSettingsExpandedChange,
+                onChannelEnabledChange = onSocketChannelEnabledChange
+            )
+
             Spacer(modifier = Modifier.height(28.dp))
 
             ProfileAccountActions(
@@ -477,6 +512,146 @@ private fun ProfileContentCard(
                 onDismissDeleteBanner = onDismissDeleteBanner
             )
         }
+    }
+}
+
+@Composable
+private fun ProfileSocketSettingsSection(
+    settings: SocketChannelSettings,
+    expanded: Boolean,
+    onExpandedChange: () -> Unit,
+    onChannelEnabledChange: (SocketChannelPreference, Boolean) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .border(1.dp, Color(0xFFE5ECE7), RoundedCornerShape(22.dp)),
+        shape = RoundedCornerShape(22.dp),
+        color = Color(0xFFF9FBFA)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onExpandedChange)
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = appString(R.string.profile_socket_settings_title),
+                        color = Color(0xFF23333A),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = appString(R.string.profile_socket_settings_subtitle),
+                        color = Color(0xFF77837D),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = Color(0xFF5C6A64)
+                )
+            }
+
+            if (expanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SocketChannelSettingRow(
+                    title = appString(R.string.profile_socket_messages_title),
+                    description = appString(R.string.profile_socket_messages_description),
+                    enabled = settings.messagesEnabled,
+                    onEnabledChange = { enabled ->
+                        onChannelEnabledChange(SocketChannelPreference.MESSAGES, enabled)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SocketChannelSettingRow(
+                    title = appString(R.string.profile_socket_emergency_title),
+                    description = appString(R.string.profile_socket_emergency_description),
+                    enabled = settings.emergencyEnabled,
+                    onEnabledChange = { enabled ->
+                        onChannelEnabledChange(SocketChannelPreference.EMERGENCY, enabled)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SocketChannelSettingRow(
+                    title = appString(R.string.profile_socket_friend_requests_title),
+                    description = appString(R.string.profile_socket_friend_requests_description),
+                    enabled = settings.friendRequestsEnabled,
+                    onEnabledChange = { enabled ->
+                        onChannelEnabledChange(SocketChannelPreference.FRIEND_REQUESTS, enabled)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SocketChannelSettingRow(
+                    title = appString(R.string.profile_socket_location_title),
+                    description = appString(R.string.profile_socket_location_description),
+                    enabled = settings.locationEnabled,
+                    onEnabledChange = { enabled ->
+                        onChannelEnabledChange(SocketChannelPreference.LOCATION, enabled)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SocketChannelSettingRow(
+    title: String,
+    description: String,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = Color(0xFF23333A),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = description,
+                color = Color(0xFF77837D),
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Switch(
+            checked = enabled,
+            onCheckedChange = onEnabledChange
+        )
     }
 }
 

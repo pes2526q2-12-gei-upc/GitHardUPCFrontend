@@ -188,6 +188,16 @@
     <string name="profile_issue_deleted_success">Incidència esborrada correctament.</string>
     <string name="profile_issue_updated_success">Incidència actualitzada correctament.</string>
     <string name="profile_issue_action_error">No s\'ha pogut completar l\'accio.</string>
+    <string name="profile_socket_settings_title">Configurar notificacions</string>
+    <string name="profile_socket_settings_subtitle">Activa o desactiva les notificacions que vols rebre en aquest dispositiu.</string>
+    <string name="profile_socket_messages_title">Missatges</string>
+    <string name="profile_socket_messages_description">Rep notificacions quan els teus amics t\'envien missatges.</string>
+    <string name="profile_socket_emergency_title">Alertes d\'emergència</string>
+    <string name="profile_socket_emergency_description">Rep una notificació quan un amic que et té guardat com a contacte d\'emergència demana ajuda.</string>
+    <string name="profile_socket_friend_requests_title">Activitat d\'amistats</string>
+    <string name="profile_socket_friend_requests_description">Rep notificacions de sol·licituds d\'amistat i d\'altres actualitzacions relacionades amb les teves amistats.</string>
+    <string name="profile_socket_location_title">Ubicació en temps real</string>
+    <string name="profile_socket_location_description">Rep la ubicació en temps real d\'un contacte que et té guardat com a contacte d\'emergència quan demana ajuda.</string>
     <string name="retry_action">Reintenta</string>
     <string name="edit_action">Edita</string>
     <string name="delete_action">Esborra</string>

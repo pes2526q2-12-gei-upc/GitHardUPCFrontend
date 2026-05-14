@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -21,24 +22,12 @@ private const val BackendWebSocketEndpoint = "ws://nattech.fib.upc.edu:40385/ws-
 private const val BackendReconnectDelayMillis = 5_000L
 private const val BackendStompNull = '\u0000'
 
-private const val MessageDestination = "/user/queue/messages"
-private const val EmergencyDestination = "/user/queue/emergency"
-private const val FriendRequestDestination = "/user/queue/requests"
-private const val LocationDestination = "/user/queue/location"
-
 private const val MessageTitleKey = "NEW_MESSAGE_TITLE"
 private const val MessageBodyKey = "NEW_MESSAGE_BODY"
 private const val EmergencyTitleKey = "EMERGENCY_TITLE"
 private const val EmergencyBodyKey = "EMERGENCY_BODY"
 private const val FriendRequestTitleKey = "FRIEND_REQ_TITLE"
 private const val FriendRequestBodyKey = "FRIEND_REQ_BODY"
-
-private val BackendSubscriptions = linkedMapOf(
-    MessageDestination to "messages-subscription",
-    EmergencyDestination to "emergency-subscription",
-    FriendRequestDestination to "friend-requests-subscription",
-    LocationDestination to "location-subscription"
-)
 
 object BackendWebSocketManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -53,8 +42,11 @@ object BackendWebSocketManager {
     private var activeGoogleId: String? = null
     private var webSocket: WebSocket? = null
     private var reconnectJob: Job? = null
+    private var settingsObservationJob: Job? = null
     private var stompConnected = false
     private var intentionalDisconnect = false
+    private var desiredChannelSettings = SocketChannelSettings()
+    private var subscribedChannels = mutableSetOf<SocketChannelPreference>()
 
     fun connect(
         context: Context,
@@ -83,6 +75,7 @@ object BackendWebSocketManager {
             socketToClose = clearCurrentSocketLocked()
         }
 
+        observeChannelSettings(context.applicationContext)
         socketToClose?.close(1000, "Switching backend websocket session")
         openSocket(normalizedGoogleId)
     }
@@ -127,7 +120,35 @@ object BackendWebSocketManager {
         webSocket = null
         activeGoogleId = null
         stompConnected = false
+        subscribedChannels.clear()
         return currentSocket
+    }
+
+    private fun observeChannelSettings(context: Context) {
+        synchronized(stateLock) {
+            if (settingsObservationJob != null) {
+                return
+            }
+
+            settingsObservationJob = scope.launch {
+                SocketChannelPreferences.settings(context).collectLatest { settings ->
+                    updateChannelSettings(settings)
+                }
+            }
+        }
+    }
+
+    private fun updateChannelSettings(settings: SocketChannelSettings) {
+        val currentSocket = synchronized(stateLock) {
+            desiredChannelSettings = settings
+            if (!stompConnected) {
+                null
+            } else {
+                webSocket
+            }
+        } ?: return
+
+        applyChannelSubscriptions(currentSocket)
     }
 
     private fun scheduleReconnect(googleId: String) {
@@ -194,14 +215,7 @@ object BackendWebSocketManager {
             webSocket
         } ?: return
 
-        BackendSubscriptions.forEach { (destination, subscriptionId) ->
-            currentSocket.send(
-                buildSubscribeFrame(
-                    destination = destination,
-                    subscriptionId = subscriptionId
-                )
-            )
-        }
+        applyChannelSubscriptions(currentSocket)
         Log.d(BackendWebSocketTag, "Suscripciones websocket activas para $googleId")
     }
 
@@ -209,19 +223,23 @@ object BackendWebSocketManager {
         socket: WebSocket,
         frame: StompFrame
     ) {
+        val destination = frame.headers["destination"]
+        val channel = SocketChannelPreference.fromDestination(destination)
         val isCurrentSocket = synchronized(stateLock) {
-            webSocket == socket && stompConnected
+            webSocket == socket &&
+                stompConnected &&
+                channel != null &&
+                desiredChannelSettings.isEnabled(channel)
         }
         if (!isCurrentSocket) {
             return
         }
 
-        val destination = frame.headers["destination"]
         val context = appContext ?: return
         val payload = BackendPayload.parse(frame.body)
 
-        when (destination) {
-            MessageDestination -> {
+        when (channel) {
+            SocketChannelPreference.MESSAGES -> {
                 showIncomingMessageNotification(
                     context = context,
                     title = payload.resolveTitle(MessageTitleKey),
@@ -229,7 +247,7 @@ object BackendWebSocketManager {
                 )
             }
 
-            EmergencyDestination -> {
+            SocketChannelPreference.EMERGENCY -> {
                 showIncomingEmergencyNotification(
                     context = context,
                     title = payload.resolveTitle(EmergencyTitleKey),
@@ -237,7 +255,7 @@ object BackendWebSocketManager {
                 )
             }
 
-            FriendRequestDestination -> {
+            SocketChannelPreference.FRIEND_REQUESTS -> {
                 showIncomingFriendRequestNotification(
                     context = context,
                     title = payload.resolveTitle(FriendRequestTitleKey),
@@ -245,7 +263,7 @@ object BackendWebSocketManager {
                 )
             }
 
-            LocationDestination -> {
+            SocketChannelPreference.LOCATION -> {
                 val coordinates = payload.extractCoordinates()
                 showIncomingLocationNotification(
                     context = context,
@@ -292,6 +310,38 @@ object BackendWebSocketManager {
         }
     }
 
+    private fun applyChannelSubscriptions(socket: WebSocket) {
+        val operations = synchronized(stateLock) {
+            if (webSocket != socket || !stompConnected) {
+                return
+            }
+
+            val desiredChannels = desiredChannelSettings.enabledChannels()
+            val channelsToSubscribe = desiredChannels - subscribedChannels
+            val channelsToUnsubscribe = subscribedChannels - desiredChannels
+
+            subscribedChannels.removeAll(channelsToUnsubscribe)
+            subscribedChannels.addAll(channelsToSubscribe)
+
+            SubscriptionOperations(
+                channelsToSubscribe = channelsToSubscribe,
+                channelsToUnsubscribe = channelsToUnsubscribe
+            )
+        }
+
+        operations.channelsToUnsubscribe.forEach { channel ->
+            socket.send(buildUnsubscribeFrame(channel.subscriptionId))
+        }
+        operations.channelsToSubscribe.forEach { channel ->
+            socket.send(
+                buildSubscribeFrame(
+                    destination = channel.destination,
+                    subscriptionId = channel.subscriptionId
+                )
+            )
+        }
+    }
+
     private fun buildConnectFrame(googleId: String): String {
         return buildString {
             append("CONNECT\n")
@@ -321,6 +371,15 @@ object BackendWebSocketManager {
     private fun buildDisconnectFrame(): String {
         return buildString {
             append("DISCONNECT\n")
+            append("\n")
+            append(BackendStompNull)
+        }
+    }
+
+    private fun buildUnsubscribeFrame(subscriptionId: String): String {
+        return buildString {
+            append("UNSUBSCRIBE\n")
+            append("id:$subscriptionId\n")
             append("\n")
             append(BackendStompNull)
         }
@@ -383,6 +442,11 @@ object BackendWebSocketManager {
         val command: String,
         val headers: Map<String, String>,
         val body: String
+    )
+
+    private data class SubscriptionOperations(
+        val channelsToSubscribe: Set<SocketChannelPreference>,
+        val channelsToUnsubscribe: Set<SocketChannelPreference>
     )
 
     private data class Coordinates(
