@@ -664,6 +664,7 @@ internal fun BoxScope.MapFloatingActions(
     uiState: MapUiState,
     reportIssueLabel: String,
     emergencyActionLabel: String,
+    isEmergencyActive: Boolean,
     onReportIssueClick: () -> Unit,
     onEmergencyClick: () -> Unit,
     state: FloatingActionsState,
@@ -724,7 +725,8 @@ internal fun BoxScope.MapFloatingActions(
                     compactMode = state.compactMode,
                     backgroundColor = Color(0xFFB71C3B),
                     borderColor = Color(0xFFFFC8D4),
-                    modifier = Modifier.testTag("btn_emergency")
+                    modifier = rememberEmergencyHeartbeatModifier(isEmergencyActive)
+                        .testTag("btn_emergency")
                 )
             }
 

@@ -113,6 +113,9 @@
     <string name="emergency_notification_permission_denied">Enable notifications to receive emergency alerts on this device.</string>
     <string name="emergency_notification_sent">Emergency alert request sent.</string>
     <string name="emergency_notification_failed">The emergency alert could not be sent.</string>
+    <string name="emergency_mode_activated">Emergency mode activated. Your real-time location is now being shared with your emergency contacts.</string>
+    <string name="emergency_mode_deactivated">Emergency mode deactivated. Your real-time location is no longer being shared with your emergency contacts.</string>
+    <string name="emergency_mode_update_failed">Emergency mode could not be updated.</string>
     <string name="calculating_best_route">Calculating the best route&#8230;</string>
     <string name="notification_title_auth">Authentication</string>
     <string name="notification_title_map">Map</string>

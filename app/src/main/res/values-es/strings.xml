@@ -113,6 +113,9 @@
     <string name="emergency_notification_permission_denied">Activa las notificaciones para recibir alertas de emergencia en este dispositivo.</string>
     <string name="emergency_notification_sent">Solicitud de alerta de emergencia enviada.</string>
     <string name="emergency_notification_failed">No se ha podido enviar la alerta de emergencia.</string>
+    <string name="emergency_mode_activated">Modo emergencia activado. Se está compartiendo tu ubicación en tiempo real con tus contactos de emergencia.</string>
+    <string name="emergency_mode_deactivated">Modo emergencia desactivado. Se ha dejado de compartir tu ubicación en tiempo real con tus contactos de emergencia.</string>
+    <string name="emergency_mode_update_failed">No se ha podido actualizar el modo emergencia.</string>
     <string name="calculating_best_route">Calculando la mejor ruta&#8230;</string>
     <string name="notification_title_auth">Autenticaci&#243;n</string>
     <string name="notification_title_map">Mapa</string>

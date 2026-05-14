@@ -113,6 +113,9 @@
     <string name="emergency_notification_permission_denied">Activa les notificacions per rebre alertes d\'emerg&#232;ncia en aquest dispositiu.</string>
     <string name="emergency_notification_sent">Sol&#183;licitud d\'alerta d\'emerg&#232;ncia enviada.</string>
     <string name="emergency_notification_failed">No s\'ha pogut enviar l\'alerta d\'emerg&#232;ncia.</string>
+    <string name="emergency_mode_activated">Mode d\'emerg&#232;ncia activat. S\'est&#224; compartint la teva ubicaci&#243; en temps real amb els teus contactes d\'emerg&#232;ncia.</string>
+    <string name="emergency_mode_deactivated">Mode d\'emerg&#232;ncia desactivat. S\'ha deixat de compartir la teva ubicaci&#243; en temps real amb els teus contactes d\'emerg&#232;ncia.</string>
+    <string name="emergency_mode_update_failed">No s\'ha pogut actualitzar el mode d\'emerg&#232;ncia.</string>
     <string name="calculating_best_route">Calculant la millor ruta&#8230;</string>
     <string name="notification_title_auth">Autenticaci&#243;</string>
     <string name="notification_title_map">Mapa</string>

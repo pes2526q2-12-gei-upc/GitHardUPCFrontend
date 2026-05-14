@@ -43,10 +43,12 @@ import com.safesteps.auth.UserInfo
 import com.safesteps.data.Coord
 import com.safesteps.data.Feature
 import com.safesteps.data.IssueApiType
+import com.safesteps.data.IssueResponseDTO
 import com.safesteps.data.PuntInteres
 import com.safesteps.data.RouteCompletionResponse
+import com.safesteps.data.alternarEstadoEmergenciaUsuario
 import com.safesteps.data.cargarContactosEmergenciaUsuario
-import com.safesteps.data.enviarNotificacionEmergenciaUsuario
+import com.safesteps.data.obtenerEstadoEmergenciaUsuario
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
@@ -93,8 +95,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import com.safesteps.data.IssueResponseDTO
 import kotlinx.coroutines.launch
+
+private const val EmergencyStatusNotificationDurationMillis = 6_000L
 
 private data class MapScreenStrings(
     val mapNotificationTitle: String,
@@ -112,10 +115,9 @@ private data class MapScreenStrings(
     val calculatingBestRouteLabel: String,
     val reportIssueLabel: String,
     val emergencyActionLabel: String,
-    val emergencyNotificationTitle: String,
-    val emergencyNotificationSentMessage: String,
-    val emergencyNotificationFailedMessage: String,
-    val emergencyNotificationPermissionNoticeMessage: String,
+    val emergencyModeActivatedMessage: String,
+    val emergencyModeDeactivatedMessage: String,
+    val emergencyModeUpdateFailedMessage: String,
     val reportIssueOutsideBarcelonaMessage: String,
     val issueLoadingAddressLabel: String,
     val issueLocationFallbackLabel: String,
@@ -324,6 +326,7 @@ private fun MapScreenContent(
     mapView: MapView,
     currentUser: UserInfo?,
     showEmergencyAction: Boolean,
+    isEmergencyActive: Boolean,
     strings: MapScreenStrings,
     actions: MapScreenActions,
     navigationHeadingDegrees: Float?,
@@ -459,6 +462,7 @@ private fun MapScreenContent(
                 ),
                 reportIssueLabel = strings.reportIssueLabel,
                 emergencyActionLabel = strings.emergencyActionLabel,
+                isEmergencyActive = isEmergencyActive,
                 onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
                 onEmergencyClick = onEmergencyClick
             )
@@ -479,6 +483,7 @@ private fun MapScreenContent(
                 myLocationLabel = strings.myLocationLabel,
                 reportIssueLabel = strings.reportIssueLabel,
                 emergencyActionLabel = strings.emergencyActionLabel,
+                isEmergencyActive = isEmergencyActive,
                 showEmergencyAction = showEmergencyAction,
                 onEmergencyClick = onEmergencyClick
             )
@@ -522,6 +527,7 @@ fun MapLibreScreen(
     var showLevelUpOverlay by remember { mutableStateOf(false) }
     var levelUpLevel by remember { mutableStateOf(1L) }
     var hasEmergencyContacts by remember(currentUser?.googleId) { mutableStateOf(false) }
+    var isEmergencyActive by remember(currentUser?.googleId) { mutableStateOf(false) }
 
     LaunchedEffect(routeCompletionResult) {
         if (routeCompletionResult != null) {
@@ -534,9 +540,10 @@ fun MapLibreScreen(
         }
     }
     val strings = mapScreenStrings()
-    val onEmergencyClick = rememberEmergencyNotificationAction(
+    val onEmergencyClick = rememberEmergencyStatusToggleAction(
         currentUser = currentUser,
-        strings = strings
+        strings = strings,
+        onEmergencyStateChanged = { isEmergencyActive = it }
     )
     var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
 
@@ -580,13 +587,19 @@ fun MapLibreScreen(
 
     LaunchedEffect(currentUser?.googleId) {
         val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
-        hasEmergencyContacts = if (googleId == null) {
-            false
-        } else {
-            runCatching {
-                cargarContactosEmergenciaUsuario(googleId).isNotEmpty()
-            }.getOrDefault(false)
+        if (googleId == null) {
+            hasEmergencyContacts = false
+            isEmergencyActive = false
+            return@LaunchedEffect
         }
+
+        hasEmergencyContacts = runCatching {
+            cargarContactosEmergenciaUsuario(googleId).isNotEmpty()
+        }.getOrDefault(false)
+
+        isEmergencyActive = runCatching {
+            obtenerEstadoEmergenciaUsuario(googleId)
+        }.getOrDefault(false)
     }
 
     LaunchedEffect(issuesRefreshTrigger) {
@@ -611,6 +624,7 @@ fun MapLibreScreen(
         mapView = mapView,
         currentUser = currentUser,
         showEmergencyAction = hasEmergencyContacts,
+        isEmergencyActive = isEmergencyActive,
         strings = strings,
         actions = actions,
         navigationHeadingDegrees = navigationHeadingDegrees,
@@ -644,6 +658,7 @@ private fun BoxScope.RouteModeFloatingActions(
     myLocationLabel: String,
     reportIssueLabel: String,
     emergencyActionLabel: String,
+    isEmergencyActive: Boolean,
     showEmergencyAction: Boolean
 ) {
     Row(
@@ -692,6 +707,7 @@ private fun BoxScope.RouteModeFloatingActions(
                 tint = Color.White,
                 backgroundColor = Color(0xFFB71C3B),
                 borderColor = Color(0xFFFFC8D4),
+                modifier = rememberEmergencyHeartbeatModifier(isEmergencyActive),
                 testTagId = "btn_emergency"
             )
         }
@@ -706,11 +722,12 @@ private fun CompactCircularMapAction(
     tint: Color = Color(0xFF33413B),
     backgroundColor: Color = Color.White,
     borderColor: Color = Color.Transparent,
+    modifier: Modifier = Modifier,
     testTagId: String? = null
 ) {
     Surface(
         shape = CircleShape,
-        modifier = Modifier
+        modifier = modifier
             .size(44.dp)
             .border(1.dp, borderColor, CircleShape),
         color = backgroundColor,
@@ -754,10 +771,9 @@ private fun mapScreenStrings(): MapScreenStrings {
         calculatingBestRouteLabel = appString(R.string.calculating_best_route),
         reportIssueLabel = appString(R.string.report_issue),
         emergencyActionLabel = appString(R.string.map_emergency_action),
-        emergencyNotificationTitle = appString(R.string.emergency_notification_received_title),
-        emergencyNotificationSentMessage = appString(R.string.emergency_notification_sent),
-        emergencyNotificationFailedMessage = appString(R.string.emergency_notification_failed),
-        emergencyNotificationPermissionNoticeMessage = appString(R.string.emergency_notification_permission_denied),
+        emergencyModeActivatedMessage = appString(R.string.emergency_mode_activated),
+        emergencyModeDeactivatedMessage = appString(R.string.emergency_mode_deactivated),
+        emergencyModeUpdateFailedMessage = appString(R.string.emergency_mode_update_failed),
         reportIssueOutsideBarcelonaMessage = appString(R.string.issue_report_outside_barcelona),
         issueLoadingAddressLabel = appString(R.string.issue_loading_address),
         issueLocationFallbackLabel = appString(R.string.issue_location_fallback),
@@ -766,39 +782,39 @@ private fun mapScreenStrings(): MapScreenStrings {
 }
 
 @Composable
-private fun rememberEmergencyNotificationAction(
+private fun rememberEmergencyStatusToggleAction(
     currentUser: UserInfo?,
-    strings: MapScreenStrings
+    strings: MapScreenStrings,
+    onEmergencyStateChanged: (Boolean) -> Unit
 ): () -> Unit {
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val latestUser = rememberUpdatedState(currentUser)
     val latestStrings = rememberUpdatedState(strings)
+    val latestOnEmergencyStateChanged = rememberUpdatedState(onEmergencyStateChanged)
 
-    return remember(context, coroutineScope) {
+    return remember(coroutineScope) {
         {
             coroutineScope.launch {
                 val resolvedUser = latestUser.value ?: return@launch
                 val googleId = resolvedUser.googleId.takeIf { it.isNotBlank() } ?: return@launch
-                val senderName = resolvedUser.username.takeIf { it.isNotBlank() }
-                    ?: context.getString(R.string.app_name)
-                val body = context.getString(R.string.emergency_notification_remote_body, senderName)
 
                 runCatching {
-                    enviarNotificacionEmergenciaUsuario(
-                        googleId = googleId,
-                        title = latestStrings.value.emergencyNotificationTitle,
-                        body = body
-                    )
-                }.onSuccess {
+                    alternarEstadoEmergenciaUsuario(googleId)
+                }.onSuccess { isActive ->
+                    latestOnEmergencyStateChanged.value(isActive)
                     ScreenNotificationManager.showNotification(
                         notificationName = latestStrings.value.emergencyActionLabel,
-                        text = latestStrings.value.emergencyNotificationSentMessage
+                        durationMillis = EmergencyStatusNotificationDurationMillis,
+                        text = if (isActive) {
+                            latestStrings.value.emergencyModeActivatedMessage
+                        } else {
+                            latestStrings.value.emergencyModeDeactivatedMessage
+                        }
                     )
                 }.onFailure {
                     ScreenNotificationManager.showNotification(
                         notificationName = latestStrings.value.emergencyActionLabel,
-                        text = latestStrings.value.emergencyNotificationFailedMessage
+                        text = latestStrings.value.emergencyModeUpdateFailedMessage
                     )
                 }
             }
