@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -733,7 +734,16 @@ private fun overlayPlannerSheetState(uiState: MapUiState): RoutePlannerSheetStat
 }
 
 @Composable
-private fun BoxScope.NavigationTopBannerOverlay(uiState: MapUiState) {
+private fun BoxScope.NavigationTopBannerOverlay(
+    uiState: MapUiState,
+    onHeightChanged: (Float) -> Unit
+) {
+    LaunchedEffect(uiState.usesLiveNavigation, uiState.routeCompleted) {
+        if (!uiState.usesLiveNavigation || uiState.routeCompleted) {
+            onHeightChanged(0f)
+        }
+    }
+
     AnimatedVisibility(
         visible = uiState.usesLiveNavigation && !uiState.routeCompleted,
         enter = slideInVertically(initialOffsetY = { -it / 2 }),
@@ -742,6 +752,9 @@ private fun BoxScope.NavigationTopBannerOverlay(uiState: MapUiState) {
             .align(Alignment.TopCenter)
             .statusBarsPadding()
             .padding(horizontal = 12.dp, vertical = 12.dp)
+            .onGloballyPositioned {
+                onHeightChanged(it.positionInParent().y + it.size.height.toFloat())
+            }
     ) {
         NavigationTopBanner(
             destinationText = uiState.textoDestino,
@@ -1251,7 +1264,8 @@ internal fun BoxScope.RouteExperienceOverlay(
     onPrioritySelected: (RoutePriority) -> Unit,
     onStartRoute: () -> Unit,
     onClose: () -> Unit,
-    onBottomPaddingChange: (Dp) -> Unit
+    onBottomPaddingChange: (Dp) -> Unit,
+    onTopBannerHeightChange: (Float) -> Unit
 ) {
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
@@ -1294,7 +1308,10 @@ internal fun BoxScope.RouteExperienceOverlay(
         }
     }
 
-    NavigationTopBannerOverlay(uiState = uiState)
+    NavigationTopBannerOverlay(
+        uiState = uiState,
+        onHeightChanged = onTopBannerHeightChange
+    )
     FixedRouteSummaryBottomCardOverlay(
         uiState = uiState,
         fixedRouteSummaryCardHeightPxState = fixedRouteSummaryCardHeightPxState,

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -74,7 +75,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Place
@@ -337,6 +337,7 @@ private fun MapScreenContent(
 ) {
     var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
     var topOverlayHeightPx by remember { mutableFloatStateOf(0f) }
+    var routeTopBannerHeightPx by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
 
     LaunchedEffect(uiState.modoRuta) {
@@ -349,12 +350,22 @@ private fun MapScreenContent(
         val navigationBarsBottomPadding = WindowInsets.navigationBars
             .asPaddingValues()
             .calculateBottomPadding()
+        val statusBarsTopPadding = WindowInsets.statusBars
+            .asPaddingValues()
+            .calculateTopPadding()
         val effectiveFloatingActionsBottomPadding = maxOf(
             floatingActionsBottomPadding,
             navigationBarsBottomPadding + 16.dp
         )
         val availableHeightPx = with(density) {
             maxHeight.toPx() - effectiveFloatingActionsBottomPadding.toPx() - topOverlayHeightPx
+        }
+        val mapStyleTopOffset = when {
+            !uiState.modoRuta && topOverlayHeightPx > 0f -> with(density) { topOverlayHeightPx.toDp() } + 12.dp
+            uiState.usesLiveNavigation && !uiState.routeCompleted && routeTopBannerHeightPx > 0f -> {
+                with(density) { routeTopBannerHeightPx.toDp() } + 12.dp
+            }
+            else -> statusBarsTopPadding + 16.dp
         }
         val floatingActionsLayout = resolveFloatingActionsLayout(
             freeHeightPx = availableHeightPx,
@@ -430,6 +441,9 @@ private fun MapScreenContent(
             onClose = actions.resetToMainMenu,
             onBottomPaddingChange = { padding ->
                 floatingActionsBottomPadding = padding
+            },
+            onTopBannerHeightChange = { heightPx ->
+                routeTopBannerHeightPx = heightPx
             }
         )
 
@@ -451,13 +465,10 @@ private fun MapScreenContent(
                 labels = FloatingActionLabels(
                     hideExtraInfoLabel = strings.hideExtraInfoLabel,
                     showExtraInfoLabel = strings.showExtraInfoLabel,
-                    standardMapStyleLabel = strings.standardMapStyleLabel,
-                    satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
                     myLocationLabel = strings.myLocationLabel
                 ),
                 callbacks = FloatingActionCallbacks(
                     onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
-                    onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
                     onMyLocationClick = actions.onCenterCurrentLocation
                 ),
                 reportIssueLabel = strings.reportIssueLabel,
@@ -468,18 +479,24 @@ private fun MapScreenContent(
             )
         }
 
+        MapStyleTopRightOverlay(
+            visible = floatingActionsLayout.showMapStyleAction,
+            isSatelliteStyle = uiState.estiloSatelite,
+            topOffset = mapStyleTopOffset,
+            standardMapStyleLabel = strings.standardMapStyleLabel,
+            satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
+            onClick = { viewModel.toggleEstiloSatelite() }
+        )
+
         if (isPlanningRoute || isActiveRoute) {
             RouteModeFloatingActions(
                 uiState = uiState,
                 bottomPadding = effectiveFloatingActionsBottomPadding,
                 onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
-                onToggleMapStyle = { viewModel.toggleEstiloSatelite() },
                 onMyLocationClick = actions.onCenterCurrentLocation,
                 onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
                 hideExtraInfoLabel = strings.hideExtraInfoLabel,
                 showExtraInfoLabel = strings.showExtraInfoLabel,
-                standardMapStyleLabel = strings.standardMapStyleLabel,
-                satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
                 myLocationLabel = strings.myLocationLabel,
                 reportIssueLabel = strings.reportIssueLabel,
                 emergencyActionLabel = strings.emergencyActionLabel,
@@ -647,14 +664,11 @@ private fun BoxScope.RouteModeFloatingActions(
     uiState: MapUiState,
     bottomPadding: Dp,
     onTogglePuntsInteres: () -> Unit,
-    onToggleMapStyle: () -> Unit,
     onMyLocationClick: () -> Unit,
     onReportIssueClick: () -> Unit,
     onEmergencyClick: () -> Unit,
     hideExtraInfoLabel: String,
     showExtraInfoLabel: String,
-    standardMapStyleLabel: String,
-    satelliteMapStyleLabel: String,
     myLocationLabel: String,
     reportIssueLabel: String,
     emergencyActionLabel: String,
@@ -677,13 +691,6 @@ private fun BoxScope.RouteModeFloatingActions(
                 testTagId = "btn_places"
             )
         }
-        CompactCircularMapAction(
-            onClick = onToggleMapStyle,
-            contentDescription = if (uiState.estiloSatelite) standardMapStyleLabel else satelliteMapStyleLabel,
-            icon = Icons.Default.Layers,
-            tint = if (uiState.estiloSatelite) Color(0xFF2A5F8A) else Color(0xFF33413B),
-            testTagId = "btn_satellit"
-        )
         CompactCircularMapAction(
             onClick = onMyLocationClick,
             contentDescription = myLocationLabel,
@@ -1129,7 +1136,7 @@ private fun floatingActionsLayoutCandidates(
         FloatingActionsLayout(
             compactMode = true,
             showPoiAction = false,
-            showMapStyleAction = false,
+            showMapStyleAction = true,
             showMyLocationAction = true,
             showReportIssueAction = true,
             showEmergencyAction = hasEmergencyAction
@@ -1137,7 +1144,7 @@ private fun floatingActionsLayoutCandidates(
         FloatingActionsLayout(
             compactMode = true,
             showPoiAction = false,
-            showMapStyleAction = false,
+            showMapStyleAction = true,
             showMyLocationAction = true,
             showReportIssueAction = false,
             showEmergencyAction = hasEmergencyAction
@@ -1145,7 +1152,7 @@ private fun floatingActionsLayoutCandidates(
         FloatingActionsLayout(
             compactMode = true,
             showPoiAction = false,
-            showMapStyleAction = false,
+            showMapStyleAction = true,
             showMyLocationAction = false,
             showReportIssueAction = false,
             showEmergencyAction = hasEmergencyAction
@@ -1153,7 +1160,7 @@ private fun floatingActionsLayoutCandidates(
         FloatingActionsLayout(
             compactMode = true,
             showPoiAction = false,
-            showMapStyleAction = false,
+            showMapStyleAction = true,
             showMyLocationAction = false,
             showReportIssueAction = false,
             showEmergencyAction = false
@@ -1164,7 +1171,6 @@ private fun floatingActionsLayoutCandidates(
 private fun estimatedFloatingActionsHeight(layout: FloatingActionsLayout): Dp {
     val itemHeights = listOfNotNull(
         floatingActionHeightOrNull(layout.showPoiAction, layout.compactMode, compactHeight = 34.dp, expandedHeight = 40.dp),
-        floatingActionHeightOrNull(layout.showMapStyleAction, layout.compactMode, compactHeight = 34.dp, expandedHeight = 40.dp),
         floatingActionHeightOrNull(layout.showReportIssueAction, layout.compactMode, compactHeight = 46.dp, expandedHeight = 54.dp),
         floatingActionHeightOrNull(layout.showEmergencyAction, layout.compactMode, compactHeight = 46.dp, expandedHeight = 54.dp),
         floatingActionHeightOrNull(layout.showMyLocationAction, layout.compactMode, compactHeight = 46.dp, expandedHeight = 54.dp)
