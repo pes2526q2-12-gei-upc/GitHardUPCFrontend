@@ -13,7 +13,7 @@ import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 
-private const val FRIENDSHIP_BASE_URL = "http://nattech.fib.upc.edu:40383/"
+private const val FRIENDSHIP_BASE_URL = "http://nattech.fib.upc.edu:40381/"
 
 private data class FriendshipRequest(
     val senderGoogleId: String,
