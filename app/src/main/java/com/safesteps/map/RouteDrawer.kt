@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
@@ -136,7 +137,7 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
         "BANC" -> "\uD83E\uDE91" to "#8D6E63".toColorInt()
         "CAMERA" -> "\uD83D\uDCF9" to "#7B1FA2".toColorInt()
         "ESCALA_MECANICA" -> "" to "#5C6F7B".toColorInt()
-        "REFUGI_CLIMATIC" -> "\u26F1\uFE0F" to "#1FA7A0".toColorInt()
+        "REFUGI_CLIMATIC" -> "" to "#F28C28".toColorInt()
         else -> "\uD83D\uDCCD" to "#C86A37".toColorInt()
     }
 
@@ -166,6 +167,7 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
 
     when (normalizedType) {
         "ESCALA_MECANICA" -> drawEscalatorSymbol(canvas, size)
+        "REFUGI_CLIMATIC" -> drawThermometerSymbol(canvas, size)
         else -> {
             val y = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
             canvas.drawText(emoji, size / 2f, y, textPaint)
@@ -197,6 +199,46 @@ private fun drawEscalatorSymbol(canvas: Canvas, size: Int) {
     canvas.drawLine(size * 0.32f, size * 0.32f, size * 0.66f, size * 0.32f, strokePaint)
     canvas.drawLine(size * 0.58f, size * 0.24f, size * 0.66f, size * 0.32f, strokePaint)
     canvas.drawLine(size * 0.58f, size * 0.40f, size * 0.66f, size * 0.32f, strokePaint)
+}
+
+private fun drawThermometerSymbol(canvas: Canvas, size: Int) {
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.FILL
+    }
+
+    val tubeBounds = RectF(
+        size * 0.42f,
+        size * 0.24f,
+        size * 0.52f,
+        size * 0.68f
+    )
+    canvas.drawRoundRect(tubeBounds, size * 0.06f, size * 0.06f, strokePaint)
+    canvas.drawCircle(size * 0.47f, size * 0.73f, size * 0.11f, strokePaint)
+    canvas.drawLine(size * 0.47f, size * 0.54f, size * 0.47f, size * 0.73f, strokePaint)
+    canvas.drawCircle(size * 0.47f, size * 0.73f, size * 0.05f, fillPaint)
+
+    val tickStartX = size * 0.58f
+    val tickBaseY = size * 0.30f
+    val tickGap = size * 0.08f
+    repeat(5) { index ->
+        val y = tickBaseY + index * tickGap
+        val tickLength = if (index % 2 == 0) size * 0.13f else size * 0.09f
+        canvas.drawLine(
+            tickStartX,
+            y,
+            tickStartX + tickLength,
+            y,
+            strokePaint
+        )
+    }
 }
 
 fun drawRouteOnMap(

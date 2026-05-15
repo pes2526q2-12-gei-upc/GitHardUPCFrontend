@@ -9,6 +9,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.horizontalScroll
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.Accessible
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.Escalator
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
@@ -59,8 +61,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -100,9 +104,14 @@ private data class RoutePrioritySpec(
 private data class PoiSummaryCardItem(
     val icon: ImageVector? = null,
     val emoji: String? = null,
+    val customIcon: PoiSummaryCustomIcon? = null,
     val text: String,
     val accentColor: Color
 )
+
+private enum class PoiSummaryCustomIcon {
+    STREET_BENCH
+}
 
 @Composable
 private fun RoutePriorityCompactOption(
@@ -367,7 +376,7 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
         if (bancs > 0) {
             add(
                 PoiSummaryCardItem(
-                    emoji = "\uD83E\uDE91",
+                    customIcon = PoiSummaryCustomIcon.STREET_BENCH,
                     text = appPlural(R.plurals.poi_benches, bancs, bancs),
                     accentColor = Color(0xFF5F6B67)
                 )
@@ -403,7 +412,7 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
         if (refugisClimatics > 0) {
             add(
                 PoiSummaryCardItem(
-                    emoji = "\u26F1\uFE0F",
+                    icon = Icons.Default.DeviceThermostat,
                     text = appPlural(R.plurals.poi_climate_shelters, refugisClimatics, refugisClimatics),
                     accentColor = Color(0xFF5F6B67)
                 )
@@ -428,8 +437,8 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
             shadowElevation = 0.dp
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 summaryItems.forEachIndexed { index, item ->
@@ -453,34 +462,100 @@ private fun PoiSummaryInlineItem(
     item: PoiSummaryCardItem
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(18.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (item.icon != null) {
+            when {
+                item.customIcon == PoiSummaryCustomIcon.STREET_BENCH -> {
+                    PoiSummaryStreetBenchIcon(
+                        color = item.accentColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                item.icon != null -> {
                 Icon(
                     imageVector = item.icon,
                     contentDescription = null,
                     tint = item.accentColor,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(16.dp)
                 )
-            } else {
-                Text(
-                    text = item.emoji.orEmpty(),
-                    style = MaterialTheme.typography.labelSmall
-                )
+                }
+                else -> {
+                    Text(
+                        text = item.emoji.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
         }
         Text(
             text = item.text,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = Color(0xFF4E5A55),
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun PoiSummaryStreetBenchIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val stroke = size.minDimension * 0.12f
+        val seatY = size.height * 0.62f
+        val backY = size.height * 0.38f
+        val leftX = size.width * 0.18f
+        val rightX = size.width * 0.82f
+
+        drawLine(
+            color = color,
+            start = Offset(leftX, backY),
+            end = Offset(rightX, backY),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(leftX, seatY),
+            end = Offset(rightX, seatY),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.24f, backY),
+            end = Offset(size.width * 0.24f, seatY),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.76f, backY),
+            end = Offset(size.width * 0.76f, seatY),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.30f, seatY),
+            end = Offset(size.width * 0.24f, size.height * 0.90f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.70f, seatY),
+            end = Offset(size.width * 0.76f, size.height * 0.90f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
         )
     }
 }
