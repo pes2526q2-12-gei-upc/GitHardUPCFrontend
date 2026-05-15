@@ -11,7 +11,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.Accessible
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Escalator
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
@@ -92,6 +95,13 @@ private data class RoutePrioritySpec(
     val icon: ImageVector,
     val activeColor: Color,
     val footer: String? = null
+)
+
+private data class PoiSummaryCardItem(
+    val icon: ImageVector? = null,
+    val emoji: String? = null,
+    val text: String,
+    val accentColor: Color
 )
 
 @Composable
@@ -344,76 +354,135 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
     val cameras = puntsInteres.count { it.tipus.uppercase() == "CAMERA" }
     val escalesMecaniques = puntsInteres.count { it.tipus.uppercase() == "ESCALA_MECANICA" }
     val refugisClimatics = puntsInteres.count { it.tipus.uppercase() == "REFUGI_CLIMATIC" }
-    val hasFirstRow = fonts > 0 || bancs > 0 || comisaries > 0
-    val hasSecondRow = cameras > 0 || escalesMecaniques > 0 || refugisClimatics > 0
+    val summaryItems = buildList {
+        if (fonts > 0) {
+            add(
+                PoiSummaryCardItem(
+                    emoji = "\uD83D\uDCA7",
+                    text = appPlural(R.plurals.poi_fountains, fonts, fonts),
+                    accentColor = Color(0xFF5F6B67)
+                )
+            )
+        }
+        if (bancs > 0) {
+            add(
+                PoiSummaryCardItem(
+                    emoji = "\uD83E\uDE91",
+                    text = appPlural(R.plurals.poi_benches, bancs, bancs),
+                    accentColor = Color(0xFF5F6B67)
+                )
+            )
+        }
+        if (comisaries > 0) {
+            add(
+                PoiSummaryCardItem(
+                    emoji = "\uD83D\uDC6E",
+                    text = appPlural(R.plurals.poi_police_stations, comisaries, comisaries),
+                    accentColor = Color(0xFF5F6B67)
+                )
+            )
+        }
+        if (cameras > 0) {
+            add(
+                PoiSummaryCardItem(
+                    emoji = "\uD83D\uDCF9",
+                    text = appPlural(R.plurals.poi_security_cameras, cameras, cameras),
+                    accentColor = Color(0xFF5F6B67)
+                )
+            )
+        }
+        if (escalesMecaniques > 0) {
+            add(
+                PoiSummaryCardItem(
+                    icon = Icons.Default.Escalator,
+                    text = appPlural(R.plurals.poi_escalators, escalesMecaniques, escalesMecaniques),
+                    accentColor = Color(0xFF5F6B67)
+                )
+            )
+        }
+        if (refugisClimatics > 0) {
+            add(
+                PoiSummaryCardItem(
+                    emoji = "\u26F1\uFE0F",
+                    text = appPlural(R.plurals.poi_climate_shelters, refugisClimatics, refugisClimatics),
+                    accentColor = Color(0xFF5F6B67)
+                )
+            )
+        }
+    }
+    val scrollState = rememberScrollState()
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
-            .padding(12.dp)
             .semantics(mergeDescendants = true) { testTag = "btn_places" }
-            .testTag("btn_places"),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .testTag("btn_places")
     ) {
-        if (hasFirstRow) {
+        Surface(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .horizontalScroll(scrollState),
+            shape = RoundedCornerShape(999.dp),
+            color = Color(0xFFF4F5F4),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (fonts > 0) {
-                    Text(
-                        text = "\uD83D\uDCA7 ${appPlural(R.plurals.poi_fountains, fonts, fonts)}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFF3D4A45)
-                    )
-                }
-                if (bancs > 0) {
-                    Text(
-                        text = "\uD83E\uDE91 ${appPlural(R.plurals.poi_benches, bancs, bancs)}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFF3D4A45)
-                    )
-                }
-                if (comisaries > 0) {
-                    Text(
-                        text = "\uD83D\uDC6E ${appPlural(R.plurals.poi_police_stations, comisaries, comisaries)}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFF3D4A45)
-                    )
-                }
-            }
-        }
-        if (hasSecondRow) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (cameras > 0) {
-                    Text(
-                        text = "\uD83D\uDCF9 ${appPlural(R.plurals.poi_security_cameras, cameras, cameras)}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFF3D4A45)
-                    )
-                }
-                if (escalesMecaniques > 0) {
-                    Text(
-                        text = "\u21C5 ${appPlural(R.plurals.poi_escalators, escalesMecaniques, escalesMecaniques)}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFF3D4A45)
-                    )
-                }
-                if (refugisClimatics > 0) {
-                    Text(
-                        text = "\uD83C\uDF21\uFE0F ${appPlural(R.plurals.poi_climate_shelters, refugisClimatics, refugisClimatics)}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color(0xFF3D4A45)
-                    )
+                summaryItems.forEachIndexed { index, item ->
+                    PoiSummaryInlineItem(item = item)
+                    if (index < summaryItems.lastIndex) {
+                        Text(
+                            text = "\u2022",
+                            color = Color(0xFFB3BBB6),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
                 }
             }
         }
     }
-    Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(12.dp))
+}
+
+@Composable
+private fun PoiSummaryInlineItem(
+    item: PoiSummaryCardItem
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (item.icon != null) {
+                Icon(
+                    imageVector = item.icon,
+                    contentDescription = null,
+                    tint = item.accentColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            } else {
+                Text(
+                    text = item.emoji.orEmpty(),
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+        Text(
+            text = item.text,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF4E5A55),
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
 }
 
 @Composable

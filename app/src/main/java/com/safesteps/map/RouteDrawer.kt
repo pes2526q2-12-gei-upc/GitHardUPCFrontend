@@ -6,6 +6,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Typeface
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
@@ -134,8 +135,8 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
         "COMISSARIA" -> "\uD83D\uDC6E" to "#355C7D".toColorInt()
         "BANC" -> "\uD83E\uDE91" to "#8D6E63".toColorInt()
         "CAMERA" -> "\uD83D\uDCF9" to "#7B1FA2".toColorInt()
-        "ESCALA_MECANICA" -> "\u21C5" to "#2E7D32".toColorInt()
-        "REFUGI_CLIMATIC" -> "\uD83C\uDF21\uFE0F" to "#FF8F00".toColorInt()
+        "ESCALA_MECANICA" -> "" to "#5C6F7B".toColorInt()
+        "REFUGI_CLIMATIC" -> "\u26F1\uFE0F" to "#1FA7A0".toColorInt()
         else -> "\uD83D\uDCCD" to "#C86A37".toColorInt()
     }
 
@@ -163,10 +164,39 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     canvas.drawCircle(size / 2f, size / 2f + 4f, size / 2.7f, shadowPaint)
     canvas.drawCircle(size / 2f, size / 2f, size / 2.8f, circlePaint)
 
-    val y = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
-    canvas.drawText(emoji, size / 2f, y, textPaint)
+    when (normalizedType) {
+        "ESCALA_MECANICA" -> drawEscalatorSymbol(canvas, size)
+        else -> {
+            val y = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
+            canvas.drawText(emoji, size / 2f, y, textPaint)
+        }
+    }
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
+}
+
+private fun drawEscalatorSymbol(canvas: Canvas, size: Int) {
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 5.5f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+
+    val stepsPath = Path().apply {
+        moveTo(size * 0.28f, size * 0.64f)
+        lineTo(size * 0.38f, size * 0.64f)
+        lineTo(size * 0.38f, size * 0.54f)
+        lineTo(size * 0.50f, size * 0.54f)
+        lineTo(size * 0.50f, size * 0.44f)
+        lineTo(size * 0.62f, size * 0.44f)
+    }
+    canvas.drawPath(stepsPath, strokePaint)
+
+    canvas.drawLine(size * 0.32f, size * 0.32f, size * 0.66f, size * 0.32f, strokePaint)
+    canvas.drawLine(size * 0.58f, size * 0.24f, size * 0.66f, size * 0.32f, strokePaint)
+    canvas.drawLine(size * 0.58f, size * 0.40f, size * 0.66f, size * 0.32f, strokePaint)
 }
 
 fun drawRouteOnMap(

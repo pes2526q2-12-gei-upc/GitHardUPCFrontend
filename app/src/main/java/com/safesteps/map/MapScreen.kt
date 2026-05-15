@@ -1794,7 +1794,6 @@ private fun isVisiblePoi(punt: PuntInteres): Boolean {
     val tipus = punt.tipus.trim().uppercase()
     return tipus == "FONT" ||
         tipus == "COMISSARIA" ||
-        tipus == "BANC" ||
         tipus == "CAMERA" ||
         tipus == "ESCALA_MECANICA" ||
         tipus == "REFUGI_CLIMATIC"
