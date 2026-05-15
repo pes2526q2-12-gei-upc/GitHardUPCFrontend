@@ -378,7 +378,7 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
                 PoiSummaryCardItem(
                     customIcon = PoiSummaryCustomIcon.STREET_BENCH,
                     text = appPlural(R.plurals.poi_benches, bancs, bancs),
-                    accentColor = Color(0xFF5F6B67)
+                    accentColor = Color(0xFF8D6E63)
                 )
             )
         }
@@ -405,7 +405,7 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
                 PoiSummaryCardItem(
                     icon = Icons.Default.Escalator,
                     text = appPlural(R.plurals.poi_escalators, escalesMecaniques, escalesMecaniques),
-                    accentColor = Color(0xFF5F6B67)
+                    accentColor = Color(0xFF2E8B57)
                 )
             )
         }
@@ -414,7 +414,7 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
                 PoiSummaryCardItem(
                     icon = Icons.Default.DeviceThermostat,
                     text = appPlural(R.plurals.poi_climate_shelters, refugisClimatics, refugisClimatics),
-                    accentColor = Color(0xFF5F6B67)
+                    accentColor = Color(0xFFE67E22)
                 )
             )
         }
