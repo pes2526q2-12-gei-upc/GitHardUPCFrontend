@@ -1,6 +1,5 @@
 ﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
-    <string name="server_client_id" translatable="false">48435478487-tupu01hq8mjcjgvrm1ckh32ak4heff8q.apps.googleusercontent.com</string>
     <string name="change_language">Change language</string>
     <string name="log_in">Log in</string>
     <string name="log_out">Log out</string>
@@ -94,6 +93,29 @@
     <string name="change_map_style">Change map style</string>
     <string name="map_style_standard">Standard</string>
     <string name="map_style_satellite">Satellite</string>
+    <string name="map_emergency_action">Emergency</string>
+    <string name="emergency_notification_channel_name">Emergency alerts</string>
+    <string name="emergency_notification_channel_description">Notifications related to emergency contact alerts.</string>
+    <string name="notification_channel_activity_name">Activity updates</string>
+    <string name="notification_channel_activity_description">Notifications related to messages, friend requests and location updates.</string>
+    <string name="emergency_notification_triggered_title">Emergency alert activated</string>
+    <string name="emergency_notification_triggered_body">%1$s activated the emergency button.</string>
+    <string name="emergency_notification_received_title">Emergency alert</string>
+    <string name="emergency_notification_received_body">One of your emergency contacts has requested help.</string>
+    <string name="message_notification_received_title">New message</string>
+    <string name="message_notification_received_body">You have received a new message in SafeSteps.</string>
+    <string name="friend_request_notification_received_title">Friend request</string>
+    <string name="friend_request_notification_received_body">Someone sent you a friend request.</string>
+    <string name="location_notification_received_title">Location update</string>
+    <string name="location_notification_received_body">A contact shared a location update with you.</string>
+    <string name="location_notification_received_body_with_coords">Location update: %1$.5f, %2$.5f</string>
+    <string name="emergency_notification_remote_body">%1$s needs help. Open SafeSteps.</string>
+    <string name="emergency_notification_permission_denied">Enable notifications to receive emergency alerts on this device.</string>
+    <string name="emergency_notification_sent">Emergency alert request sent.</string>
+    <string name="emergency_notification_failed">The emergency alert could not be sent.</string>
+    <string name="emergency_mode_activated">Emergency mode activated. Your real-time location is now being shared with your emergency contacts.</string>
+    <string name="emergency_mode_deactivated">Emergency mode deactivated. Your real-time location is no longer being shared with your emergency contacts.</string>
+    <string name="emergency_mode_update_failed">Emergency mode could not be updated.</string>
     <string name="calculating_best_route">Calculating the best route&#8230;</string>
     <string name="notification_title_auth">Authentication</string>
     <string name="notification_title_map">Map</string>
@@ -166,6 +188,16 @@
     <string name="profile_issue_deleted_success">Issue deleted successfully.</string>
     <string name="profile_issue_updated_success">Issue updated successfully.</string>
     <string name="profile_issue_action_error">The action could not be completed.</string>
+    <string name="profile_socket_settings_title">Manage notifications</string>
+    <string name="profile_socket_settings_subtitle">Turn on or off the notifications you want to receive on this device.</string>
+    <string name="profile_socket_messages_title">Messages</string>
+    <string name="profile_socket_messages_description">Receive notifications when your friends send you messages.</string>
+    <string name="profile_socket_emergency_title">Emergency alerts</string>
+    <string name="profile_socket_emergency_description">Receive a notification when a friend who has you saved as an emergency contact asks for help.</string>
+    <string name="profile_socket_friend_requests_title">Friend activity</string>
+    <string name="profile_socket_friend_requests_description">Receive notifications about friend requests and friendship updates.</string>
+    <string name="profile_socket_location_title">Real-time location</string>
+    <string name="profile_socket_location_description">Receive the real-time location of a contact who has you saved as an emergency contact when they ask for help.</string>
     <string name="retry_action">Retry</string>
     <string name="edit_action">Edit</string>
     <string name="delete_action">Delete</string>
@@ -256,6 +288,11 @@
     <string name="chat_members_selected">members selected</string>
     <string name="chat_create_group_action">Create group</string>
     <string name="chat_create_private_action">Start chat</string>
+    <string name="friends_emergency_summary">%1$d emergency contacts active</string>
+    <string name="friends_emergency_summary_empty">You have no emergency contacts</string>
+    <string name="friends_emergency_contact_title">Emergency contact</string>
+    <string name="friends_emergency_mark_action">Add to emergency</string>
+    <string name="friends_emergency_unmark_action">Remove from emergency</string>
 
 
     <plurals name="poi_fountains">
@@ -269,6 +306,18 @@
     <plurals name="poi_police_stations">
         <item quantity="one">%d police station</item>
         <item quantity="other">%d police stations</item>
+    </plurals>
+    <plurals name="poi_security_cameras">
+        <item quantity="one">%d security camera</item>
+        <item quantity="other">%d security cameras</item>
+    </plurals>
+    <plurals name="poi_escalators">
+        <item quantity="one">%d escalator</item>
+        <item quantity="other">%d escalators</item>
+    </plurals>
+    <plurals name="poi_climate_shelters">
+        <item quantity="one">%d climate shelter</item>
+        <item quantity="other">%d climate shelters</item>
     </plurals>
     <plurals name="profile_filter_count">
         <item quantity="one">%d filter</item>

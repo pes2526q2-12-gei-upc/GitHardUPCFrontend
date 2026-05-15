@@ -1,4 +1,4 @@
-﻿<resources>
+﻿﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="change_language">Cambiar idioma</string>
     <string name="log_in">Iniciar sesi&#243;n</string>
@@ -93,6 +93,29 @@
     <string name="change_map_style">Cambiar estilo del mapa</string>
     <string name="map_style_standard">Est&#225;ndar</string>
     <string name="map_style_satellite">Sat&#233;lite</string>
+    <string name="map_emergency_action">Emergencia</string>
+    <string name="emergency_notification_channel_name">Alertas de emergencia</string>
+    <string name="emergency_notification_channel_description">Notificaciones relacionadas con avisos a contactos de emergencia.</string>
+    <string name="notification_channel_activity_name">Actualizaciones de actividad</string>
+    <string name="notification_channel_activity_description">Notificaciones relacionadas con mensajes, solicitudes de amistad y actualizaciones de ubicaci&#243;n.</string>
+    <string name="emergency_notification_triggered_title">Alerta de emergencia activada</string>
+    <string name="emergency_notification_triggered_body">%1$s ha activado el bot&#243;n de emergencia.</string>
+    <string name="emergency_notification_received_title">Alerta de emergencia</string>
+    <string name="emergency_notification_received_body">Uno de tus contactos de emergencia ha pedido ayuda.</string>
+    <string name="message_notification_received_title">Nuevo mensaje</string>
+    <string name="message_notification_received_body">Has recibido un nuevo mensaje en SafeSteps.</string>
+    <string name="friend_request_notification_received_title">Solicitud de amistad</string>
+    <string name="friend_request_notification_received_body">Alguien te ha enviado una solicitud de amistad.</string>
+    <string name="location_notification_received_title">Actualizaci&#243;n de ubicaci&#243;n</string>
+    <string name="location_notification_received_body">Un contacto ha compartido una actualizaci&#243;n de ubicaci&#243;n contigo.</string>
+    <string name="location_notification_received_body_with_coords">Actualizaci&#243;n de ubicaci&#243;n: %1$.5f, %2$.5f</string>
+    <string name="emergency_notification_remote_body">%1$s necesita ayuda. Abre SafeSteps.</string>
+    <string name="emergency_notification_permission_denied">Activa las notificaciones para recibir alertas de emergencia en este dispositivo.</string>
+    <string name="emergency_notification_sent">Solicitud de alerta de emergencia enviada.</string>
+    <string name="emergency_notification_failed">No se ha podido enviar la alerta de emergencia.</string>
+    <string name="emergency_mode_activated">Modo emergencia activado. Se está compartiendo tu ubicación en tiempo real con tus contactos de emergencia.</string>
+    <string name="emergency_mode_deactivated">Modo emergencia desactivado. Se ha dejado de compartir tu ubicación en tiempo real con tus contactos de emergencia.</string>
+    <string name="emergency_mode_update_failed">No se ha podido actualizar el modo emergencia.</string>
     <string name="calculating_best_route">Calculando la mejor ruta&#8230;</string>
     <string name="notification_title_auth">Autenticaci&#243;n</string>
     <string name="notification_title_map">Mapa</string>
@@ -169,6 +192,16 @@
     <string name="profile_issue_deleted_success">Incidencia eliminada correctamente.</string>
     <string name="profile_issue_updated_success">Incidencia actualizada correctamente.</string>
     <string name="profile_issue_action_error">No se ha podido completar la acci&#243;n.</string>
+    <string name="profile_socket_settings_title">Configurar notificaciones</string>
+    <string name="profile_socket_settings_subtitle">Activa o desactiva las notificaciones que quieres recibir en este dispositivo.</string>
+    <string name="profile_socket_messages_title">Mensajes</string>
+    <string name="profile_socket_messages_description">Recibe notificaciones cuando tus amigos te env&#237;an mensajes.</string>
+    <string name="profile_socket_emergency_title">Alertas de emergencia</string>
+    <string name="profile_socket_emergency_description">Recibe una notificaci&#243;n cuando un amigo que te tiene guardado como contacto de emergencia pide ayuda.</string>
+    <string name="profile_socket_friend_requests_title">Actividad de amistades</string>
+    <string name="profile_socket_friend_requests_description">Recibe notificaciones de solicitudes de amistad y otras actualizaciones relacionadas con tus amistades.</string>
+    <string name="profile_socket_location_title">Ubicaci&#243;n en tiempo real</string>
+    <string name="profile_socket_location_description">Recibe la ubicaci&#243;n en tiempo real de un contacto que te tiene guardado como contacto de emergencia cuando pide ayuda.</string>
     <string name="retry_action">Reintentar</string>
     <string name="edit_action">Editar</string>
     <string name="delete_action">Eliminar</string>
@@ -230,6 +263,11 @@
     <string name="friends_remove_confirm_action">Eliminar</string>
     <string name="friends_remove_confirmation_title">Eliminar amistad</string>
     <string name="friends_remove_confirmation_message">También se borrará el chat con %1$s.</string>
+    <string name="friends_emergency_summary">%1$d contactos de emergencia activos</string>
+    <string name="friends_emergency_summary_empty">No tienes contactos de emergencia</string>
+    <string name="friends_emergency_contact_title">Contacto de emergencia</string>
+    <string name="friends_emergency_mark_action">Añadir a emergencia</string>
+    <string name="friends_emergency_unmark_action">Quitar de emergencia</string>
 
 
     <string name="chat_load_failed">No se han podido cargar los chats.</string>
@@ -274,6 +312,21 @@
         <item quantity="one">%d comisar&#237;a</item>
         <item quantity="many">%d comisar&#237;as</item>
         <item quantity="other">%d comisar&#237;as</item>
+    </plurals>
+    <plurals name="poi_security_cameras">
+        <item quantity="one">%d c&#225;mara de seguridad</item>
+        <item quantity="many">%d c&#225;maras de seguridad</item>
+        <item quantity="other">%d c&#225;maras de seguridad</item>
+    </plurals>
+    <plurals name="poi_escalators">
+        <item quantity="one">%d escalera mec&#225;nica</item>
+        <item quantity="many">%d escaleras mec&#225;nicas</item>
+        <item quantity="other">%d escaleras mec&#225;nicas</item>
+    </plurals>
+    <plurals name="poi_climate_shelters">
+        <item quantity="one">%d refugio clim&#225;tico</item>
+        <item quantity="many">%d refugios clim&#225;ticos</item>
+        <item quantity="other">%d refugios clim&#225;ticos</item>
     </plurals>
     <plurals name="profile_filter_count">
         <item quantity="one">%d filtro</item>

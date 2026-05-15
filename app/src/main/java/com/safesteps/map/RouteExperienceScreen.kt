@@ -9,9 +9,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -33,6 +36,8 @@ import androidx.compose.material.icons.automirrored.filled.Accessible
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeviceThermostat
+import androidx.compose.material.icons.filled.Escalator
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
@@ -56,10 +61,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,6 +100,18 @@ private data class RoutePrioritySpec(
     val activeColor: Color,
     val footer: String? = null
 )
+
+private data class PoiSummaryCardItem(
+    val icon: ImageVector? = null,
+    val emoji: String? = null,
+    val customIcon: PoiSummaryCustomIcon? = null,
+    val text: String,
+    val accentColor: Color
+)
+
+private enum class PoiSummaryCustomIcon {
+    STREET_BENCH
+}
 
 @Composable
 private fun RoutePriorityCompactOption(
@@ -340,39 +360,204 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
     val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
     val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
     val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
-            .padding(12.dp)
-            .semantics(mergeDescendants = true) { testTag = "btn_places" }
-            .testTag("btn_places"),
-        horizontalArrangement = Arrangement.SpaceEvenly
-    ) {
+    val cameras = puntsInteres.count { it.tipus.uppercase() == "CAMERA" }
+    val escalesMecaniques = puntsInteres.count { it.tipus.uppercase() == "ESCALA_MECANICA" }
+    val refugisClimatics = puntsInteres.count { it.tipus.uppercase() == "REFUGI_CLIMATIC" }
+    val summaryItems = buildList {
         if (fonts > 0) {
-            Text(
-                text = "\uD83D\uDCA7 ${appPlural(R.plurals.poi_fountains, fonts, fonts)}",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color(0xFF3D4A45)
+            add(
+                PoiSummaryCardItem(
+                    emoji = "\uD83D\uDCA7",
+                    text = appPlural(R.plurals.poi_fountains, fonts, fonts),
+                    accentColor = Color(0xFF5F6B67)
+                )
             )
         }
         if (bancs > 0) {
-            Text(
-                text = "\uD83E\uDE91 ${appPlural(R.plurals.poi_benches, bancs, bancs)}",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color(0xFF3D4A45)
+            add(
+                PoiSummaryCardItem(
+                    customIcon = PoiSummaryCustomIcon.STREET_BENCH,
+                    text = appPlural(R.plurals.poi_benches, bancs, bancs),
+                    accentColor = Color(0xFF8D6E63)
+                )
             )
         }
         if (comisaries > 0) {
-            Text(
-                text = "\uD83D\uDC6E ${appPlural(R.plurals.poi_police_stations, comisaries, comisaries)}",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color(0xFF3D4A45)
+            add(
+                PoiSummaryCardItem(
+                    emoji = "\uD83D\uDC6E",
+                    text = appPlural(R.plurals.poi_police_stations, comisaries, comisaries),
+                    accentColor = Color(0xFF5F6B67)
+                )
+            )
+        }
+        if (cameras > 0) {
+            add(
+                PoiSummaryCardItem(
+                    emoji = "\uD83D\uDCF9",
+                    text = appPlural(R.plurals.poi_security_cameras, cameras, cameras),
+                    accentColor = Color(0xFF5F6B67)
+                )
+            )
+        }
+        if (escalesMecaniques > 0) {
+            add(
+                PoiSummaryCardItem(
+                    icon = Icons.Default.Escalator,
+                    text = appPlural(R.plurals.poi_escalators, escalesMecaniques, escalesMecaniques),
+                    accentColor = Color(0xFF2E8B57)
+                )
+            )
+        }
+        if (refugisClimatics > 0) {
+            add(
+                PoiSummaryCardItem(
+                    icon = Icons.Default.DeviceThermostat,
+                    text = appPlural(R.plurals.poi_climate_shelters, refugisClimatics, refugisClimatics),
+                    accentColor = Color(0xFFE67E22)
+                )
             )
         }
     }
-    Spacer(modifier = Modifier.height(16.dp))
+    val scrollState = rememberScrollState()
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) { testTag = "btn_places" }
+            .testTag("btn_places")
+    ) {
+        Surface(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .horizontalScroll(scrollState),
+            shape = RoundedCornerShape(999.dp),
+            color = Color(0xFFF4F5F4),
+            tonalElevation = 0.dp,
+            shadowElevation = 0.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                summaryItems.forEachIndexed { index, item ->
+                    PoiSummaryInlineItem(item = item)
+                    if (index < summaryItems.lastIndex) {
+                        Text(
+                            text = "\u2022",
+                            color = Color(0xFFB3BBB6),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(12.dp))
+}
+
+@Composable
+private fun PoiSummaryInlineItem(
+    item: PoiSummaryCardItem
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(18.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                item.customIcon == PoiSummaryCustomIcon.STREET_BENCH -> {
+                    PoiSummaryStreetBenchIcon(
+                        color = item.accentColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                item.icon != null -> {
+                Icon(
+                    imageVector = item.icon,
+                    contentDescription = null,
+                    tint = item.accentColor,
+                    modifier = Modifier.size(16.dp)
+                )
+                }
+                else -> {
+                    Text(
+                        text = item.emoji.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+        Text(
+            text = item.text,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color(0xFF4E5A55),
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun PoiSummaryStreetBenchIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val stroke = size.minDimension * 0.12f
+        val seatY = size.height * 0.62f
+        val backY = size.height * 0.38f
+        val leftX = size.width * 0.18f
+        val rightX = size.width * 0.82f
+
+        drawLine(
+            color = color,
+            start = Offset(leftX, backY),
+            end = Offset(rightX, backY),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(leftX, seatY),
+            end = Offset(rightX, seatY),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.24f, backY),
+            end = Offset(size.width * 0.24f, seatY),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.76f, backY),
+            end = Offset(size.width * 0.76f, seatY),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.30f, seatY),
+            end = Offset(size.width * 0.24f, size.height * 0.90f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.70f, seatY),
+            end = Offset(size.width * 0.76f, size.height * 0.90f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+    }
 }
 
 @Composable
@@ -733,7 +918,16 @@ private fun overlayPlannerSheetState(uiState: MapUiState): RoutePlannerSheetStat
 }
 
 @Composable
-private fun BoxScope.NavigationTopBannerOverlay(uiState: MapUiState) {
+private fun BoxScope.NavigationTopBannerOverlay(
+    uiState: MapUiState,
+    onHeightChanged: (Float) -> Unit
+) {
+    LaunchedEffect(uiState.usesLiveNavigation, uiState.routeCompleted) {
+        if (!uiState.usesLiveNavigation || uiState.routeCompleted) {
+            onHeightChanged(0f)
+        }
+    }
+
     AnimatedVisibility(
         visible = uiState.usesLiveNavigation && !uiState.routeCompleted,
         enter = slideInVertically(initialOffsetY = { -it / 2 }),
@@ -742,6 +936,9 @@ private fun BoxScope.NavigationTopBannerOverlay(uiState: MapUiState) {
             .align(Alignment.TopCenter)
             .statusBarsPadding()
             .padding(horizontal = 12.dp, vertical = 12.dp)
+            .onGloballyPositioned {
+                onHeightChanged(it.positionInParent().y + it.size.height.toFloat())
+            }
     ) {
         NavigationTopBanner(
             destinationText = uiState.textoDestino,
@@ -1251,7 +1448,8 @@ internal fun BoxScope.RouteExperienceOverlay(
     onPrioritySelected: (RoutePriority) -> Unit,
     onStartRoute: () -> Unit,
     onClose: () -> Unit,
-    onBottomPaddingChange: (Dp) -> Unit
+    onBottomPaddingChange: (Dp) -> Unit,
+    onTopBannerHeightChange: (Float) -> Unit
 ) {
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
@@ -1294,7 +1492,10 @@ internal fun BoxScope.RouteExperienceOverlay(
         }
     }
 
-    NavigationTopBannerOverlay(uiState = uiState)
+    NavigationTopBannerOverlay(
+        uiState = uiState,
+        onHeightChanged = onTopBannerHeightChange
+    )
     FixedRouteSummaryBottomCardOverlay(
         uiState = uiState,
         fixedRouteSummaryCardHeightPxState = fixedRouteSummaryCardHeightPxState,

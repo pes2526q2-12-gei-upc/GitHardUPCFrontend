@@ -34,6 +34,7 @@ import com.safesteps.i18n.ProvideLocalizedStrings
 import com.safesteps.i18n.appString
 import com.safesteps.map.CommunityMenuScreen
 import com.safesteps.map.MapLibreScreen
+import com.safesteps.notifications.BackendWebSocketManager
 import com.safesteps.profile.ProfileFilterState
 import com.safesteps.profile.ProfileGamificationCallbacks
 import com.safesteps.profile.ProfileGamificationState
@@ -241,6 +242,7 @@ fun SafeStepsApp(
         currentDestination = currentDestination,
         onProfileOpened = profileViewModel::onProfileScreenOpened
     )
+    HandleBackendWebSocketEffect(currentUser = authUiState.currentUser)
     val onLanguageSelected: (AppLanguage) -> Unit = remember(languageViewModel, authViewModel) {
         { language ->
             languageViewModel.onLanguageSelected(
@@ -348,6 +350,26 @@ private fun HandleProfileRedirectEffect(
         val needsLoggedUser = currentDestination != SafeStepsDestination.MAP
         if (currentUser == null && needsLoggedUser) {
             onNavigateToMap()
+        }
+    }
+}
+
+@Composable
+private fun HandleBackendWebSocketEffect(currentUser: UserInfo?) {
+    val appContext = LocalContext.current.applicationContext
+    val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
+
+    LaunchedEffect(appContext, googleId) {
+        if (googleId == null) {
+            BackendWebSocketManager.disconnect()
+        } else {
+            BackendWebSocketManager.connect(appContext, googleId)
+        }
+    }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            BackendWebSocketManager.disconnect()
         }
     }
 }

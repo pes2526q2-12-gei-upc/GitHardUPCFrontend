@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -61,6 +62,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.semantics
@@ -120,20 +122,19 @@ internal data class FloatingActionsState(
     val compactMode: Boolean,
     val showPoiAction: Boolean,
     val showMapStyleAction: Boolean,
-    val showMyLocationAction: Boolean
+    val showMyLocationAction: Boolean,
+    val showReportIssueAction: Boolean,
+    val showEmergencyAction: Boolean
 )
 
 internal data class FloatingActionLabels(
     val hideExtraInfoLabel: String,
     val showExtraInfoLabel: String,
-    val standardMapStyleLabel: String,
-    val satelliteMapStyleLabel: String,
     val myLocationLabel: String
 )
 
 internal data class FloatingActionCallbacks(
     val onTogglePuntsInteres: () -> Unit,
-    val onToggleMapStyle: () -> Unit,
     val onMyLocationClick: () -> Unit
 )
 
@@ -459,7 +460,7 @@ private fun TopSearchPanel(
             .padding(horizontal = 14.dp, vertical = 8.dp)
             .shadow(10.dp, RoundedCornerShape(24.dp), clip = false)
             .onGloballyPositioned {
-                callbacks.onHeightChanged(it.size.height.toFloat())
+                callbacks.onHeightChanged(it.positionInParent().y + it.size.height.toFloat())
             },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -552,6 +553,51 @@ internal fun BoxScope.MainMapOverlay(
 }
 
 @Composable
+internal fun BoxScope.MapStyleTopRightOverlay(
+    visible: Boolean,
+    isSatelliteStyle: Boolean,
+    topOffset: Dp,
+    standardMapStyleLabel: String,
+    satelliteMapStyleLabel: String,
+    onClick: () -> Unit
+) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSatelliteStyle) Color(0xFFE8F0FE) else Color.White,
+        label = "mapStyleTopButtonBackground"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (isSatelliteStyle) Color(0xFFB9D4FB) else Color(0xFFE2E7E4),
+        label = "mapStyleTopButtonBorder"
+    )
+    val iconColor by animateColorAsState(
+        targetValue = if (isSatelliteStyle) Color(0xFF1A73E8) else Color(0xFF44514B),
+        label = "mapStyleTopButtonIcon"
+    )
+
+    AnimatedVisibility(
+        visible = visible,
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .padding(top = topOffset, end = 16.dp)
+    ) {
+        MapActionCircleButton(
+            icon = Icons.Default.Layers,
+            contentDescription = if (isSatelliteStyle) {
+                standardMapStyleLabel
+            } else {
+                satelliteMapStyleLabel
+            },
+            iconTint = iconColor,
+            onClick = onClick,
+            compactMode = true,
+            backgroundColor = backgroundColor,
+            borderColor = borderColor,
+            modifier = Modifier.testTag("btn_satellit")
+        )
+    }
+}
+
+@Composable
 private fun MapActionPill(
     label: String,
     icon: ImageVector,
@@ -623,6 +669,8 @@ private fun MapActionCircleButton(
     iconTint: Color,
     onClick: () -> Unit,
     compactMode: Boolean,
+    backgroundColor: Color = Color.White,
+    borderColor: Color = Color(0xFFE2E7E4),
     modifier: Modifier = Modifier
 ) {
     val buttonSize = if (compactMode) 46.dp else 54.dp
@@ -635,13 +683,13 @@ private fun MapActionCircleButton(
             .shadow(12.dp, CircleShape, clip = false)
             .clip(CircleShape)
             .clickable(onClick = onClick),
-        color = Color.White,
+        color = backgroundColor,
         shape = CircleShape
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .border(1.dp, Color(0xFFE2E7E4), CircleShape),
+                .border(1.dp, borderColor, CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -658,7 +706,10 @@ private fun MapActionCircleButton(
 internal fun BoxScope.MapFloatingActions(
     uiState: MapUiState,
     reportIssueLabel: String,
+    emergencyActionLabel: String,
+    isEmergencyActive: Boolean,
     onReportIssueClick: () -> Unit,
+    onEmergencyClick: () -> Unit,
     state: FloatingActionsState,
     labels: FloatingActionLabels,
     callbacks: FloatingActionCallbacks
@@ -690,14 +741,8 @@ internal fun BoxScope.MapFloatingActions(
                 labels = labels,
                 onClick = callbacks.onTogglePuntsInteres
             )
-            MapStyleFloatingAction(
-                uiState = uiState,
-                state = state,
-                labels = labels,
-                onClick = callbacks.onToggleMapStyle
-            )
 
-            AnimatedVisibility(visible = !uiState.modoRuta) {
+            AnimatedVisibility(visible = state.showReportIssueAction && !uiState.modoRuta) {
                 MapActionCircleButton(
                     icon = Icons.Default.ReportProblem,
                     contentDescription = reportIssueLabel,
@@ -705,6 +750,20 @@ internal fun BoxScope.MapFloatingActions(
                     onClick = onReportIssueClick,
                     compactMode = state.compactMode,
                     modifier = Modifier.testTag("btn_incidencies")
+                )
+            }
+
+            AnimatedVisibility(visible = state.showEmergencyAction && !uiState.modoRuta) {
+                MapActionCircleButton(
+                    icon = Icons.Default.NotificationsActive,
+                    contentDescription = emergencyActionLabel,
+                    iconTint = Color.White,
+                    onClick = onEmergencyClick,
+                    compactMode = state.compactMode,
+                    backgroundColor = Color(0xFFB71C3B),
+                    borderColor = Color(0xFFFFC8D4),
+                    modifier = rememberEmergencyHeartbeatModifier(isEmergencyActive)
+                        .testTag("btn_emergency")
                 )
             }
 
@@ -719,7 +778,10 @@ internal fun BoxScope.MapFloatingActions(
 }
 
 private fun hasVisibleFloatingActions(state: FloatingActionsState): Boolean {
-    return state.showPoiAction || state.showMapStyleAction || state.showMyLocationAction
+    return state.showPoiAction ||
+        state.showMyLocationAction ||
+        state.showReportIssueAction ||
+        state.showEmergencyAction
 }
 
 @Composable
@@ -741,31 +803,6 @@ private fun PoiFloatingAction(
             onClick = onClick,
             compactMode = state.compactMode,
             modifier = Modifier.width(if (state.compactMode) 112.dp else 132.dp)
-        )
-    }
-}
-
-@Composable
-private fun MapStyleFloatingAction(
-    uiState: MapUiState,
-    state: FloatingActionsState,
-    labels: FloatingActionLabels,
-    onClick: () -> Unit
-) {
-    AnimatedVisibility(visible = state.showMapStyleAction) {
-        MapActionPill(
-            label = if (uiState.estiloSatelite) {
-                labels.standardMapStyleLabel
-            } else {
-                labels.satelliteMapStyleLabel
-            },
-            icon = Icons.Default.Layers,
-            selected = uiState.estiloSatelite,
-            onClick = onClick,
-            compactMode = state.compactMode,
-            modifier = Modifier
-                .width(if (state.compactMode) 112.dp else 132.dp)
-                .testTag("btn_satellit")
         )
     }
 }

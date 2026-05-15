@@ -96,7 +96,8 @@ fun FriendsScreen(
                     onBack = onBack,
                     onAddFriendClick = onAddFriendClick,
                     pendingCount = uiState.pendingRequests.size,
-                    friendCount = uiState.friends.size
+                    friendCount = uiState.friends.size,
+                    emergencyContactCount = uiState.friends.count(FriendListItemUiState::isEmergencyContact)
                 )
             }
 
@@ -158,6 +159,9 @@ fun FriendsScreen(
                         ) { friend ->
                             FriendItemCard(
                                 friend = friend,
+                                onEmergencyContactToggleClick = {
+                                    viewModel.onEmergencyContactToggleClicked(friend.googleId)
+                                },
                                 onChatClick = { onChatClick(friend) },
                                 onRemoveClick = { friendPendingRemoval = friend }
                             )
@@ -186,7 +190,8 @@ private fun FriendsTopBar(
     onBack: () -> Unit,
     onAddFriendClick: () -> Unit,
     pendingCount: Int,
-    friendCount: Int
+    friendCount: Int,
+    emergencyContactCount: Int
 ) {
     androidx.compose.foundation.layout.Column(
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -269,6 +274,14 @@ private fun FriendsTopBar(
                     color = Color(0xFF61716A),
                     style = MaterialTheme.typography.bodyMedium
                 )
+
+                if (friendCount > 0) {
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    EmergencyContactsSummaryChip(
+                        count = emergencyContactCount
+                    )
+                }
 
                 if (pendingCount > 0 || friendCount > 0) {
                     Spacer(modifier = Modifier.height(18.dp))
@@ -580,9 +593,12 @@ private fun PendingFriendRequestCard(
 @Composable
 private fun FriendItemCard(
     friend: FriendListItemUiState,
+    onEmergencyContactToggleClick: () -> Unit,
     onChatClick: () -> Unit,
     onRemoveClick: () -> Unit
 ) {
+    val isBusy = friend.isRemoving || friend.isUpdatingEmergencyContact
+
     Card(
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.97f)),
@@ -638,6 +654,16 @@ private fun FriendItemCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            EmergencyContactActionButton(
+                modifier = Modifier.fillMaxWidth(),
+                isEmergencyContact = friend.isEmergencyContact,
+                enabled = !isBusy,
+                isLoading = friend.isUpdatingEmergencyContact,
+                onClick = onEmergencyContactToggleClick
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -645,14 +671,14 @@ private fun FriendItemCard(
             ) {
                 NegativeActionButton(
                     onClick = onRemoveClick,
-                    enabled = !friend.isRemoving,
+                    enabled = !isBusy,
                     isLoading = friend.isRemoving,
                     text = appString(R.string.friends_remove_action)
                 )
 
                 OutlinedButton(
                     onClick = onChatClick,
-                    enabled = !friend.isRemoving,
+                    enabled = !isBusy,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(18.dp),
                     border = BorderStroke(1.dp, Color(0xFFD3E4DA)),
@@ -674,6 +700,133 @@ private fun FriendItemCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EmergencyContactsSummaryChip(
+    count: Int
+) {
+    val hasContacts = count > 0
+    val tint = if (hasContacts) Color(0xFF4F7D66) else Color(0xFF72827A)
+    val containerColor = if (hasContacts) Color(0xFFEAF4EE) else Color(0xFFF3F6F4)
+    val borderColor = if (hasContacts) Color(0xFFD7E7DC) else Color(0xFFE2E9E4)
+    val iconContainerColor = if (hasContacts) Color(0xFFD8ECDC) else Color(0xFFE6ECE8)
+    val label = if (hasContacts) {
+        appString(R.string.friends_emergency_summary, count)
+    } else {
+        appString(R.string.friends_emergency_summary_empty)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(24.dp),
+                shape = CircleShape,
+                color = iconContainerColor
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (hasContacts) Icons.Default.Check else Icons.Default.PersonAddAlt1,
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = label,
+                color = tint,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmergencyContactActionButton(
+    modifier: Modifier = Modifier,
+    isEmergencyContact: Boolean,
+    enabled: Boolean,
+    isLoading: Boolean,
+    onClick: () -> Unit
+) {
+    val label = if (isEmergencyContact) {
+        appString(R.string.friends_emergency_unmark_action)
+    } else {
+        appString(R.string.friends_emergency_mark_action)
+    }
+    val containerColor = if (isEmergencyContact) Color(0xFFEAF4EE) else Color(0xFFF3F8F5)
+    val borderColor = if (isEmergencyContact) Color(0xFFD3E5D8) else Color(0xFFDCEAE2)
+    val contentColor = if (enabled) {
+        if (isEmergencyContact) Color(0xFF486C59) else Color(0xFF587D6A)
+    } else {
+        Color(0xFF93A69A)
+    }
+    val iconContainerColor = if (isEmergencyContact) Color(0xFFD9EBDD) else Color(0xFFE4EFE8)
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor),
+        shadowElevation = 0.dp
+    ) {
+        TextButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            colors = ButtonDefaults.textButtonColors(
+                containerColor = Color.Transparent,
+                contentColor = contentColor,
+                disabledContainerColor = Color.Transparent,
+                disabledContentColor = contentColor
+            )
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    color = contentColor,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Surface(
+                    modifier = Modifier.size(22.dp),
+                    shape = CircleShape,
+                    color = iconContainerColor
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isEmergencyContact) {
+                                Icons.Default.Check
+                            } else {
+                                Icons.Default.PersonAddAlt1
+                            },
+                            contentDescription = null,
+                            tint = contentColor,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        } 
     }
 }
 
