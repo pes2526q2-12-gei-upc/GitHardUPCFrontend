@@ -848,7 +848,12 @@ private fun BoxScope.EmergencyContactHelpOverlay(
         return
     }
 
-    val resolvedTitle = normalizeEmergencyBannerText(pendingLocation.title) ?: titleFallback
+    val resolvedTitle = normalizeEmergencyBannerText(pendingLocation.username)
+        ?.let { username ->
+            appString(R.string.emergency_contact_help_title_with_name, username)
+        }
+        ?: normalizeEmergencyBannerText(pendingLocation.title)
+        ?: titleFallback
     val formattedLastSeenTime = DateFormat.getTimeInstance(
         DateFormat.SHORT,
         Locale.getDefault()
@@ -2001,7 +2006,9 @@ private fun addEmergencyContactMarkers(
         addLegacyMarker(
             map = map,
             position = LatLng(location.latitude, location.longitude),
-            title = location.title?.takeIf { it.isNotBlank() } ?: defaultTitle,
+            title = location.username?.takeIf { it.isNotBlank() }
+                ?: location.title?.takeIf { it.isNotBlank() }
+                ?: defaultTitle,
             icon = createEmergencyContactIcon(
                 context = context,
                 highlighted = location.id == highlightedLocationId

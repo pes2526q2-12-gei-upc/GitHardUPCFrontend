@@ -477,6 +477,7 @@ class MapViewModel(
                 id = locationId,
                 latitude = event.latitude,
                 longitude = event.longitude,
+                username = event.username,
                 title = event.title,
                 body = event.body
             )
@@ -553,7 +554,11 @@ class MapViewModel(
 
         val matchingLocation = currentState.emergencyContactLocations
             .lastOrNull { existing ->
-                existing.title == event.title && existing.body == event.body
+                (
+                    !event.username.isNullOrBlank() &&
+                        existing.username == event.username
+                    ) ||
+                    (existing.title == event.title && existing.body == event.body)
             }
         if (matchingLocation != null) {
             return matchingLocation.id

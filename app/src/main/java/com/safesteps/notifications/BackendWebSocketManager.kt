@@ -37,6 +37,7 @@ data class BackendLocationSocketEvent(
     val latitude: Double,
     val longitude: Double,
     val sourceKey: String? = null,
+    val username: String? = null,
     val title: String? = null,
     val body: String? = null
 )
@@ -331,6 +332,7 @@ object BackendWebSocketManager {
 
             SocketChannelPreference.LOCATION -> {
                 val coordinates = payload.extractCoordinates()
+                val resolvedUsername = payload.resolveUsername()
                 val resolvedTitle = payload.resolveTitle(null)
                 val resolvedBody = payload.resolveBody(null)
                 coordinates?.let {
@@ -339,6 +341,7 @@ object BackendWebSocketManager {
                             latitude = it.latitude,
                             longitude = it.longitude,
                             sourceKey = payload.resolveSourceKey(),
+                            username = resolvedUsername,
                             title = resolvedTitle,
                             body = resolvedBody
                         )
@@ -594,6 +597,29 @@ object BackendWebSocketManager {
             )
 
             return sequenceOf(dataObject, root)
+                .flatMap { objectNode ->
+                    candidateKeys.asSequence().mapNotNull { key ->
+                        objectNode?.optString(key)
+                            ?.takeIf { it.isMeaningfulPayloadText() }
+                    }
+                }
+                .firstOrNull()
+        }
+
+        fun resolveUsername(): String? {
+            val candidateKeys = listOf(
+                "username",
+                "userName",
+                "displayName",
+                "name"
+            )
+
+            return sequenceOf(
+                dataObject,
+                dataObject?.optJSONObject("payload"),
+                root,
+                root?.optJSONObject("payload")
+            )
                 .flatMap { objectNode ->
                     candidateKeys.asSequence().mapNotNull { key ->
                         objectNode?.optString(key)

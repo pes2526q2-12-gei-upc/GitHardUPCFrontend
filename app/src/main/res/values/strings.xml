@@ -117,6 +117,7 @@
     <string name="emergency_mode_deactivated">Emergency mode deactivated. Your real-time location is no longer being shared with your emergency contacts.</string>
     <string name="emergency_mode_update_failed">Emergency mode could not be updated.</string>
     <string name="emergency_contact_help_title">Emergency contact needs help</string>
+    <string name="emergency_contact_help_title_with_name">%1$s needs help</string>
     <string name="emergency_contact_help_body">A real-time location update was received. Tap this alert to center it.</string>
     <string name="emergency_contact_last_seen_format">Last seen: %1$s</string>
     <string name="emergency_contact_help_action">View on map</string>

@@ -38,6 +38,7 @@ data class EmergencyContactLocation(
     val id: String,
     val latitude: Double,
     val longitude: Double,
+    val username: String? = null,
     val title: String? = null,
     val body: String? = null,
     val receivedAtMillis: Long = System.currentTimeMillis()
