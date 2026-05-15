@@ -118,8 +118,10 @@
     <string name="emergency_mode_update_failed">Emergency mode could not be updated.</string>
     <string name="emergency_contact_help_title">Emergency contact needs help</string>
     <string name="emergency_contact_help_body">A contact shared a real-time location update. Tap View on map to center it.</string>
+    <string name="emergency_contact_last_seen_format">Last location received at %1$s</string>
     <string name="emergency_contact_help_action">View on map</string>
     <string name="emergency_contact_marker_label">Emergency contact</string>
+    <string name="emergency_contact_dismiss_label">Dismiss SOS</string>
     <string name="calculating_best_route">Calculating the best route&#8230;</string>
     <string name="notification_title_auth">Authentication</string>
     <string name="notification_title_map">Map</string>

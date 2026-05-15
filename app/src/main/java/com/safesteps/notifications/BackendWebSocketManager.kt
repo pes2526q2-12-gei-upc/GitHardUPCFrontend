@@ -41,6 +41,12 @@ data class BackendLocationSocketEvent(
     val body: String? = null
 )
 
+data class BackendEmergencySocketEvent(
+    val sourceKey: String? = null,
+    val title: String? = null,
+    val body: String? = null
+)
+
 object BackendWebSocketManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val client = OkHttpClient.Builder()
@@ -62,8 +68,12 @@ object BackendWebSocketManager {
     private val _locationEvents = MutableSharedFlow<BackendLocationSocketEvent>(
         extraBufferCapacity = 16
     )
+    private val _emergencyEvents = MutableSharedFlow<BackendEmergencySocketEvent>(
+        extraBufferCapacity = 16
+    )
 
     val locationEvents: SharedFlow<BackendLocationSocketEvent> = _locationEvents.asSharedFlow()
+    val emergencyEvents: SharedFlow<BackendEmergencySocketEvent> = _emergencyEvents.asSharedFlow()
 
     fun connect(
         context: Context,
@@ -295,10 +305,19 @@ object BackendWebSocketManager {
             }
 
             SocketChannelPreference.EMERGENCY -> {
+                val resolvedTitle = payload.resolveTitle(EmergencyTitleKey)
+                val resolvedBody = payload.resolveBody(EmergencyBodyKey)
                 showIncomingEmergencyNotification(
                     context = context,
-                    title = payload.resolveTitle(EmergencyTitleKey),
-                    body = payload.resolveBody(EmergencyBodyKey)
+                    title = resolvedTitle,
+                    body = resolvedBody
+                )
+                _emergencyEvents.tryEmit(
+                    BackendEmergencySocketEvent(
+                        sourceKey = payload.resolveSourceKey(),
+                        title = resolvedTitle,
+                        body = resolvedBody
+                    )
                 )
             }
 
@@ -314,13 +333,6 @@ object BackendWebSocketManager {
                 val coordinates = payload.extractCoordinates()
                 val resolvedTitle = payload.resolveTitle(null)
                 val resolvedBody = payload.resolveBody(null)
-                showIncomingLocationNotification(
-                    context = context,
-                    title = resolvedTitle,
-                    body = resolvedBody,
-                    latitude = coordinates?.latitude,
-                    longitude = coordinates?.longitude
-                )
                 coordinates?.let {
                     _locationEvents.tryEmit(
                         BackendLocationSocketEvent(
@@ -540,7 +552,7 @@ object BackendWebSocketManager {
             val directTitle = sequenceOf(root, dataObject)
                 .mapNotNull { objectNode ->
                     objectNode?.optString("title")
-                        ?.takeIf { it.isNotBlank() }
+                        ?.takeIf { it.isMeaningfulPayloadText() }
                 }
                 .firstOrNull()
             if (directTitle != null) {
@@ -548,7 +560,7 @@ object BackendWebSocketManager {
             }
 
             val titleKey = root?.optString("titleKey")
-                ?.takeIf { it.isNotBlank() }
+                ?.takeIf { it.isMeaningfulPayloadText() }
                 ?: return null
 
             return titleKey.takeUnless { it == defaultKey }
@@ -558,7 +570,7 @@ object BackendWebSocketManager {
             val directBody = sequenceOf(root, dataObject)
                 .mapNotNull { objectNode ->
                     objectNode?.optString("body")
-                        ?.takeIf { it.isNotBlank() }
+                        ?.takeIf { it.isMeaningfulPayloadText() }
                 }
                 .firstOrNull()
             if (directBody != null) {
@@ -566,7 +578,7 @@ object BackendWebSocketManager {
             }
 
             val bodyKey = root?.optString("bodyKey")
-                ?.takeIf { it.isNotBlank() }
+                ?.takeIf { it.isMeaningfulPayloadText() }
                 ?: return null
 
             return bodyKey.takeUnless { it == defaultKey }
@@ -585,7 +597,7 @@ object BackendWebSocketManager {
                 .flatMap { objectNode ->
                     candidateKeys.asSequence().mapNotNull { key ->
                         objectNode?.optString(key)
-                            ?.takeIf { it.isNotBlank() }
+                            ?.takeIf { it.isMeaningfulPayloadText() }
                     }
                 }
                 .firstOrNull()
@@ -653,6 +665,10 @@ object BackendWebSocketManager {
                 return BackendPayload(root = jsonObject)
             }
         }
+    }
+
+    private fun String.isMeaningfulPayloadText(): Boolean {
+        return isNotBlank() && !equals("null", ignoreCase = true)
     }
 
     private class BackendSocketListener(

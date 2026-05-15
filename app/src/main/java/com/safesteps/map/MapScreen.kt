@@ -76,6 +76,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Place
@@ -92,12 +93,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
 
 private const val EmergencyStatusNotificationDurationMillis = 6_000L
 
@@ -124,6 +130,7 @@ private data class MapScreenStrings(
     val emergencyContactHelpBody: String,
     val emergencyContactHelpAction: String,
     val emergencyContactMarkerLabel: String,
+    val emergencyContactDismissLabel: String,
     val reportIssueOutsideBarcelonaMessage: String,
     val issueLoadingAddressLabel: String,
     val issueLocationFallbackLabel: String,
@@ -380,13 +387,7 @@ private fun MapScreenContent(
             hasPoiAction = uiState.puntsInteres.isNotEmpty(),
             hasEmergencyAction = showEmergencyAction
         )
-        val emergencyHelpBottomPadding = if (uiState.modoRuta) {
-            effectiveFloatingActionsBottomPadding + 56.dp
-        } else {
-            effectiveFloatingActionsBottomPadding +
-                estimatedFloatingActionsHeight(floatingActionsLayout) +
-                16.dp
-        }
+        val emergencyHelpBottomPadding = navigationBarsBottomPadding + 18.dp
 
         MapViewSurface(
             mapView = mapView,
@@ -520,20 +521,26 @@ private fun MapScreenContent(
             )
         }
 
-        EmergencyContactHelpOverlay(
-            pendingLocation = uiState.pendingEmergencyContactLocation,
-            titleFallback = strings.emergencyContactHelpTitle,
-            bodyFallback = strings.emergencyContactHelpBody,
-            actionLabel = strings.emergencyContactHelpAction,
-            bottomPadding = emergencyHelpBottomPadding,
-            onViewOnMapClick = {
-                focusOnEmergencyContactLocation(
-                    mapView = mapView,
-                    uiState = uiState,
-                    viewModel = viewModel
-                )
-            }
-        )
+        if (!isPlanningRoute && !isActiveRoute) {
+            EmergencyContactHelpOverlay(
+                pendingLocation = uiState.pendingEmergencyContactLocation,
+                titleFallback = strings.emergencyContactHelpTitle,
+                bodyFallback = strings.emergencyContactHelpBody,
+                actionLabel = strings.emergencyContactHelpAction,
+                dismissLabel = strings.emergencyContactDismissLabel,
+                bottomPadding = emergencyHelpBottomPadding,
+                onViewOnMapClick = {
+                    focusOnEmergencyContactLocation(
+                        mapView = mapView,
+                        uiState = uiState,
+                        viewModel = viewModel
+                    )
+                },
+                onDismissClick = {
+                    uiState.pendingEmergencyContactLocation?.id?.let(viewModel::dismissEmergencyContactLocation)
+                }
+            )
+        }
 
         CalculatingRouteOverlay(
             visible = uiState.calculantRuta,
@@ -818,73 +825,159 @@ private fun BoxScope.EmergencyContactHelpOverlay(
     titleFallback: String,
     bodyFallback: String,
     actionLabel: String,
+    dismissLabel: String,
     bottomPadding: Dp,
-    onViewOnMapClick: () -> Unit
+    onViewOnMapClick: () -> Unit,
+    onDismissClick: () -> Unit
 ) {
     if (pendingLocation == null) {
         return
     }
 
+    val resolvedTitle = normalizeEmergencyBannerText(pendingLocation.title) ?: titleFallback
+    val formattedLastSeenTime = DateFormat.getTimeInstance(
+        DateFormat.SHORT,
+        Locale.getDefault()
+    ).format(Date(pendingLocation.receivedAtMillis))
+    val resolvedBody = normalizeEmergencyBannerText(pendingLocation.body) ?: bodyFallback
+    val resolvedLastSeenText = appString(
+        R.string.emergency_contact_last_seen_format,
+        formattedLastSeenTime
+    )
+
     Surface(
         modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(start = 16.dp, end = 16.dp, bottom = bottomPadding)
-            .fillMaxWidth(0.92f),
-        shape = RoundedCornerShape(24.dp),
-        color = Color(0xFFFFF6F6),
-        shadowElevation = 10.dp
+            .align(Alignment.BottomStart)
+            .padding(start = 16.dp, end = 104.dp, bottom = bottomPadding)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = Color.Transparent,
+        shadowElevation = 16.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Color(0xFFFFD5D5), RoundedCornerShape(24.dp))
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFFFFFCFC),
+                            Color(0xFFFFF1F3)
+                        )
+                    ),
+                    shape = RoundedCornerShape(28.dp)
+                )
+                .border(1.dp, Color(0xFFFFD6DE), RoundedCornerShape(28.dp))
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFFB71C3B)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Box(
-                    modifier = Modifier.size(40.dp),
-                    contentAlignment = Alignment.Center
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFFB71C3B)
+                ) {
+                    Box(
+                        modifier = Modifier.size(46.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsActive,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = Color(0xFFFBE0E5)
+                    ) {
+                        Text(
+                            text = "SOS",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            color = Color(0xFFB71C3B),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        text = resolvedTitle,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF6E1730)
+                    )
+                    Text(
+                        text = resolvedBody,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF5F4A4A)
+                    )
+                }
+
+                IconButton(
+                    onClick = onDismissClick,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .background(Color(0xFFFFF4F5), CircleShape)
+                        .border(1.dp, Color(0xFFFFD6DE), CircleShape)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.NotificationsActive,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Default.Close,
+                        contentDescription = dismissLabel,
+                        tint = Color(0xFF9C4A4A),
+                        modifier = Modifier.size(15.dp)
                     )
                 }
             }
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = pendingLocation.title?.takeIf { it.isNotBlank() } ?: titleFallback,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF7A1327)
-                )
-                Text(
-                    text = pendingLocation.body?.takeIf { it.isNotBlank() } ?: bodyFallback,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF5F4A4A)
-                )
-            }
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFFDEAEC)
+                ) {
+                    Text(
+                        text = resolvedLastSeenText,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        color = Color(0xFF8A4A5B),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
 
-            Button(
-                onClick = onViewOnMapClick,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB71C3B)),
-                shape = RoundedCornerShape(18.dp)
-            ) {
-                Text(text = actionLabel, color = Color.White)
+                Button(
+                    onClick = onViewOnMapClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB71C3B)),
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.height(42.dp)
+                ) {
+                    Text(
+                        text = actionLabel,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
+}
+
+private fun normalizeEmergencyBannerText(value: String?): String? {
+    return value
+        ?.trim()
+        ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
 }
 
 @Composable
@@ -912,6 +1005,7 @@ private fun mapScreenStrings(): MapScreenStrings {
         emergencyContactHelpBody = appString(R.string.emergency_contact_help_body),
         emergencyContactHelpAction = appString(R.string.emergency_contact_help_action),
         emergencyContactMarkerLabel = appString(R.string.emergency_contact_marker_label),
+        emergencyContactDismissLabel = appString(R.string.emergency_contact_dismiss_label),
         reportIssueOutsideBarcelonaMessage = appString(R.string.issue_report_outside_barcelona),
         issueLoadingAddressLabel = appString(R.string.issue_loading_address),
         issueLocationFallbackLabel = appString(R.string.issue_location_fallback),
@@ -984,8 +1078,6 @@ private fun focusOnEmergencyContactLocation(
             1200
         )
     }
-
-    viewModel.onEmergencyContactLocationCentered()
 }
 
 @Composable

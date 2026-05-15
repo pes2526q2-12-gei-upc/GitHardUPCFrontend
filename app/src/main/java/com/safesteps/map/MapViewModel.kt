@@ -471,22 +471,17 @@ class MapViewModel(
     }
 
     fun onEmergencyContactLocationReceived(event: BackendLocationSocketEvent) {
-        val sourceKey = event.sourceKey?.trim()?.takeIf { it.isNotBlank() }
-        val locationId = sourceKey ?: "emergency-${System.currentTimeMillis()}"
-        val receivedLocation = EmergencyContactLocation(
-            id = locationId,
-            latitude = event.latitude,
-            longitude = event.longitude,
-            title = event.title,
-            body = event.body
-        )
-
         _uiState.update { currentState ->
+            val locationId = resolveEmergencyLocationId(currentState, event)
+            val receivedLocation = EmergencyContactLocation(
+                id = locationId,
+                latitude = event.latitude,
+                longitude = event.longitude,
+                title = event.title,
+                body = event.body
+            )
             val deduplicatedLocations = currentState.emergencyContactLocations.filterNot { existing ->
-                existing.id == locationId ||
-                    (sourceKey == null &&
-                        existing.latitude == receivedLocation.latitude &&
-                        existing.longitude == receivedLocation.longitude)
+                existing.id == locationId
             }
 
             currentState.copy(
@@ -497,8 +492,45 @@ class MapViewModel(
         }
     }
 
-    fun onEmergencyContactLocationCentered() {
-        _uiState.update { it.copy(pendingEmergencyContactLocation = null) }
+    fun dismissEmergencyContactLocation(locationId: String) {
+        _uiState.update { currentState ->
+            val updatedLocations = currentState.emergencyContactLocations
+                .filterNot { it.id == locationId }
+            val updatedPendingLocation = currentState.pendingEmergencyContactLocation
+                ?.takeUnless { it.id == locationId }
+                ?: updatedLocations.lastOrNull()
+
+            currentState.copy(
+                emergencyContactLocations = updatedLocations,
+                pendingEmergencyContactLocation = updatedPendingLocation
+            )
+        }
+    }
+
+    private fun resolveEmergencyLocationId(
+        currentState: MapUiState,
+        event: BackendLocationSocketEvent
+    ): String {
+        val sourceKey = event.sourceKey?.trim()?.takeIf { it.isNotBlank() }
+        if (sourceKey != null) {
+            return sourceKey
+        }
+
+        currentState.pendingEmergencyContactLocation?.id?.let { return it }
+
+        val matchingLocation = currentState.emergencyContactLocations
+            .lastOrNull { existing ->
+                existing.title == event.title && existing.body == event.body
+            }
+        if (matchingLocation != null) {
+            return matchingLocation.id
+        }
+
+        if (currentState.emergencyContactLocations.size == 1) {
+            return currentState.emergencyContactLocations.first().id
+        }
+
+        return "emergency-unknown"
     }
 
     private suspend fun getTextoDestino(point: LatLng): String {
