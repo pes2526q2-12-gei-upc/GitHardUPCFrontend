@@ -53,6 +53,7 @@ import com.safesteps.data.obtenerEstadoEmergenciaUsuario
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
+import com.safesteps.notifications.BackendWebSocketManager
 import com.safesteps.notifications.persistEmergencyNotificationUser
 import com.safesteps.notifications.syncCurrentFcmTokenForUser
 import org.maplibre.android.annotations.IconFactory
@@ -95,6 +96,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 private const val EmergencyStatusNotificationDurationMillis = 6_000L
@@ -118,6 +120,10 @@ private data class MapScreenStrings(
     val emergencyModeActivatedMessage: String,
     val emergencyModeDeactivatedMessage: String,
     val emergencyModeUpdateFailedMessage: String,
+    val emergencyContactHelpTitle: String,
+    val emergencyContactHelpBody: String,
+    val emergencyContactHelpAction: String,
+    val emergencyContactMarkerLabel: String,
     val reportIssueOutsideBarcelonaMessage: String,
     val issueLoadingAddressLabel: String,
     val issueLocationFallbackLabel: String,
@@ -144,7 +150,8 @@ private data class MapRenderContext(
     val viewModel: MapViewModel,
     val navigationHeadingDegrees: Float?,
     val originLabel: String,
-    val destinationLabel: String
+    val destinationLabel: String,
+    val emergencyContactMarkerLabel: String
 )
 
 private data class NavigationTrackingState(
@@ -373,6 +380,13 @@ private fun MapScreenContent(
             hasPoiAction = uiState.puntsInteres.isNotEmpty(),
             hasEmergencyAction = showEmergencyAction
         )
+        val emergencyHelpBottomPadding = if (uiState.modoRuta) {
+            effectiveFloatingActionsBottomPadding + 56.dp
+        } else {
+            effectiveFloatingActionsBottomPadding +
+                estimatedFloatingActionsHeight(floatingActionsLayout) +
+                16.dp
+        }
 
         MapViewSurface(
             mapView = mapView,
@@ -506,6 +520,21 @@ private fun MapScreenContent(
             )
         }
 
+        EmergencyContactHelpOverlay(
+            pendingLocation = uiState.pendingEmergencyContactLocation,
+            titleFallback = strings.emergencyContactHelpTitle,
+            bodyFallback = strings.emergencyContactHelpBody,
+            actionLabel = strings.emergencyContactHelpAction,
+            bottomPadding = emergencyHelpBottomPadding,
+            onViewOnMapClick = {
+                focusOnEmergencyContactLocation(
+                    mapView = mapView,
+                    uiState = uiState,
+                    viewModel = viewModel
+                )
+            }
+        )
+
         CalculatingRouteOverlay(
             visible = uiState.calculantRuta,
             calculatingBestRouteLabel = strings.calculatingBestRouteLabel
@@ -579,7 +608,8 @@ fun MapLibreScreen(
         viewModel = viewModel,
         navigationHeadingDegrees = navigationHeadingDegrees,
         originLabel = strings.originLabel,
-        destinationLabel = strings.destinationLabel
+        destinationLabel = strings.destinationLabel,
+        emergencyContactMarkerLabel = strings.emergencyContactMarkerLabel
     )
 
     LaunchedEffect(currentUser?.googleId) {
@@ -621,6 +651,28 @@ fun MapLibreScreen(
 
     LaunchedEffect(issuesRefreshTrigger) {
         viewModel.loadIssuesMap()
+    }
+
+    LaunchedEffect(viewModel) {
+        BackendWebSocketManager.locationEvents.collectLatest { event ->
+            viewModel.onEmergencyContactLocationReceived(event)
+        }
+    }
+
+    LaunchedEffect(
+        isEmergencyActive,
+        uiState.ultimaUbicacion?.latitude,
+        uiState.ultimaUbicacion?.longitude
+    ) {
+        val location = uiState.ultimaUbicacion ?: return@LaunchedEffect
+        if (!isEmergencyActive) {
+            return@LaunchedEffect
+        }
+
+        BackendWebSocketManager.sendLocationUpdate(
+            latitude = location.latitude,
+            longitude = location.longitude
+        )
     }
 
     MapScreenEffects(
@@ -761,6 +813,81 @@ private fun CompactCircularMapAction(
 }
 
 @Composable
+private fun BoxScope.EmergencyContactHelpOverlay(
+    pendingLocation: EmergencyContactLocation?,
+    titleFallback: String,
+    bodyFallback: String,
+    actionLabel: String,
+    bottomPadding: Dp,
+    onViewOnMapClick: () -> Unit
+) {
+    if (pendingLocation == null) {
+        return
+    }
+
+    Surface(
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(start = 16.dp, end = 16.dp, bottom = bottomPadding)
+            .fillMaxWidth(0.92f),
+        shape = RoundedCornerShape(24.dp),
+        color = Color(0xFFFFF6F6),
+        shadowElevation = 10.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color(0xFFFFD5D5), RoundedCornerShape(24.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFB71C3B)
+            ) {
+                Box(
+                    modifier = Modifier.size(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.NotificationsActive,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = pendingLocation.title?.takeIf { it.isNotBlank() } ?: titleFallback,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF7A1327)
+                )
+                Text(
+                    text = pendingLocation.body?.takeIf { it.isNotBlank() } ?: bodyFallback,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF5F4A4A)
+                )
+            }
+
+            Button(
+                onClick = onViewOnMapClick,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB71C3B)),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Text(text = actionLabel, color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
 private fun mapScreenStrings(): MapScreenStrings {
     return MapScreenStrings(
         mapNotificationTitle = appString(R.string.notification_title_map),
@@ -781,6 +908,10 @@ private fun mapScreenStrings(): MapScreenStrings {
         emergencyModeActivatedMessage = appString(R.string.emergency_mode_activated),
         emergencyModeDeactivatedMessage = appString(R.string.emergency_mode_deactivated),
         emergencyModeUpdateFailedMessage = appString(R.string.emergency_mode_update_failed),
+        emergencyContactHelpTitle = appString(R.string.emergency_contact_help_title),
+        emergencyContactHelpBody = appString(R.string.emergency_contact_help_body),
+        emergencyContactHelpAction = appString(R.string.emergency_contact_help_action),
+        emergencyContactMarkerLabel = appString(R.string.emergency_contact_marker_label),
         reportIssueOutsideBarcelonaMessage = appString(R.string.issue_report_outside_barcelona),
         issueLoadingAddressLabel = appString(R.string.issue_loading_address),
         issueLocationFallbackLabel = appString(R.string.issue_location_fallback),
@@ -827,6 +958,34 @@ private fun rememberEmergencyStatusToggleAction(
             }
         }
     }
+}
+
+private fun focusOnEmergencyContactLocation(
+    mapView: MapView,
+    uiState: MapUiState,
+    viewModel: MapViewModel
+) {
+    val pendingLocation = uiState.pendingEmergencyContactLocation ?: return
+
+    if (
+        uiState.modoRuta &&
+        !uiState.routeCompleted &&
+        uiState.navigationCameraFollowing
+    ) {
+        viewModel.onNavigationCameraDismissedByGesture()
+    }
+
+    mapView.getMapAsync { map ->
+        map.animateCamera(
+            CameraUpdateFactory.newLatLngZoom(
+                LatLng(pendingLocation.latitude, pendingLocation.longitude),
+                16.0
+            ),
+            1200
+        )
+    }
+
+    viewModel.onEmergencyContactLocationCentered()
 }
 
 @Composable
@@ -1062,7 +1221,9 @@ private fun MapStyleRenderingEffect(
         uiState.puntsInteres,
         uiState.origenSeleccionado,
         uiState.destinoSeleccionado,
-        uiState.issues
+        uiState.issues,
+        uiState.emergencyContactLocations,
+        uiState.pendingEmergencyContactLocation?.id
     ) {
         val targetStyleUrl = resolveMapStyleUrl(uiState.estiloSatelite)
         renderContext.mapView.getMapAsync { map ->
@@ -1679,6 +1840,13 @@ private fun renderMapStateAfterStyleLoaded(
             context = renderContext.context
         )
         addIssueMarkers(map, uiState.issues, renderContext.context)
+        addEmergencyContactMarkers(
+            map = map,
+            emergencyContactLocations = uiState.emergencyContactLocations,
+            pendingEmergencyContactLocation = uiState.pendingEmergencyContactLocation,
+            context = renderContext.context,
+            defaultTitle = renderContext.emergencyContactMarkerLabel
+        )
         return
     }
 
@@ -1691,6 +1859,13 @@ private fun renderMapStateAfterStyleLoaded(
         destinationLabel = renderContext.destinationLabel
     )
     addIssueMarkers(map, uiState.issues, renderContext.context)
+    addEmergencyContactMarkers(
+        map = map,
+        emergencyContactLocations = uiState.emergencyContactLocations,
+        pendingEmergencyContactLocation = uiState.pendingEmergencyContactLocation,
+        context = renderContext.context,
+        defaultTitle = renderContext.emergencyContactMarkerLabel
+    )
 }
 
 private fun addIssueMarkers(
@@ -1704,6 +1879,28 @@ private fun addIssueMarkers(
             position = LatLng(issue.coordinates.lat, issue.coordinates.lon),
             title = issue.type.name,
             icon = createIssueIcon(context, issue.type)
+        )
+    }
+}
+
+private fun addEmergencyContactMarkers(
+    map: MapLibreMap,
+    emergencyContactLocations: List<EmergencyContactLocation>,
+    pendingEmergencyContactLocation: EmergencyContactLocation?,
+    context: Context,
+    defaultTitle: String
+) {
+    val highlightedLocationId = pendingEmergencyContactLocation?.id
+
+    emergencyContactLocations.forEach { location ->
+        addLegacyMarker(
+            map = map,
+            position = LatLng(location.latitude, location.longitude),
+            title = location.title?.takeIf { it.isNotBlank() } ?: defaultTitle,
+            icon = createEmergencyContactIcon(
+                context = context,
+                highlighted = location.id == highlightedLocationId
+            )
         )
     }
 }
@@ -1916,6 +2113,46 @@ fun createIssueIcon(context: Context, tipus: IssueApiType): org.maplibre.android
 
     val y = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
     canvas.drawText(emoji, size / 2f, y, textPaint)
+
+    return IconFactory.getInstance(context).fromBitmap(bitmap)
+}
+
+private fun createEmergencyContactIcon(
+    context: Context,
+    highlighted: Boolean
+): org.maplibre.android.annotations.Icon? {
+    val markerText = if (highlighted) "SOS" else "!"
+    val backgroundColor = if (highlighted) "#B71C3B".toColorInt() else "#E76F51".toColorInt()
+    val size = 96
+    val bitmap = createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+
+    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(48, 0, 0, 0)
+        style = Paint.Style.FILL
+    }
+    val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = backgroundColor
+        style = Paint.Style.FILL
+    }
+    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 6f
+    }
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        textAlign = Paint.Align.CENTER
+        textSize = if (highlighted) 26f else 44f
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
+    canvas.drawCircle(size / 2f, size / 2f + 4f, size / 2.7f, shadowPaint)
+    canvas.drawCircle(size / 2f, size / 2f, size / 2.8f, circlePaint)
+    canvas.drawCircle(size / 2f, size / 2f, size / 2.8f, ringPaint)
+
+    val textY = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
+    canvas.drawText(markerText, size / 2f, textY, textPaint)
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
 }

@@ -31,6 +31,7 @@ import com.safesteps.data.obtenirVotsUsuari
 import com.safesteps.data.votarIncidencia
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
+import com.safesteps.notifications.BackendLocationSocketEvent
 import com.safesteps.ui.notifications.ScreenNotificationManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -101,6 +102,7 @@ class MapViewModel(
         const val OFF_ROUTE_RECALCULATION_THRESHOLD_METERS = 200.0
         const val OFF_ROUTE_RECALCULATION_COOLDOWN_MS = 15_000L
         const val MIN_DISTANCE_FOR_ACTIVE_NAVIGATION_METERS = 30.0
+        const val MAX_EMERGENCY_CONTACT_LOCATIONS = 10
     }
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -137,14 +139,26 @@ class MapViewModel(
         currentGoogleId = user?.googleId?.takeIf { it.isNotBlank() }
         val gid = currentGoogleId
         if (gid != null) {
-            _uiState.update { it.copy(userVotes = emptyMap()) }
+            _uiState.update {
+                it.copy(
+                    userVotes = emptyMap(),
+                    emergencyContactLocations = emptyList(),
+                    pendingEmergencyContactLocation = null
+                )
+            }
             userVoteIds = emptyMap()
 
             viewModelScope.launch {
                 refreshUserVotesFromBackend(gid)
             }
         } else {
-            _uiState.update { it.copy(userVotes = emptyMap()) }
+            _uiState.update {
+                it.copy(
+                    userVotes = emptyMap(),
+                    emergencyContactLocations = emptyList(),
+                    pendingEmergencyContactLocation = null
+                )
+            }
             userVoteIds = emptyMap()
         }
         _uiState.update { it.copy(routeColor = user?.routeColor) }
@@ -454,6 +468,37 @@ class MapViewModel(
 
     fun onPuntInteresSeleccionat(punt: PuntInteres?) {
         _uiState.update { it.copy(puntInteresSeleccionat = punt) }
+    }
+
+    fun onEmergencyContactLocationReceived(event: BackendLocationSocketEvent) {
+        val sourceKey = event.sourceKey?.trim()?.takeIf { it.isNotBlank() }
+        val locationId = sourceKey ?: "emergency-${System.currentTimeMillis()}"
+        val receivedLocation = EmergencyContactLocation(
+            id = locationId,
+            latitude = event.latitude,
+            longitude = event.longitude,
+            title = event.title,
+            body = event.body
+        )
+
+        _uiState.update { currentState ->
+            val deduplicatedLocations = currentState.emergencyContactLocations.filterNot { existing ->
+                existing.id == locationId ||
+                    (sourceKey == null &&
+                        existing.latitude == receivedLocation.latitude &&
+                        existing.longitude == receivedLocation.longitude)
+            }
+
+            currentState.copy(
+                emergencyContactLocations = (deduplicatedLocations + receivedLocation)
+                    .takeLast(MAX_EMERGENCY_CONTACT_LOCATIONS),
+                pendingEmergencyContactLocation = receivedLocation
+            )
+        }
+    }
+
+    fun onEmergencyContactLocationCentered() {
+        _uiState.update { it.copy(pendingEmergencyContactLocation = null) }
     }
 
     private suspend fun getTextoDestino(point: LatLng): String {

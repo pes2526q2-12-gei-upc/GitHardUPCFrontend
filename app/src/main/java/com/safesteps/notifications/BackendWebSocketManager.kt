@@ -9,6 +9,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -21,6 +24,7 @@ private const val BackendWebSocketTag = "BACKEND_WS"
 private const val BackendWebSocketEndpoint = "ws://nattech.fib.upc.edu:40383/ws-safesteps"
 private const val BackendReconnectDelayMillis = 5_000L
 private const val BackendStompNull = '\u0000'
+private const val BackendLocationUpdateDestination = "/app/location.update"
 
 private const val MessageTitleKey = "NEW_MESSAGE_TITLE"
 private const val MessageBodyKey = "NEW_MESSAGE_BODY"
@@ -28,6 +32,14 @@ private const val EmergencyTitleKey = "EMERGENCY_TITLE"
 private const val EmergencyBodyKey = "EMERGENCY_BODY"
 private const val FriendRequestTitleKey = "FRIEND_REQ_TITLE"
 private const val FriendRequestBodyKey = "FRIEND_REQ_BODY"
+
+data class BackendLocationSocketEvent(
+    val latitude: Double,
+    val longitude: Double,
+    val sourceKey: String? = null,
+    val title: String? = null,
+    val body: String? = null
+)
 
 object BackendWebSocketManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -47,6 +59,11 @@ object BackendWebSocketManager {
     private var intentionalDisconnect = false
     private var desiredChannelSettings = SocketChannelSettings()
     private var subscribedChannels = mutableSetOf<SocketChannelPreference>()
+    private val _locationEvents = MutableSharedFlow<BackendLocationSocketEvent>(
+        extraBufferCapacity = 16
+    )
+
+    val locationEvents: SharedFlow<BackendLocationSocketEvent> = _locationEvents.asSharedFlow()
 
     fun connect(
         context: Context,
@@ -94,6 +111,36 @@ object BackendWebSocketManager {
             send(buildDisconnectFrame())
             close(1000, "Backend websocket disconnected")
         }
+    }
+
+    fun sendLocationUpdate(
+        latitude: Double,
+        longitude: Double
+    ): Boolean {
+        if (!latitude.isFinite() || !longitude.isFinite()) {
+            return false
+        }
+
+        val socket = synchronized(stateLock) {
+            if (!stompConnected) {
+                null
+            } else {
+                webSocket
+            }
+        } ?: return false
+
+        val body = JSONObject()
+            .put("lat", latitude)
+            .put("lon", longitude)
+            .toString()
+
+        return socket.send(
+            buildSendFrame(
+                destination = BackendLocationUpdateDestination,
+                body = body,
+                contentType = "application/json"
+            )
+        )
     }
 
     private fun openSocket(googleId: String) {
@@ -265,13 +312,26 @@ object BackendWebSocketManager {
 
             SocketChannelPreference.LOCATION -> {
                 val coordinates = payload.extractCoordinates()
+                val resolvedTitle = payload.resolveTitle(null)
+                val resolvedBody = payload.resolveBody(null)
                 showIncomingLocationNotification(
                     context = context,
-                    title = payload.resolveTitle(null),
-                    body = payload.resolveBody(null),
+                    title = resolvedTitle,
+                    body = resolvedBody,
                     latitude = coordinates?.latitude,
                     longitude = coordinates?.longitude
                 )
+                coordinates?.let {
+                    _locationEvents.tryEmit(
+                        BackendLocationSocketEvent(
+                            latitude = it.latitude,
+                            longitude = it.longitude,
+                            sourceKey = payload.resolveSourceKey(),
+                            title = resolvedTitle,
+                            body = resolvedBody
+                        )
+                    )
+                }
             }
 
             else -> {
@@ -372,6 +432,22 @@ object BackendWebSocketManager {
         return buildString {
             append("DISCONNECT\n")
             append("\n")
+            append(BackendStompNull)
+        }
+    }
+
+    private fun buildSendFrame(
+        destination: String,
+        body: String,
+        contentType: String? = null
+    ): String {
+        return buildString {
+            append("SEND\n")
+            append("destination:$destination\n")
+            contentType?.let { append("content-type:$it\n") }
+            append("content-length:${body.toByteArray(Charsets.UTF_8).size}\n")
+            append("\n")
+            append(body)
             append(BackendStompNull)
         }
     }
@@ -496,19 +572,53 @@ object BackendWebSocketManager {
             return bodyKey.takeUnless { it == defaultKey }
         }
 
-        fun extractCoordinates(): Coordinates? {
-            val candidates = listOfNotNull(
-                dataObject,
-                root?.optJSONObject("coords"),
-                root?.optJSONObject("location"),
-                root
+        fun resolveSourceKey(): String? {
+            val candidateKeys = listOf(
+                "googleId",
+                "userId",
+                "senderGoogleId",
+                "contactGoogleId",
+                "username"
             )
 
+            return sequenceOf(dataObject, root)
+                .flatMap { objectNode ->
+                    candidateKeys.asSequence().mapNotNull { key ->
+                        objectNode?.optString(key)
+                            ?.takeIf { it.isNotBlank() }
+                    }
+                }
+                .firstOrNull()
+        }
+
+        fun extractCoordinates(): Coordinates? {
+            val candidates = candidateObjects(dataObject) + candidateObjects(root)
             for (candidate in candidates) {
                 parseCoordinates(candidate)?.let { return it }
             }
 
             return null
+        }
+
+        private fun candidateObjects(objectNode: JSONObject?): List<JSONObject> {
+            if (objectNode == null) {
+                return emptyList()
+            }
+
+            val nestedKeys = listOf("coord", "coords", "coordinates", "location", "payload")
+            val locationKeys = listOf("coord", "coords", "coordinates", "location")
+
+            return buildList {
+                add(objectNode)
+                nestedKeys.forEach { key ->
+                    objectNode.optJSONObject(key)?.let { nested ->
+                        add(nested)
+                        locationKeys.forEach { nestedLocationKey ->
+                            nested.optJSONObject(nestedLocationKey)?.let(::add)
+                        }
+                    }
+                }
+            }
         }
 
         private fun parseCoordinates(objectNode: JSONObject): Coordinates? {

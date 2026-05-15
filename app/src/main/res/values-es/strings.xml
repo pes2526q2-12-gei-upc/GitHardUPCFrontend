@@ -116,6 +116,10 @@
     <string name="emergency_mode_activated">Modo emergencia activado. Se está compartiendo tu ubicación en tiempo real con tus contactos de emergencia.</string>
     <string name="emergency_mode_deactivated">Modo emergencia desactivado. Se ha dejado de compartir tu ubicación en tiempo real con tus contactos de emergencia.</string>
     <string name="emergency_mode_update_failed">No se ha podido actualizar el modo emergencia.</string>
+    <string name="emergency_contact_help_title">Un contacto de emergencia necesita ayuda</string>
+    <string name="emergency_contact_help_body">Se ha recibido una ubicación en tiempo real. Pulsa Ver en mapa para centrarla.</string>
+    <string name="emergency_contact_help_action">Ver en mapa</string>
+    <string name="emergency_contact_marker_label">Contacto de emergencia</string>
     <string name="calculating_best_route">Calculando la mejor ruta&#8230;</string>
     <string name="notification_title_auth">Autenticaci&#243;n</string>
     <string name="notification_title_map">Mapa</string>

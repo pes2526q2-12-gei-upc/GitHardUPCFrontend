@@ -116,6 +116,10 @@
     <string name="emergency_mode_activated">Mode d\'emerg&#232;ncia activat. S\'est&#224; compartint la teva ubicaci&#243; en temps real amb els teus contactes d\'emerg&#232;ncia.</string>
     <string name="emergency_mode_deactivated">Mode d\'emerg&#232;ncia desactivat. S\'ha deixat de compartir la teva ubicaci&#243; en temps real amb els teus contactes d\'emerg&#232;ncia.</string>
     <string name="emergency_mode_update_failed">No s\'ha pogut actualitzar el mode d\'emerg&#232;ncia.</string>
+    <string name="emergency_contact_help_title">Un contacte d\'emerg&#232;ncia necessita ajuda</string>
+    <string name="emergency_contact_help_body">S\'ha rebut una ubicaci&#243; en temps real. Prem Veure al mapa per centrar-la.</string>
+    <string name="emergency_contact_help_action">Veure al mapa</string>
+    <string name="emergency_contact_marker_label">Contacte d\'emerg&#232;ncia</string>
     <string name="calculating_best_route">Calculant la millor ruta&#8230;</string>
     <string name="notification_title_auth">Autenticaci&#243;</string>
     <string name="notification_title_map">Mapa</string>
