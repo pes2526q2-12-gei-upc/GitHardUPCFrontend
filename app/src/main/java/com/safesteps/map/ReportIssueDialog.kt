@@ -1208,15 +1208,20 @@ private fun UserVoteFeedbackBar(
         ) {
             Text(
                 text = if (isPositive) confirmedLabel else falseReportLabel,
+                modifier = Modifier.weight(1f),
                 color = if (isPositive) Color(0xFF2E7D32) else Color(0xFFD32F2F),
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = undoLabel,
                 modifier = Modifier.clickable { onUndo() },
                 color = Color.Gray,
                 textDecoration = TextDecoration.Underline,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                softWrap = false
             )
         }
     }

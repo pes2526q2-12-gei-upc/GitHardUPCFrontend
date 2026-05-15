@@ -124,7 +124,7 @@ private interface VotesApiService {
 }
 
 private object IssueBackend {
-    private const val BASE_URL = "http://nattech.fib.upc.edu:40383/"
+    private const val BASE_URL = "http://nattech.fib.upc.edu:40381/"
 
     private val retrofit by lazy {
         Retrofit.Builder()

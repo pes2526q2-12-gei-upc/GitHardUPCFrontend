@@ -17,7 +17,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40383/"
+private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40381/"
 private const val USERS_PATH = "api/v1/users"
 
 enum class UserSyncResult {
@@ -458,7 +458,9 @@ suspend fun completarRutaEnBackend(googleId: String, distanceMeters: Double): Ro
 suspend fun cargarPerfilDeUsuario(googleId: String): UserResponse? {
     val response = UserBackend.service.getUserByGoogleId(googleId)
     if (response.isSuccessful) {
-        return response.body()
+        val res = response.body()
+        Log.d("USER_API_RAW", "Body rebut: $res")
+        return res
     }
     return null
 }

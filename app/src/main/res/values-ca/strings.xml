@@ -230,6 +230,34 @@
     <string name="friends_remove_confirmation_title">Eliminar amistat</string>
     <string name="friends_remove_confirmation_message">També s\'esborrarà el xat amb %1$s.</string>
 
+    <string name="chat_load_failed">No s\'han pogut carregar els xats.</string>
+    <string name="chat_messages_load_failed">No s\'han pogut carregar els missatges.</string>
+    <string name="chat_no_conversations">Encara no tens cap conversa</string>
+    <string name="chat_start_hint">Inicia un xat des de la llista d\'amics</string>
+    <string name="chat_tap_to_open">Toca per obrir la conversa</string>
+    <string name="chat_online_status">En línia</string>
+    <string name="chat_no_messages_yet">Sigues el primer en escriure!</string>
+    <string name="chat_input_placeholder">Escriu un missatge…</string>
+    <string name="chat_send_action">Enviar</string>
+    <string name="chat_send_failed">Error en enviar. Torna-ho a intentar.</string>
+    <string name="chat_delete_title">Esborrar conversa</string>
+    <string name="chat_delete_confirmation">Vols esborrar la conversa amb %s?</string>
+    <string name="chat_create_action">Nou xat</string>
+    <string name="chat_create_title">Nou xat</string>
+    <string name="chat_no_friends_to_chat">No tens amics disponibles</string>
+    <string name="chat_group_name_label">Nom del grup</string>
+    <string name="chat_group_name_placeholder">Ex: Amics del barri…</string>
+    <string name="chat_members_selected">membres seleccionats</string>
+    <string name="chat_create_group_action">Crear grup</string>
+    <string name="chat_create_private_action">Iniciar xat</string>
+    <string name="chat_exit_title">Sortir del xat</string>
+    <string name="chat_exit_confirmation">Segur que vols sortir d\'aquest grup?</string>
+    <string name="chat_exit_action">Sortir del grup</string>
+    <string name="chat_details_action">Detalls del xat</string>
+    <string name="chat_group_label">Grup</string>
+    <string name="chat_private_label">Conversa privada</string>
+    <string name="chat_participants_label">Participants</string>
+
     <plurals name="poi_fountains">
         <item quantity="one">%d font</item>
         <item quantity="many">%d fonts</item>

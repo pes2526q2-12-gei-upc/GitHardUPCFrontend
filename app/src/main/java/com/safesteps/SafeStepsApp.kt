@@ -20,7 +20,12 @@ import com.safesteps.auth.AuthViewModel
 import com.safesteps.auth.UserInfo
 import com.safesteps.auth.rememberGoogleSignOutAction
 import com.safesteps.auth.rememberGoogleSignInAction
+import com.safesteps.chat.ChatListScreen
+import com.safesteps.chat.ConversationScreen
+import com.safesteps.chat.CreateChatScreen
 import com.safesteps.data.RouteCompletionResponse
+import com.safesteps.profile.ChatListViewModel
+import com.safesteps.profile.FriendListItemUiState
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.LanguagePreferencesRepository
 import com.safesteps.i18n.LanguageViewModel
@@ -47,7 +52,10 @@ private enum class SafeStepsDestination {
     ROUTE_FILTERS,
     PROFILE,
     CUSTOMIZE,
-    FRIEND_SEARCH
+    FRIEND_SEARCH,
+    CHAT,
+    CHAT_CONVERSATION,
+    CREATE_CHAT
 }
 
 private data class AuthNoticeTexts(
@@ -70,10 +78,9 @@ fun SafeStepsApp(
 ) {
     val appContext = LocalContext.current.applicationContext
     val languageRepository = remember(appContext) { LanguagePreferencesRepository(appContext) }
-    val languageViewModel: LanguageViewModel = viewModel(
-        factory = LanguageViewModelFactory(languageRepository)
-    )
+    val languageViewModel: LanguageViewModel = viewModel(factory = LanguageViewModelFactory(languageRepository))
     val profileViewModel: ProfileViewModel = viewModel()
+    val chatListViewModel: ChatListViewModel = viewModel()
     val authUiState by authViewModel.uiState.collectAsState()
     val languageUiState by languageViewModel.uiState.collectAsState()
     val profileUiState by profileViewModel.uiState.collectAsState()
@@ -83,6 +90,11 @@ fun SafeStepsApp(
     var profileBackDestination by rememberSaveable {
         mutableStateOf(SafeStepsDestination.MAP)
     }
+
+    var chatBackDestination by rememberSaveable { mutableStateOf(SafeStepsDestination.FRIENDS) }
+    var currentChatId by rememberSaveable { mutableStateOf(-1L) }
+    var currentChatOtherName by rememberSaveable { mutableStateOf("") }
+    var conversationBackToList by rememberSaveable { mutableStateOf(false) }
 
     var issuesRefreshTrigger by rememberSaveable {
         mutableStateOf(0)
@@ -118,6 +130,74 @@ fun SafeStepsApp(
         profileBackDestination = SafeStepsDestination.FRIEND_SEARCH
         currentDestination = SafeStepsDestination.PROFILE
     }
+
+    val onNavigatToChatFromFriends: (FriendListItemUiState) -> Unit = { friend ->
+        val user = authUiState.currentUser
+        if (user != null) {
+            chatListViewModel.onCurrentUserChanged(user.googleId, user.username)
+            chatListViewModel.findOrCreatePrivateChat(friend.googleId, friend.username) { chatId ->
+                currentChatId = chatId
+                currentChatOtherName = friend.username
+                conversationBackToList = false
+                chatBackDestination = SafeStepsDestination.FRIENDS
+                currentDestination = SafeStepsDestination.CHAT_CONVERSATION
+            }
+        }
+    }
+
+    val onNavigateFromListToConversation: (Long, String) -> Unit = { chatId, name ->
+        currentChatId = chatId
+        currentChatOtherName = name
+        conversationBackToList = true
+        currentDestination = SafeStepsDestination.CHAT_CONVERSATION
+    }
+
+    val onNavigateToCreateChat = {
+        authUiState.currentUser?.let {
+            chatListViewModel.onCurrentUserChanged(it.googleId, it.username)
+        }
+        currentDestination = SafeStepsDestination.CREATE_CHAT
+    }
+
+    val onNavigateBackFromCreateChat = {
+        currentDestination = SafeStepsDestination.CHAT
+    }
+
+    val onChatCreatedNavigate: (Long, String) -> Unit = { chatId, chatName ->
+        currentChatId = chatId
+        currentChatOtherName = chatName
+        conversationBackToList = true
+        currentDestination = SafeStepsDestination.CHAT_CONVERSATION
+    }
+
+    val onNavigateBackFromConversation = {
+        if (conversationBackToList) {
+            currentDestination = SafeStepsDestination.CHAT
+        } else {
+            currentDestination = SafeStepsDestination.FRIENDS
+        }
+    }
+
+    val onNavigateToChatFromMenu = {
+        chatBackDestination = SafeStepsDestination.MENU
+        currentDestination = SafeStepsDestination.CHAT
+    }
+
+    val onNavigateBackFromChat = {
+        when(chatBackDestination){
+            SafeStepsDestination.FRIENDS -> {
+                currentDestination = SafeStepsDestination.FRIENDS
+            }
+            SafeStepsDestination.MENU -> {
+                currentDestination = SafeStepsDestination.MENU
+            }
+            else -> {
+                chatBackDestination = SafeStepsDestination.MAP
+                currentDestination = SafeStepsDestination.MAP
+            }
+        }
+    }
+
     val onNavigateBackFromProfile = {
         when (profileBackDestination) {
             SafeStepsDestination.MENU -> {
@@ -136,6 +216,7 @@ fun SafeStepsApp(
             }
         }
     }
+
 
     HandleProfileRedirectEffect(
         currentUser = authUiState.currentUser,
@@ -191,6 +272,15 @@ fun SafeStepsApp(
             SafeStepsDestination.PROFILE -> {
                 onNavigateBackFromProfile()
             }
+            SafeStepsDestination.CHAT -> {
+                onNavigateBackFromChat()
+            }
+            SafeStepsDestination.CHAT_CONVERSATION -> {
+                onNavigateBackFromConversation()
+            }
+            SafeStepsDestination.CREATE_CHAT -> {
+                currentDestination = SafeStepsDestination.CHAT
+            }
             SafeStepsDestination.MAP -> Unit
         }
     }
@@ -215,6 +305,16 @@ fun SafeStepsApp(
         onNavigateToProfileFromMap = onNavigateToProfileFromMap,
         onNavigateToProfileFromMenu = onNavigateToProfileFromMenu,
         onNavigateToProfileFromFriendSearch = onNavigateToProfileFromFriendSearch,
+        onNavigateBackFromChat = onNavigateBackFromChat,
+        onNavigateToFriendsFromChat = onNavigatToChatFromFriends,
+        onNavigateToMenuFromChat = onNavigateToChatFromMenu,
+        onNavigateFromListToConversation = onNavigateFromListToConversation,
+        onNavigateBackFromConversation = onNavigateBackFromConversation,
+        onNavigateToCreateChat = onNavigateToCreateChat,
+        onNavigateBackFromCreateChat = onNavigateBackFromCreateChat,
+        onChatCreatedNavigate = onChatCreatedNavigate,
+        currentChatId = currentChatId,
+        currentChatOtherName = currentChatOtherName,
         onReturnToProfile = { currentDestination = SafeStepsDestination.PROFILE },
         onNavigateToCustomize = { currentDestination = SafeStepsDestination.CUSTOMIZE },
         onNavigateToFriendSearch = { currentDestination = SafeStepsDestination.FRIEND_SEARCH },
@@ -307,6 +407,16 @@ private fun SafeStepsLocalizedContent(
     onNavigateToProfileFromMap: () -> Unit,
     onNavigateToProfileFromMenu: () -> Unit,
     onNavigateToProfileFromFriendSearch: () -> Unit,
+    onNavigateBackFromChat: () -> Unit,
+    onNavigateToFriendsFromChat: (FriendListItemUiState) -> Unit,
+    onNavigateToMenuFromChat: () -> Unit,
+    onNavigateFromListToConversation: (Long, String) -> Unit,
+    onNavigateBackFromConversation: () -> Unit,
+    onNavigateToCreateChat: () -> Unit,
+    onNavigateBackFromCreateChat: () -> Unit,
+    onChatCreatedNavigate: (Long, String) -> Unit,
+    currentChatId: Long,
+    currentChatOtherName: String,
     onReturnToProfile: () -> Unit,
     onNavigateToCustomize: () -> Unit,
     onNavigateToFriendSearch: () -> Unit,
@@ -354,6 +464,16 @@ private fun SafeStepsLocalizedContent(
             onNavigateToProfileFromMap = onNavigateToProfileFromMap,
             onNavigateToProfileFromMenu = onNavigateToProfileFromMenu,
             onNavigateToProfileFromFriendSearch = onNavigateToProfileFromFriendSearch,
+            onNavigateBackFromChat = onNavigateBackFromChat,
+            onNavigateToChatFromFriends = onNavigateToFriendsFromChat,
+            onNavigateToChatFromMenu = onNavigateToMenuFromChat,
+            onNavigateFromListToConversation = onNavigateFromListToConversation,
+            onNavigateBackFromConversation = onNavigateBackFromConversation,
+            onNavigateToCreateChat = onNavigateToCreateChat,
+            onNavigateBackFromCreateChat = onNavigateBackFromCreateChat,
+            onChatCreatedNavigate = onChatCreatedNavigate,
+            currentChatId = currentChatId,
+            currentChatOtherName = currentChatOtherName,
             onReturnToProfile = onReturnToProfile,
             onNavigateToCustomize = onNavigateToCustomize,
             onNavigateToFriendSearch = onNavigateToFriendSearch,
@@ -418,6 +538,16 @@ private fun SafeStepsBody(
     onNavigateToProfileFromMap: () -> Unit,
     onNavigateToProfileFromMenu: () -> Unit,
     onNavigateToProfileFromFriendSearch: () -> Unit,
+    onNavigateBackFromChat: () -> Unit,
+    onNavigateToChatFromFriends: (FriendListItemUiState) -> Unit,
+    onNavigateToChatFromMenu: () -> Unit,
+    onNavigateFromListToConversation: (Long, String) -> Unit,
+    onNavigateBackFromConversation: () -> Unit,
+    onNavigateToCreateChat: () -> Unit,
+    onNavigateBackFromCreateChat: () -> Unit,
+    onChatCreatedNavigate: (Long, String) -> Unit,
+    currentChatId: Long,
+    currentChatOtherName: String,
     onReturnToProfile: () -> Unit,
     onNavigateToCustomize: () -> Unit,
     onNavigateToFriendSearch: () -> Unit,
@@ -460,6 +590,7 @@ private fun SafeStepsBody(
                         onCustomizeClick = onNavigateToCustomize
                     )
                 }
+
                 SafeStepsDestination.ROUTE_FILTERS -> {
                     RouteFiltersScreen(
                         filterState = ProfileFilterState(
@@ -473,34 +604,39 @@ private fun SafeStepsBody(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
+
                 SafeStepsDestination.CUSTOMIZE -> {
                     com.safesteps.profile.ProfileCustomizationScreen(
                         user = currentUser,
                         onBack = onReturnToProfile,
-                        unlockedPremis = profileUiState.premis, // FUSIONADO GAMIFICACIÓN
+                        unlockedPremis = profileUiState.premis,
                         onSave = onUpdateUserProfile,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
+
                 SafeStepsDestination.MENU -> {
                     CommunityMenuScreen(
                         user = currentUser,
                         onBack = onNavigateToMap,
                         onProfileClick = onNavigateToProfileFromMenu,
                         onFriendsClick = onNavigateToFriends,
+                        onChatClick = onNavigateToChatFromMenu,
                         onRouteFiltersClick = onNavigateToRouteFilters,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
+
                 SafeStepsDestination.FRIENDS -> {
                     FriendsScreen(
                         user = currentUser,
                         onBack = onNavigateToMenu,
                         onAddFriendClick = onNavigateToFriendSearch,
-                        onChatClick = {},
+                        onChatClick = onNavigateToChatFromFriends,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
+
                 SafeStepsDestination.FRIEND_SEARCH -> {
                     FriendSearchScreen(
                         user = currentUser,
@@ -508,6 +644,7 @@ private fun SafeStepsBody(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
+
                 SafeStepsDestination.MAP -> {
                     MapLibreScreen(
                         modifier = Modifier.fillMaxSize(),
@@ -518,6 +655,35 @@ private fun SafeStepsBody(
                         onMenuClick = onNavigateToMenu,
                         onProfileClick = onNavigateToProfileFromMap,
                         onRouteCompleted = onRouteCompleted
+                    )
+                }
+
+                SafeStepsDestination.CHAT -> {
+                    ChatListScreen(
+                        user = currentUser,
+                        onBack = onNavigateBackFromChat,
+                        onChatSelected = onNavigateFromListToConversation,
+                        onCreateChat = onNavigateToCreateChat,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                SafeStepsDestination.CHAT_CONVERSATION -> {
+                    ConversationScreen(
+                        chatId = currentChatId,
+                        otherParticipantName = currentChatOtherName,
+                        user = currentUser,
+                        onBack = onNavigateBackFromConversation,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                SafeStepsDestination.CREATE_CHAT -> {
+                    CreateChatScreen(
+                        user = currentUser,
+                        onBack = onNavigateBackFromCreateChat,
+                        onChatCreated = onChatCreatedNavigate,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
