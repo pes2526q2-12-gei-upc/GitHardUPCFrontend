@@ -279,6 +279,18 @@
         <item quantity="one">%d police station</item>
         <item quantity="other">%d police stations</item>
     </plurals>
+    <plurals name="poi_security_cameras">
+        <item quantity="one">%d security camera</item>
+        <item quantity="other">%d security cameras</item>
+    </plurals>
+    <plurals name="poi_escalators">
+        <item quantity="one">%d escalator</item>
+        <item quantity="other">%d escalators</item>
+    </plurals>
+    <plurals name="poi_climate_shelters">
+        <item quantity="one">%d climate shelter</item>
+        <item quantity="other">%d climate shelters</item>
+    </plurals>
     <plurals name="profile_filter_count">
         <item quantity="one">%d filter</item>
         <item quantity="other">%d filters</item>

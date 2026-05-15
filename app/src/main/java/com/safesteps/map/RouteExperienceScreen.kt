@@ -341,36 +341,76 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
     val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
     val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
     val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
+    val cameras = puntsInteres.count { it.tipus.uppercase() == "CAMERA" }
+    val escalesMecaniques = puntsInteres.count { it.tipus.uppercase() == "ESCALA_MECANICA" }
+    val refugisClimatics = puntsInteres.count { it.tipus.uppercase() == "REFUGI_CLIMATIC" }
+    val hasFirstRow = fonts > 0 || bancs > 0 || comisaries > 0
+    val hasSecondRow = cameras > 0 || escalesMecaniques > 0 || refugisClimatics > 0
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFFF2F4F3), RoundedCornerShape(12.dp))
             .padding(12.dp)
             .semantics(mergeDescendants = true) { testTag = "btn_places" }
             .testTag("btn_places"),
-        horizontalArrangement = Arrangement.SpaceEvenly
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        if (fonts > 0) {
-            Text(
-                text = "\uD83D\uDCA7 ${appPlural(R.plurals.poi_fountains, fonts, fonts)}",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color(0xFF3D4A45)
-            )
+        if (hasFirstRow) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (fonts > 0) {
+                    Text(
+                        text = "\uD83D\uDCA7 ${appPlural(R.plurals.poi_fountains, fonts, fonts)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF3D4A45)
+                    )
+                }
+                if (bancs > 0) {
+                    Text(
+                        text = "\uD83E\uDE91 ${appPlural(R.plurals.poi_benches, bancs, bancs)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF3D4A45)
+                    )
+                }
+                if (comisaries > 0) {
+                    Text(
+                        text = "\uD83D\uDC6E ${appPlural(R.plurals.poi_police_stations, comisaries, comisaries)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF3D4A45)
+                    )
+                }
+            }
         }
-        if (bancs > 0) {
-            Text(
-                text = "\uD83E\uDE91 ${appPlural(R.plurals.poi_benches, bancs, bancs)}",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color(0xFF3D4A45)
-            )
-        }
-        if (comisaries > 0) {
-            Text(
-                text = "\uD83D\uDC6E ${appPlural(R.plurals.poi_police_stations, comisaries, comisaries)}",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color(0xFF3D4A45)
-            )
+        if (hasSecondRow) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (cameras > 0) {
+                    Text(
+                        text = "\uD83D\uDCF9 ${appPlural(R.plurals.poi_security_cameras, cameras, cameras)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF3D4A45)
+                    )
+                }
+                if (escalesMecaniques > 0) {
+                    Text(
+                        text = "\u21C5 ${appPlural(R.plurals.poi_escalators, escalesMecaniques, escalesMecaniques)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF3D4A45)
+                    )
+                }
+                if (refugisClimatics > 0) {
+                    Text(
+                        text = "\uD83C\uDF21\uFE0F ${appPlural(R.plurals.poi_climate_shelters, refugisClimatics, refugisClimatics)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color(0xFF3D4A45)
+                    )
+                }
+            }
         }
     }
     Spacer(modifier = Modifier.height(16.dp))

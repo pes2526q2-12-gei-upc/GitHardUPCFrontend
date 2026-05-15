@@ -284,6 +284,21 @@
         <item quantity="many">%d comisar&#237;as</item>
         <item quantity="other">%d comisar&#237;as</item>
     </plurals>
+    <plurals name="poi_security_cameras">
+        <item quantity="one">%d c&#225;mara de seguridad</item>
+        <item quantity="many">%d c&#225;maras de seguridad</item>
+        <item quantity="other">%d c&#225;maras de seguridad</item>
+    </plurals>
+    <plurals name="poi_escalators">
+        <item quantity="one">%d escalera mec&#225;nica</item>
+        <item quantity="many">%d escaleras mec&#225;nicas</item>
+        <item quantity="other">%d escaleras mec&#225;nicas</item>
+    </plurals>
+    <plurals name="poi_climate_shelters">
+        <item quantity="one">%d refugio clim&#225;tico</item>
+        <item quantity="many">%d refugios clim&#225;ticos</item>
+        <item quantity="other">%d refugios clim&#225;ticos</item>
+    </plurals>
     <plurals name="profile_filter_count">
         <item quantity="one">%d filtro</item>
         <item quantity="many">%d filtros</item>

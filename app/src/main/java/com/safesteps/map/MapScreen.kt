@@ -1792,13 +1792,19 @@ private fun addPoiMarkersIfVisible(
 
 private fun isVisiblePoi(punt: PuntInteres): Boolean {
     val tipus = punt.tipus.trim().uppercase()
-    return tipus == "FONT" || tipus == "COMISSARIA"
+    return tipus == "FONT" ||
+        tipus == "COMISSARIA" ||
+        tipus == "BANC" ||
+        tipus == "CAMERA" ||
+        tipus == "ESCALA_MECANICA" ||
+        tipus == "REFUGI_CLIMATIC"
 }
 
 private fun poiTitle(punt: PuntInteres): String {
-    return punt.nom ?: punt.tipus.lowercase().replaceFirstChar { char ->
-        char.uppercase()
-    }
+    return punt.nom ?: punt.tipus
+        .lowercase()
+        .replace('_', ' ')
+        .replaceFirstChar { char -> char.uppercase() }
 }
 
 private fun addSelectionMarkers(

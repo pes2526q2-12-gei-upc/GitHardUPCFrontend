@@ -132,6 +132,10 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     val (emoji, bgColor) = when (normalizedType) {
         "FONT" -> "\uD83D\uDCA7" to "#3DA5F4".toColorInt()
         "COMISSARIA" -> "\uD83D\uDC6E" to "#355C7D".toColorInt()
+        "BANC" -> "\uD83E\uDE91" to "#8D6E63".toColorInt()
+        "CAMERA" -> "\uD83D\uDCF9" to "#7B1FA2".toColorInt()
+        "ESCALA_MECANICA" -> "\u21C5" to "#2E7D32".toColorInt()
+        "REFUGI_CLIMATIC" -> "\uD83C\uDF21\uFE0F" to "#FF8F00".toColorInt()
         else -> "\uD83D\uDCCD" to "#C86A37".toColorInt()
     }
 
