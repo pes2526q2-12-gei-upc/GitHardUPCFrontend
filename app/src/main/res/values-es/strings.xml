@@ -117,9 +117,10 @@
     <string name="emergency_mode_deactivated">Modo emergencia desactivado. Se ha dejado de compartir tu ubicación en tiempo real con tus contactos de emergencia.</string>
     <string name="emergency_mode_update_failed">No se ha podido actualizar el modo emergencia.</string>
     <string name="emergency_contact_help_title">Un contacto de emergencia necesita ayuda</string>
-    <string name="emergency_contact_help_body">Se ha recibido una ubicación en tiempo real. Pulsa Ver en mapa para centrarla.</string>
-    <string name="emergency_contact_last_seen_format">Última ubicación recibida a las %1$s</string>
+    <string name="emergency_contact_help_body">Se ha recibido una ubicación en tiempo real. Toca este aviso para centrarla.</string>
+    <string name="emergency_contact_last_seen_format">Última ubicación: %1$s</string>
     <string name="emergency_contact_help_action">Ver en mapa</string>
+    <string name="emergency_contact_help_route_action">Ir a ayudar</string>
     <string name="emergency_contact_marker_label">Contacto de emergencia</string>
     <string name="emergency_contact_dismiss_label">Cerrar SOS</string>
     <string name="calculating_best_route">Calculando la mejor ruta&#8230;</string>

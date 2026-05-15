@@ -507,6 +507,39 @@ class MapViewModel(
         }
     }
 
+    fun prepareEmergencyHelpRoute(location: EmergencyContactLocation) {
+        if (_uiState.value.modoRuta) {
+            return
+        }
+
+        val destination = LatLng(location.latitude, location.longitude)
+        _uiState.update {
+            it.copy(
+                prioridadSeleccionada = RoutePriority.PERSONALIZED,
+                destinoSeleccionado = destination,
+                textoDestino = textProvider.searchingAddress(currentLanguage),
+                distanceText = DEFAULT_DISTANCE_TEXT,
+                durationText = DEFAULT_DURATION_TEXT,
+                etaText = DEFAULT_ETA_TEXT,
+                mostrarOrigen = true,
+                campActiu = textField.NONE,
+                isTyping = false,
+                adrecesSuggerides = emptyList()
+            )
+        }
+
+        viewModelScope.launch {
+            val destinationText = getTextoDestino(destination)
+            _uiState.update { state ->
+                if (state.destinoSeleccionado == destination) {
+                    state.copy(textoDestino = destinationText)
+                } else {
+                    state
+                }
+            }
+        }
+    }
+
     private fun resolveEmergencyLocationId(
         currentState: MapUiState,
         event: BackendLocationSocketEvent
