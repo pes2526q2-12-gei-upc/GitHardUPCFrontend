@@ -1,13 +1,27 @@
 package com.safesteps.chat
 
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Dialog
+
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -38,12 +53,7 @@ import coil.compose.AsyncImage
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
 import com.safesteps.i18n.appString
-import com.safesteps.profile.ChatListItemUiState
-import com.safesteps.profile.ChatListViewModel
-import com.safesteps.profile.ConversationViewModel
-import com.safesteps.profile.FriendForChat
-import com.safesteps.profile.MessageUiState
-
+import com.safesteps.chat.ChatConversationViewModel
 
 
 @Composable
@@ -51,8 +61,7 @@ fun UserAvatarSmall(username: String, photoUrl: String?, size: Int = 36) {
     val sizeDp = size.dp
     val cleanUrl = photoUrl?.trim()?.takeIf { it.isNotBlank() }
 
-    // LOG per diagnosticar avatar — filtra per "AVATAR_UI" al Logcat
-    android.util.Log.d("AVATAR_UI", "username='$username' url='$cleanUrl'")
+    Log.d("AVATAR_UI", "username='$username' url='$cleanUrl'")
 
     if (cleanUrl != null) {
         AsyncImage(
@@ -60,8 +69,8 @@ fun UserAvatarSmall(username: String, photoUrl: String?, size: Int = 36) {
             contentDescription = username,
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(sizeDp).clip(CircleShape),
-            onError = { android.util.Log.e("AVATAR_UI", "Coil ERROR carregant: $cleanUrl → ${it.result.throwable?.message}") },
-            onSuccess = { android.util.Log.d("AVATAR_UI", "Coil OK: $cleanUrl") }
+            onError = { Log.e("AVATAR_UI", "Coil ERROR carregant: $cleanUrl → ${it.result.throwable?.message}") },
+            onSuccess = { Log.d("AVATAR_UI", "Coil OK: $cleanUrl") }
         )
     } else {
         Surface(
@@ -101,7 +110,6 @@ fun GroupAvatar(size: Int = 46) {
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
     user: UserInfo,
@@ -113,7 +121,6 @@ fun ChatListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val avatars by viewModel.avatars.collectAsState()
-    var detailsChat by remember { mutableStateOf<ChatListItemUiState?>(null) }
     var exitConfirmChatId by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(user.googleId) {
@@ -132,16 +139,6 @@ fun ChatListScreen(
                 ) { Text(appString(R.string.chat_exit_action), color = Color.White) }
             },
             dismissButton = { TextButton(onClick = { exitConfirmChatId = null }) { Text(appString(R.string.cancel_action)) } }
-        )
-    }
-
-    detailsChat?.let { chat ->
-        ChatDetailsBottomSheet(
-            chatName = chat.otherParticipantName,
-            isGroup = chat.type == "GROUP",
-            participants = chat.participantNames,
-            onExitChat = { detailsChat = null; exitConfirmChatId = chat.chatId },
-            onDismiss = { detailsChat = null }
         )
     }
 
@@ -180,8 +177,7 @@ fun ChatListScreen(
                             chat = chat,
                             avatarUrl = chat.otherParticipantGoogleId?.let { avatars[it] },
                             onClick = { onChatSelected(chat.chatId, chat.otherParticipantName) },
-                            onExitClick = { exitConfirmChatId = chat.chatId },
-                            onInfoClick = { detailsChat = chat }
+                            onExitClick = { exitConfirmChatId = chat.chatId }
                         )
                     }
                 }
@@ -223,8 +219,7 @@ private fun ChatListItemCard(
     chat: ChatListItemUiState,
     avatarUrl: String?,
     onClick: () -> Unit,
-    onExitClick: () -> Unit,
-    onInfoClick: () -> Unit
+    onExitClick: () -> Unit
 ) {
     val isGroup = chat.type == "GROUP"
 
@@ -277,21 +272,94 @@ private fun ChatListItemCard(
                     )
                 }
             }
-            IconButton(
-                onClick = onInfoClick,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    Icons.Default.Info,
-                    appString(R.string.chat_details_action),
-                    tint = Color(0xFF9AA7A0),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
         }
     }
 }
 
+
+@Composable
+private fun ChatConfirmDialog(
+    title: String,
+    message: String,
+    confirmText: String,
+    confirmColor: Color,
+    icon: ImageVector? = null,
+    iconTint: Color = Color(0xFF5E9F7A),
+    cancelText: String = appString(R.string.cancel_action),
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight()
+                .padding(8.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xFFFFFFFF),
+            contentColor = Color(0xFF23333A),
+            shadowElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (icon != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(58.dp)
+                            .background(iconTint.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(icon, null, tint = iconTint, modifier = Modifier.size(30.dp))
+                    }
+                    Spacer(Modifier.height(18.dp))
+                }
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    color = Color(0xFF23333A),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = message,
+                    color = Color(0xFF5E6B73),
+                    textAlign = TextAlign.Center,
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp
+                )
+                Spacer(Modifier.height(28.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, Color(0xFFDDE8E3)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF23333A))
+                    ) {
+                        Text(cancelText, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    }
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = confirmColor)
+                    ) {
+                        Text(confirmText, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    }
+                }
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -299,132 +367,377 @@ internal fun ChatDetailsBottomSheet(
     chatName: String,
     isGroup: Boolean,
     participants: List<String>,
+    participantGoogleIds: List<String> = emptyList(),
+    avatars: Map<String, String> = emptyMap(),
+    myGoogleId: String = "",
+    isProcessing: Boolean = false,
+    creatorGoogleId: String? = null,
+    adminGoogleIds: Set<String> = emptySet(),
+    currentUserIsAdmin: Boolean = false,
+    currentUserIsCreator: Boolean = false,
+    addableFriends: List<FriendForChat> = emptyList(),
+    isLoadingAddableFriends: Boolean = false,
+    onRequestLoadAddable: () -> Unit = {},
+    onAdd: (googleId: String, username: String) -> Unit = { _, _ -> },
+    onClearAddable: () -> Unit = {},
+    onRequestAvatar: (googleId: String) -> Unit = {},
     onExitChat: () -> Unit,
+    onKick: (googleId: String, username: String) -> Unit = { _, _ -> },
+    onPromote: (googleId: String, username: String) -> Unit = { _, _ -> },
+    onRevokeAdmin: (googleId: String, username: String) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var kickConfirm by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var promoteConfirm by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var revokeConfirm by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(participantGoogleIds) {
+        participantGoogleIds.filter { it.isNotBlank() }.forEach { onRequestAvatar(it) }
+    }
+
+    ChatRoleDialogs(
+        kickConfirm = kickConfirm,
+        promoteConfirm = promoteConfirm,
+        revokeConfirm = revokeConfirm,
+        onKick = { gid, name -> kickConfirm = null; onKick(gid, name) },
+        onPromote = { gid, name -> promoteConfirm = null; onPromote(gid, name) },
+        onRevoke = { gid, name -> revokeConfirm = null; onRevokeAdmin(gid, name) },
+        onDismissKick = { kickConfirm = null },
+        onDismissPromote = { promoteConfirm = null },
+        onDismissRevoke = { revokeConfirm = null }
+    )
+
+    if (showAddDialog) {
+        AddParticipantDialog(
+            isLoading = isLoadingAddableFriends,
+            friends = addableFriends,
+            avatars = avatars,
+            onAdd = { gid, name -> showAddDialog = false; onAdd(gid, name); onClearAddable() },
+            onDismiss = { showAddDialog = false; onClearAddable() }
+        )
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color.White,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+        containerColor = Color(0xFFFFFFFF),
+        dragHandle = null
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier.size(width = 40.dp, height = 4.dp).background(Color(0xFFDDE8E3), shape = RoundedCornerShape(2.dp)))
+            if (isProcessing) {
+                LinearProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 8.dp), color = Color(0xFF5E9F7A), trackColor = Color(0xFF5E9F7A).copy(alpha = 0.15f))
+            }
+            Box(modifier = Modifier.padding(top = 12.dp).size(40.dp, 4.dp).background(Color(0xFFDDE8E3), RoundedCornerShape(2.dp)))
             Spacer(Modifier.height(20.dp))
 
-            if (isGroup) GroupAvatar(size = 64)
-            else UserAvatarSmall(
-                username = chatName,
-                photoUrl = null,
-                size = 64
+            ChatDetailsHeader(
+                chatName = chatName, isGroup = isGroup, participantsCount = participants.size,
+                participantGoogleIds = participantGoogleIds, myGoogleId = myGoogleId, avatars = avatars
             )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = chatName,
-                color = Color(0xFF23333A),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = if (isGroup) appString(R.string.chat_group_label) else appString(R.string.chat_private_label),
-                color = Color(0xFF9AA7A0),
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            if (participants.isNotEmpty()) {
-                Spacer(Modifier.height(24.dp))
-                HorizontalDivider(
-                    Modifier,
-                    DividerDefaults.Thickness,
-                    color = Color(0xFFEEF2EF)
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        appString(R.string.chat_participants_label),
-                        color = Color(0xFF67756F),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Surface(
-                        shape = CircleShape,
-                        color = Color(0xFF5E9F7A).copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = "${participants.size}",
-                            color = Color(0xFF5E9F7A),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                participants.forEach { name ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        UserAvatarSmall(
-                            username = name,
-                            photoUrl = null,
-                            size = 36
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = name,
-                            color = Color(0xFF23333A),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
 
             if (isGroup) {
-                Spacer(Modifier.height(24.dp))
-                HorizontalDivider(
-                    Modifier,
-                    DividerDefaults.Thickness,
-                    color = Color(0xFFEEF2EF)
+                Text(
+                    text = appString(R.string.chat_members_label), modifier = Modifier.fillMaxWidth(),
+                    color = Color(0xFF23333A), fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.titleSmall
                 )
+                Spacer(Modifier.height(10.dp))
+
+                participants.forEachIndexed { idx, name ->
+                    val gid = participantGoogleIds.getOrNull(idx) ?: ""
+                    ChatParticipantRow(
+                        name = name, gid = gid, myGoogleId = myGoogleId, creatorGoogleId = creatorGoogleId,
+                        adminGoogleIds = adminGoogleIds, avatars = avatars, currentUserIsAdmin = currentUserIsAdmin,
+                        currentUserIsCreator = currentUserIsCreator, isProcessing = isProcessing,
+                        onPromote = { promoteConfirm = it }, onRevoke = { revokeConfirm = it }, onKick = { kickConfirm = it }
+                    )
+                }
+
+                Spacer(Modifier.height(24.dp))
+                HorizontalDivider(color = Color(0xFFEEF2EF))
                 Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = onExitChat,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEDED))
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                        contentDescription =  null,
-                        tint = Color(0xFFD32F2F),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        appString(R.string.chat_exit_action),
-                        color = Color(0xFFD32F2F),
-                        fontWeight = FontWeight.SemiBold
-                    )
+
+                ChatDetailsActionButtons(
+                    currentUserIsAdmin = currentUserIsAdmin, currentUserIsCreator = currentUserIsCreator,
+                    isProcessing = isProcessing, onAddClick = { onRequestLoadAddable(); showAddDialog = true },
+                    onExitClick = onExitChat
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatDetailsHeader(
+    chatName: String, isGroup: Boolean, participantsCount: Int,
+    participantGoogleIds: List<String>, myGoogleId: String, avatars: Map<String, String>
+) {
+    if (isGroup) {
+        GroupAvatar(size = 64)
+    } else {
+        val otherGid = participantGoogleIds.firstOrNull { it != myGoogleId && it.isNotBlank() }
+        UserAvatarSmall(username = chatName, photoUrl = avatars[otherGid], size = 64)
+    }
+    Spacer(Modifier.height(12.dp))
+    Text(chatName, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color(0xFF23333A))
+    Spacer(Modifier.height(4.dp))
+    Text(
+        if (isGroup) appString(R.string.chat_group_subtitle, participantsCount) else appString(R.string.chat_private_subtitle),
+        color = Color(0xFF9AA7A0), style = MaterialTheme.typography.bodySmall
+    )
+    Spacer(Modifier.height(20.dp))
+    HorizontalDivider(color = Color(0xFFEEF2EF))
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun ChatParticipantRow(
+    name: String, gid: String, myGoogleId: String, creatorGoogleId: String?,
+    adminGoogleIds: Set<String>, avatars: Map<String, String>, currentUserIsAdmin: Boolean,
+    currentUserIsCreator: Boolean, isProcessing: Boolean,
+    onPromote: (Pair<String, String>) -> Unit, onRevoke: (Pair<String, String>) -> Unit, onKick: (Pair<String, String>) -> Unit
+) {
+    val isMe = gid == myGoogleId
+    val isCreator = gid.isNotBlank() && gid == creatorGoogleId
+    val isAdmin = gid in adminGoogleIds
+    val canManage = (currentUserIsAdmin || currentUserIsCreator) && !isMe && gid.isNotBlank()
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        UserAvatarSmall(username = name, photoUrl = avatars[gid], size = 38)
+        Spacer(Modifier.width(10.dp))
+
+        ParticipantInfo(
+            name = name, isMe = isMe, isCreator = isCreator, isAdmin = isAdmin,
+            modifier = Modifier.weight(1f)
+        )
+
+        if (canManage) {
+            ParticipantManagementActions(
+                gid = gid, name = name, isAdmin = isAdmin, isCreator = isCreator,
+                currentUserIsCreator = currentUserIsCreator, isProcessing = isProcessing,
+                onPromote = onPromote, onRevoke = onRevoke, onKick = onKick
+            )
+        }
+    }
+}
+
+@Composable
+private fun ParticipantInfo(
+    name: String, isMe: Boolean, isCreator: Boolean, isAdmin: Boolean, modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = name, color = Color(0xFF23333A),
+                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold
+            )
+            if (isMe) {
+                Spacer(Modifier.width(6.dp))
+                Text(appString(R.string.chat_self_indicator), color = Color(0xFF9AA7A0), style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        ParticipantRoleBadge(isCreator = isCreator, isAdmin = isAdmin)
+    }
+}
+
+@Composable
+private fun ParticipantRoleBadge(isCreator: Boolean, isAdmin: Boolean) {
+    if (isCreator) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("👑", fontSize = 12.sp)
+            Spacer(Modifier.width(4.dp))
+            Text(appString(R.string.chat_role_leader), color = Color(0xFFB8860B), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+        }
+    } else if (isAdmin) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("⭐", fontSize = 11.sp)
+            Spacer(Modifier.width(4.dp))
+            Text(appString(R.string.chat_role_admin), color = Color(0xFFF5A623), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun ParticipantManagementActions(
+    gid: String, name: String, isAdmin: Boolean, isCreator: Boolean,
+    currentUserIsCreator: Boolean, isProcessing: Boolean,
+    onPromote: (Pair<String, String>) -> Unit, onRevoke: (Pair<String, String>) -> Unit, onKick: (Pair<String, String>) -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (!isAdmin) {
+            PromoteButton(isProcessing) { onPromote(gid to name) }
+        } else if (currentUserIsCreator) {
+            RevokeButton(isProcessing) { onRevoke(gid to name) }
+        }
+
+        if (!isCreator) {
+            KickButton(isProcessing) { onKick(gid to name) }
+        }
+    }
+}
+
+
+@Composable
+private fun PromoteButton(isProcessing: Boolean, onClick: () -> Unit) {
+    ChatActionButton(
+        icon = Icons.Default.Star,
+        activeTint = Color(0xFFF5A623),
+        isProcessing = isProcessing,
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun RevokeButton(isProcessing: Boolean, onClick: () -> Unit) {
+    ChatActionButton(
+        icon = Icons.Default.StarBorder,
+        activeTint = Color(0xFF9AA7A0),
+        isProcessing = isProcessing,
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun KickButton(isProcessing: Boolean, onClick: () -> Unit) {
+    ChatActionButton(
+        icon = Icons.AutoMirrored.Filled.ExitToApp,
+        activeTint = Color(0xFFD32F2F),
+        isProcessing = isProcessing,
+        onClick = onClick
+    )
+}
+
+
+@Composable
+private fun ChatActionButton(
+    icon: ImageVector,
+    activeTint: Color,
+    isProcessing: Boolean,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = !isProcessing,
+        modifier = Modifier.size(40.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (isProcessing) Color(0xFFCCCCCC) else activeTint,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+
+@Composable
+private fun ChatRoleDialogs(
+    kickConfirm: Pair<String, String>?, promoteConfirm: Pair<String, String>?, revokeConfirm: Pair<String, String>?,
+    onKick: (String, String) -> Unit, onPromote: (String, String) -> Unit, onRevoke: (String, String) -> Unit,
+    onDismissKick: () -> Unit, onDismissPromote: () -> Unit, onDismissRevoke: () -> Unit
+) {
+    kickConfirm?.let { (gid, name) ->
+        ChatConfirmDialog(
+            title = appString(R.string.chat_kick_title, name), message = appString(R.string.chat_kick_confirmation, name),
+            confirmText = appString(R.string.chat_kick_action), confirmColor = Color(0xFFD32F2F),
+            icon = Icons.AutoMirrored.Filled.ExitToApp, iconTint = Color(0xFFD32F2F),
+            onConfirm = { onKick(gid, name) }, onDismiss = onDismissKick
+        )
+    }
+    promoteConfirm?.let { (gid, name) ->
+        ChatConfirmDialog(
+            title = appString(R.string.chat_promote_title, name), message = appString(R.string.chat_promote_confirmation, name),
+            confirmText = appString(R.string.chat_promote_action), confirmColor = Color(0xFF5E9F7A),
+            icon = Icons.Default.Star, iconTint = Color(0xFFF5A623),
+            onConfirm = { onPromote(gid, name) }, onDismiss = onDismissPromote
+        )
+    }
+    revokeConfirm?.let { (gid, name) ->
+        ChatConfirmDialog(
+            title = appString(R.string.chat_revoke_title, name), message = appString(R.string.chat_revoke_confirmation, name),
+            confirmText = appString(R.string.chat_revoke_action), confirmColor = Color(0xFFD32F2F),
+            icon = Icons.Default.StarBorder, iconTint = Color(0xFFD32F2F),
+            onConfirm = { onRevoke(gid, name) }, onDismiss = onDismissRevoke
+        )
+    }
+}
+
+@Composable
+private fun ChatDetailsActionButtons(
+    currentUserIsAdmin: Boolean, currentUserIsCreator: Boolean,
+    isProcessing: Boolean, onAddClick: () -> Unit, onExitClick: () -> Unit
+) {
+    if (currentUserIsAdmin || currentUserIsCreator) {
+        Button(
+            onClick = onAddClick, enabled = !isProcessing,
+            modifier = Modifier.fillMaxWidth().height(52.dp), shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE8F5EE), disabledContainerColor = Color(0xFFEEEEEE))
+        ) {
+            Icon(Icons.Default.PersonAdd, null, tint = if (isProcessing) Color(0xFFCCCCCC) else Color(0xFF2E7D5B), modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(appString(R.string.chat_add_participant_action), color = if (isProcessing) Color(0xFFCCCCCC) else Color(0xFF2E7D5B), fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+    Button(
+        onClick = onExitClick, modifier = Modifier.fillMaxWidth().height(52.dp),
+        shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFEDED))
+    ) {
+        Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = Color(0xFFD32F2F), modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(appString(R.string.chat_exit_action), color = Color(0xFFD32F2F), fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun AddParticipantDialog(
+    isLoading: Boolean, friends: List<FriendForChat>, avatars: Map<String, String>,
+    onAdd: (String, String) -> Unit, onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.92f).heightIn(min = 200.dp, max = 520.dp).padding(8.dp),
+            shape = RoundedCornerShape(24.dp), color = Color(0xFFFFFFFF), shadowElevation = 8.dp
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(44.dp).background(Color(0xFF5E9F7A).copy(alpha = 0.15f), CircleShape), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.PersonAdd, null, tint = Color(0xFF2E7D5B))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Text(appString(R.string.chat_add_to_group_title), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF23333A))
+                }
+                Spacer(Modifier.height(16.dp))
+                when {
+                    isLoading -> Box(Modifier.fillMaxWidth().padding(32.dp), Alignment.Center) { CircularProgressIndicator(color = Color(0xFF5E9F7A)) }
+                    friends.isEmpty() -> Text(appString(R.string.chat_no_more_friends_to_add), color = Color(0xFF9AA7A0), modifier = Modifier.padding(vertical = 24.dp))
+                    else -> LazyColumn(modifier = Modifier.weight(1f, fill = false).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(friends, key = { it.googleId.ifBlank { it.username } }) { f ->
+                            Row(modifier = Modifier.fillMaxWidth().clickable { onAdd(f.googleId, f.username) }.padding(vertical = 10.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                UserAvatarSmall(username = f.username, photoUrl = avatars[f.googleId], size = 40)
+                                Spacer(Modifier.width(12.dp))
+                                Text(f.username, modifier = Modifier.weight(1f), color = Color(0xFF23333A), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                                Icon(Icons.Default.Add, appString(R.string.chat_add_action), tint = Color(0xFF5E9F7A))
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text(appString(R.string.close), color = Color(0xFF5E9F7A), fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
     }
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ConversationScreen(
     chatId: Long,
@@ -432,218 +745,223 @@ fun ConversationScreen(
     user: UserInfo,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ConversationViewModel = viewModel()
+    viewModel: ChatConversationViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val avatars by viewModel.avatars.collectAsState()
     val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showDetails by remember { mutableStateOf(false) }
     var showExitConfirm by remember { mutableStateOf(false) }
+    var notAdminMsg by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(chatId) {
-        viewModel.init(
-            chatId = chatId,
-            myGoogleId = user.googleId,
-            myUsername = user.username,
-            otherParticipantName = otherParticipantName
+    ConversationSideEffects(viewModel, chatId, user, otherParticipantName, snackbarHostState) { notAdminMsg = it }
+
+    notAdminMsg?.let { msg ->
+        ChatConfirmDialog(
+            title = appString(R.string.chat_action_not_allowed), message = msg,
+            confirmText = appString(R.string.understood_action), confirmColor = Color(0xFFF5A623),
+            icon = Icons.Default.Info, iconTint = Color(0xFFF5A623), cancelText = "",
+            onConfirm = { notAdminMsg = null }, onDismiss = { notAdminMsg = null }
         )
-    }
-    DisposableEffect(chatId) {
-        viewModel.onScreenVisible();
-        onDispose { viewModel.onScreenHidden() }
-    }
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) listState.animateScrollToItem(uiState.messages.size - 1)
-    }
-    // Re-scroll quan el teclat s'obre perquè el darrer missatge no es tapi
-    val imeVisible = WindowInsets.isImeVisible
-    LaunchedEffect(imeVisible) {
-        if (imeVisible && uiState.messages.isNotEmpty()) {
-            kotlinx.coroutines.delay(150)
-            listState.animateScrollToItem(uiState.messages.size - 1)
-        }
-    }
-    LaunchedEffect(user.googleId) {
-        viewModel.carregarAvatarSiCal(user.googleId)
     }
 
     if (showDetails) {
         ChatDetailsBottomSheet(
             chatName = otherParticipantName, isGroup = uiState.isGroup,
-            participants = uiState.participantNames,
+            participants = uiState.participantNames, participantGoogleIds = uiState.participantGoogleIds,
+            avatars = avatars, myGoogleId = user.googleId, isProcessing = uiState.isProcessingAdmin,
+            creatorGoogleId = uiState.creatorGoogleId, adminGoogleIds = uiState.adminGoogleIds,
+            currentUserIsAdmin = uiState.currentUserIsAdmin, currentUserIsCreator = uiState.currentUserIsCreator,
+            addableFriends = uiState.addableFriends, isLoadingAddableFriends = uiState.isLoadingAddableFriends,
+            onRequestLoadAddable = viewModel::loadFriendsToAdd, onAdd = viewModel::addParticipant,
+            onClearAddable = viewModel::clearAddableFriends, onRequestAvatar = viewModel::carregarAvatarSiCal,
             onExitChat = { showDetails = false; showExitConfirm = true },
-            onDismiss = { showDetails = false }
+            onKick = viewModel::kickParticipant, onPromote = viewModel::promoteToAdmin,
+            onRevokeAdmin = viewModel::revokeAdmin, onDismiss = { showDetails = false }
         )
     }
 
     if (showExitConfirm) {
-        AlertDialog(
-            onDismissRequest = { showExitConfirm = false },
-            title = { Text(appString(R.string.chat_exit_title)) },
-            text = { Text(appString(R.string.chat_exit_confirmation)) },
-            confirmButton = {
-                Button(
-                    onClick = { showExitConfirm = false; onBack() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
-                ) { Text(
-                    text = appString(R.string.chat_exit_action),
-                    color = Color.White
-                ) }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showExitConfirm = false }
-                ) {
-                    Text(text = appString(R.string.cancel_action)) } }
+        ChatConfirmDialog(
+            title = appString(R.string.chat_exit_title), message = appString(R.string.chat_exit_confirmation),
+            confirmText = appString(R.string.chat_exit_action), confirmColor = Color(0xFFD32F2F),
+            icon = Icons.AutoMirrored.Filled.ExitToApp, iconTint = Color(0xFFD32F2F),
+            cancelText = appString(R.string.cancel_action),
+            onConfirm = { showExitConfirm = false; onBack() }, onDismiss = { showExitConfirm = false }
         )
     }
 
-    // NOTA: per al teclat, cal afegir a MainActivity.onCreate():
-    //   WindowCompat.setDecorFitsSystemWindows(window, false)
-    // Sense això, imePadding() reporta 0 i el camp no es mou sobre el teclat.
-    Column(modifier = modifier
-        .fillMaxSize()
-        .background(Color(0xFFF4F7F5))
-        .statusBarsPadding()
-        .imePadding()           // ajusta quan apareix el teclat
-        .navigationBarsPadding() // ajusta per a la barra de navegació
-    ) {
-        ConversationTopBar(
-            title = otherParticipantName,
-            onBack = onBack,
-            onOptions = { showDetails = true }
-        )
-        when {
-            uiState.isLoadingHistory ->
-                Box(
-                    Modifier.weight(1f).fillMaxWidth(), // fillMaxWidth per centrar correctament
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = Color(0xFF5E9F7A))
-                }
-            uiState.loadFailed ->
-                ChatErrorState(
-                    modifier = Modifier.weight(1f),
-                    message = appString(R.string.chat_messages_load_failed),
-                    onRetry = viewModel::onScreenVisible
+    val isSwitchingChat = uiState.otherParticipantName != otherParticipantName
+    val showFullLoader = isSwitchingChat || !uiState.isReady
+
+    key(chatId) {
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            snackbarHost = { SnackbarHost(snackbarHostState) { data -> Snackbar(snackbarData = data, containerColor = Color(0xFF33413B), contentColor = Color.White) } },
+            containerColor = Color(0xFFF4F7F5),
+            contentWindowInsets = WindowInsets(0)
+        ) { _ ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                ConversationContent(
+                    uiState = uiState, avatars = avatars, listState = listState,
+                    otherParticipantName = otherParticipantName,
+                    onBack = onBack, onOptions = { showDetails = true },
+                    onInputChanged = viewModel::onInputChanged, onSendMessage = viewModel::sendMessage,
+                    onRetryLoad = viewModel::onScreenVisible, onLoadAvatar = viewModel::carregarAvatarSiCal
                 )
 
-            else -> LazyColumn(
-                modifier = Modifier.weight(1f),
-                state = listState,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (uiState.messages.isEmpty()) {
-                    item {
-                        Box(
-                            Modifier.fillMaxWidth().padding(top = 60.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = appString(R.string.chat_no_messages_yet),
-                                color = Color(0xFF9AA7A0),
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center
-                            )
-                        } }
-                } else {
-                    items(uiState.messages, key = { it.localId ?: it.id.toString() }) { msg ->
-                        MessageBubble(
-                            message = msg,
-                            avatarUrl = avatars[msg.senderGoogleId],
-                            onLoadAvatar = { viewModel.carregarAvatarSiCal(msg.senderGoogleId) }
-                        )
-                    }
+                if (showFullLoader) {
+                    ConversationLoadingOverlay()
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ConversationSideEffects(
+    viewModel: ChatConversationViewModel,
+    chatId: Long,
+    user: UserInfo,
+    otherParticipantName: String,
+    snackbarHostState: SnackbarHostState,
+    onNotAdminError: (String) -> Unit
+) {
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            val missatge = when (event) {
+                is ConversationEvent.Success -> context.getString(event.msgResId, *event.args.toTypedArray())
+                is ConversationEvent.Error -> context.getString(event.msgResId, *event.args.toTypedArray())
+                is ConversationEvent.Info -> context.getString(event.msgResId, *event.args.toTypedArray())
+                is ConversationEvent.NotAdmin -> { onNotAdminError(context.getString(event.msgResId, *event.args.toTypedArray())); null }
+            }
+            missatge?.let { snackbarHostState.showSnackbar(it) }
+        }
+    }
+
+    LaunchedEffect(chatId) { viewModel.init(chatId, user.googleId, user.username, otherParticipantName) }
+    DisposableEffect(chatId) {
+        viewModel.onScreenVisible()
+        onDispose { viewModel.onScreenHidden() }
+    }
+    LaunchedEffect(user.googleId) { viewModel.carregarAvatarSiCal(user.googleId) }
+}
+
+@Composable
+private fun ConversationContent(
+    uiState: ConversationUiState, avatars: Map<String, String>, listState: LazyListState,
+    otherParticipantName: String, onBack: () -> Unit, onOptions: () -> Unit,
+    onInputChanged: (String) -> Unit, onSendMessage: () -> Unit,
+    onRetryLoad: () -> Unit, onLoadAvatar: (String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F7F5)).statusBarsPadding().imePadding()) {
+        ConversationTopBar(
+            title = otherParticipantName, isGroup = uiState.isGroup,
+            avatarUrl = uiState.otherParticipantGoogleId?.let { avatars[it] },
+            onBack = onBack, onOptions = onOptions
+        )
+        if (uiState.loadFailed) {
+            ChatErrorState(modifier = Modifier.weight(1f), message = appString(R.string.chat_messages_load_failed), onRetry = onRetryLoad)
+        } else {
+            ConversationMessagesList(uiState.messages, avatars, listState, onLoadAvatar, Modifier.weight(1f))
+        }
         MessageInputBar(
-            text = uiState.inputText,
-            isSending = uiState.isSending,
-            sendFailed = uiState.sendFailed,
-            onTextChange = viewModel::onInputChanged,
-            onSend = viewModel::sendMessage
+            text = uiState.inputText, isSending = uiState.isSending, sendFailed = uiState.sendFailed,
+            onTextChange = onInputChanged, onSend = onSendMessage
         )
     }
 }
 
-
 @Composable
-private fun ChatTopBarSimple(
-    title: String,
-    onBack: () -> Unit
+private fun ConversationMessagesList(
+    messages: List<MessageUiState>, avatars: Map<String, String>, listState: LazyListState,
+    onLoadAvatar: (String) -> Unit, modifier: Modifier
 ) {
-    Surface(
-        color = Color.White,
-        shadowElevation = 4.dp
+    LazyColumn(
+        modifier = modifier, state = listState, reverseLayout = true,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            IconButton(
-                onClick = onBack
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = appString(R.string.back),
-                    tint = Color(0xFF33413B)
-                ) }
-            Text(
-                text = title,
-                color = Color(0xFF23333A),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-            )
+        if (messages.isEmpty()) {
+            item {
+                Box(Modifier.fillMaxWidth().padding(top = 60.dp), Alignment.Center) {
+                    Text(appString(R.string.chat_no_messages_yet), color = Color(0xFF9AA7A0), style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+                }
+            }
+        } else {
+            items(messages.reversed(), key = { it.localId ?: it.id.toString() }) { msg ->
+                MessageBubble(message = msg, avatarUrl = avatars[msg.senderGoogleId], onLoadAvatar = { onLoadAvatar(msg.senderGoogleId) })
+            }
         }
     }
 }
 
 @Composable
-private fun ConversationTopBar(title: String, onBack: () -> Unit, onOptions: () -> Unit) {
-    Surface(
-        color = Color.White,
-        shadowElevation = 4.dp
+private fun ConversationLoadingOverlay() {
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color(0xFFF4F7F5)),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = title,
-                color = Color(0xFF23333A),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 200.dp).clickable(onClick = onOptions)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onBack
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = appString(R.string.back),
-                        tint = Color(0xFF33413B)
-                    )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(color = Color(0xFF5E9F7A), strokeWidth = 3.dp, modifier = Modifier.size(46.dp))
+            Spacer(Modifier.height(16.dp))
+            Text(appString(R.string.chat_loading_conversation), color = Color(0xFF5E6B73), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+
+
+@Composable
+private fun ChatTopBarSimple(title: String, onBack: () -> Unit) {
+    Box(modifier = Modifier.fillMaxWidth().background(Color.Transparent).padding(vertical = 12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(60.dp), Alignment.CenterStart) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, appString(R.string.back), tint = Color(0xFF33413B))
                 }
-                IconButton(
-                    onClick = onOptions
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription =  appString(R.string.chat_details_action),
-                        tint = Color(0xFF33413B)
-                    )
+            }
+            Box(Modifier.weight(1f), Alignment.Center) {
+                Surface(shape = RoundedCornerShape(20.dp), color = Color.White.copy(0.76f),
+                    border = BorderStroke(1.dp, Color(0xFFE1EBE4))) {
+                    Text(title, color = Color(0xFF23333A), style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
                 }
+            }
+            Spacer(Modifier.width(60.dp))
+        }
+    }
+}
+
+@Composable
+private fun ConversationTopBar(
+    title: String, isGroup: Boolean = false, avatarUrl: String? = null,
+    onBack: () -> Unit, onOptions: () -> Unit
+) {
+    Surface(color = Color.White, shadowElevation = 4.dp) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 0.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, appString(R.string.back), tint = Color(0xFF33413B))
+            }
+            Row(modifier = Modifier.weight(1f).clickable(onClick = onOptions),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center) {
+                if (isGroup) GroupAvatar(size = 30) else UserAvatarSmall(username = title, photoUrl = avatarUrl, size = 30)
+                Spacer(Modifier.width(6.dp))
+                Text(title, color = Color(0xFF23333A), style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 180.dp))
+            }
+            IconButton(onClick = onOptions) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription =  appString(R.string.chat_details_action),
+                    tint = Color(0xFF33413B)
+                )
             }
         }
     }
@@ -656,10 +974,17 @@ private fun MessageBubble(
     onLoadAvatar: () -> Unit
 ) {
     val isMe = message.isFromMe
-    val bubbleColor = if (isMe) Color(0xFF5E9F7A) else Color(0xFFE9EDF0)
-    val textColor = if (isMe) Color.White else Color(0xFF23333A)
+    var showSenderInfo by remember { mutableStateOf(false) }
 
     LaunchedEffect(message.senderGoogleId) { onLoadAvatar() }
+
+    if (showSenderInfo && !isMe) {
+        SenderInfoDialog(
+            username = message.senderUsername,
+            avatarUrl = avatarUrl,
+            onDismiss = { showSenderInfo = false }
+        )
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -667,78 +992,112 @@ private fun MessageBubble(
         verticalAlignment = Alignment.Bottom
     ) {
         if (!isMe) {
-            UserAvatarSmall(
-                username = message.senderUsername,
-                photoUrl = avatarUrl, size = 28);
+            UserAvatarSmall(username = message.senderUsername, photoUrl = avatarUrl, size = 28)
             Spacer(Modifier.width(6.dp))
         }
-        Surface(
-            modifier = Modifier.widthIn(max = 260.dp),
-            shape =
-                if (isMe)
-                    RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
-                else
-                    RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp),
-            color = bubbleColor
+
+        MessageBubbleContent(
+            message = message,
+            isMe = isMe,
+            onClick = { if (!isMe) showSenderInfo = true }
+        )
+
+        if (isMe) {
+            Spacer(Modifier.width(6.dp))
+            UserAvatarSmall(username = message.senderUsername, photoUrl = avatarUrl, size = 28)
+        }
+    }
+}
+
+@Composable
+private fun MessageBubbleContent(message: MessageUiState, isMe: Boolean, onClick: () -> Unit) {
+    val bubbleColor = if (isMe) Color(0xFF5E9F7A) else Color(0xFFE9EDF0)
+    val textColor = if (isMe) Color.White else Color(0xFF23333A)
+
+    Surface(
+        modifier = Modifier.widthIn(max = 260.dp).clickable(onClick = onClick),
+        shape = if (isMe) RoundedCornerShape(16.dp, 16.dp, 4.dp, 16.dp)
+        else RoundedCornerShape(4.dp, 16.dp, 16.dp, 16.dp),
+        color = bubbleColor
+    ) {
+        Column(
+            modifier = Modifier
+                .wrapContentWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Text(
-                    text = message.content,
-                    color = textColor.copy(alpha = if (message.isOptimistic) 0.6f else 1f),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                // Timestamp + icona d'estat (read receipt visual)
-                Spacer(Modifier.height(3.dp))
-                Row(
-                    modifier = Modifier.align(Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    if (message.createdAt.isNotBlank()) {
-                        Text(
-                            text = message.createdAt,
-                            color = textColor.copy(alpha = 0.55f),
-                            fontSize = 10.sp,
-                            softWrap = false
-                        )
-                    }
-                    // Mostrem l'estat NOMÉS als nostres missatges
-                    if (message.isFromMe) {
-                        when {
-                            message.isOptimistic -> {
-                                // Enviant: icona de rellotge
-                                Icon(
-                                    imageVector = Icons.Default.Schedule,
-                                    contentDescription = "Enviant",
-                                    tint = textColor.copy(alpha = 0.5f),
-                                    modifier = Modifier.size(11.dp)
-                                )
-                            }
-                            else -> {
-                                // Enviat i confirmat: ✓ (un sol tick verd/blanc)
-                                Icon(
-                                    imageVector = Icons.Default.Done,
-                                    contentDescription = "Enviat",
-                                    tint = textColor.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                        }
-                    }
+            Text(
+                text = message.content,
+                color = textColor.copy(alpha = if (message.isOptimistic) 0.6f else 1f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(3.dp))
+
+            MessageStatusRow(
+                message = message,
+                isMe = isMe,
+                textColor = textColor,
+                modifier = Modifier.align(if (isMe) Alignment.End else Alignment.Start)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MessageStatusRow(
+    message: MessageUiState,
+    isMe: Boolean,
+    textColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.wrapContentWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (message.createdAt.isNotBlank()) {
+            Text(
+                text = message.createdAt,
+                color = textColor.copy(alpha = 0.55f),
+                fontSize = 10.sp,
+                softWrap = false
+            )
+        }
+        if (isMe) {
+            Icon(
+                imageVector = if (message.isOptimistic) Icons.Default.Schedule else Icons.Default.Done,
+                contentDescription = null,
+                tint = textColor.copy(alpha = if (message.isOptimistic) 0.5f else 0.7f),
+                modifier = Modifier.size(if (message.isOptimistic) 11.dp else 14.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SenderInfoDialog(username: String, avatarUrl: String?, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.85f).padding(8.dp),
+            shape = RoundedCornerShape(22.dp), color = Color.White, shadowElevation = 8.dp
+        ) {
+            Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                UserAvatarSmall(username = username, photoUrl = avatarUrl, size = 72)
+                Spacer(Modifier.height(14.dp))
+                Text(username.ifBlank { appString(R.string.chat_unknown_sender) }, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Spacer(Modifier.height(4.dp))
+                Text(appString(R.string.chat_message_sender_label), color = Color(0xFF9AA7A0), style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(20.dp))
+                Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(46.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5E9F7A))) {
+                    Text(appString(R.string.close), color = Color.White)
                 }
             }
         }
-        if (isMe) {
-            Spacer(Modifier.width(6.dp));
-            UserAvatarSmall(
-                username = message.senderUsername,
-                photoUrl = avatarUrl,
-                size = 28
-            ) }
     }
 }
 
 
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MessageInputBar(
     text: String,
@@ -747,18 +1106,21 @@ private fun MessageInputBar(
     onTextChange: (String) -> Unit,
     onSend: () -> Unit
 ) {
-    Surface(
-        color = Color.White,
-        shadowElevation = 8.dp
-    ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-            if (sendFailed)
+    val imeVisible = WindowInsets.isImeVisible
+    Surface(color = Color.White, shadowElevation = 8.dp) {
+        Column(
+            Modifier.fillMaxWidth()
+                .then(if (!imeVisible) Modifier.navigationBarsPadding() else Modifier)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            if (sendFailed) {
                 Text(
                     text = appString(R.string.chat_send_failed),
                     color = Color(0xFFD32F2F),
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
                 )
+            }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -767,52 +1129,48 @@ private fun MessageInputBar(
                 OutlinedTextField(
                     value = text,
                     onValueChange = onTextChange,
-                    placeholder = {
-                        Text(
-                            text = appString(R.string.chat_input_placeholder),
-                            color = Color(0xFF9AA7A0)
-                        ) },
+                    placeholder = { Text(appString(R.string.chat_input_placeholder), color = Color(0xFF9AA7A0)) },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color(0xFF5E9F7A),
                         unfocusedBorderColor = Color(0xFFDDE8E3),
                         focusedContainerColor = Color(0xFFF8FBF9),
-                        unfocusedContainerColor = Color(0xFFF8FBF9)),
+                        unfocusedContainerColor = Color(0xFFF8FBF9)
+                    ),
                     maxLines = 4,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { onSend() })
                 )
-                Surface(
-                    Modifier.size(48.dp),
-                    shape = CircleShape,
-                    color =
-                        if (text.isNotBlank() && !isSending) Color(0xFF5E9F7A)
-                        else Color(0xFFDDE8E3)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        if (isSending)
-                            CircularProgressIndicator(
-                                Modifier.size(22.dp),
-                                color = Color(0xFF5E9F7A),
-                                strokeWidth = 2.dp
-                            )
-                        else
-                            IconButton(
-                                onClick = onSend,
-                                enabled = text.isNotBlank()
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription =  appString(R.string.chat_send_action),
-                                    tint =
-                                        if (text.isNotBlank())
-                                            Color.White
-                                        else
-                                            Color(0xFF9AA7A0),
-                                    modifier = Modifier.size(20.dp))
-                            }
-                    }
+
+                SendMessageButton(
+                    isSending = isSending,
+                    isEnabled = text.isNotBlank(),
+                    onSend = onSend
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SendMessageButton(isSending: Boolean, isEnabled: Boolean, onSend: () -> Unit) {
+    Surface(
+        modifier = Modifier.size(48.dp),
+        shape = CircleShape,
+        color = if (isEnabled && !isSending) Color(0xFF5E9F7A) else Color(0xFFDDE8E3)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (isSending) {
+                CircularProgressIndicator(Modifier.size(22.dp), color = Color(0xFF5E9F7A), strokeWidth = 2.dp)
+            } else {
+                IconButton(onClick = onSend, enabled = isEnabled) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = appString(R.string.chat_send_action),
+                        tint = if (isEnabled) Color.White else Color(0xFF9AA7A0),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
@@ -960,7 +1318,7 @@ private fun FriendSelectableItem(
         colors = CardDefaults.cardColors(containerColor = if (isSelected) Color(0xFFE8F5EE) else Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         onClick = onClick,
-        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF5E9F7A)) else null
+        border = if (isSelected) BorderStroke(1.5.dp, Color(0xFF5E9F7A)) else null
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),

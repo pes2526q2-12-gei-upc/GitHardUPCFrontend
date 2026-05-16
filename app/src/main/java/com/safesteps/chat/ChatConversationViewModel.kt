@@ -1,27 +1,35 @@
-package com.safesteps.profile
+package com.safesteps.chat
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.safesteps.R
+import com.safesteps.data.ChatDto
 import com.safesteps.data.MessageDto
-import com.safesteps.data.buscarUsuariosParaAmistad
+import com.safesteps.data.afegirParticipant
 import com.safesteps.data.cargarAmigosUsuario
 import com.safesteps.data.cargarPerfilDeUsuario
 import com.safesteps.data.enviarMissatge
+import com.safesteps.data.expulsarParticipant
 import com.safesteps.data.marcarMissatgeLlegit
 import com.safesteps.data.obtenirDataActual
 import com.safesteps.data.obtenirMissatges
-import com.safesteps.chat.ChatEventBus
 import com.safesteps.data.obtenirXatsUsuari
+import com.safesteps.data.promocionarAdmin
+import com.safesteps.data.revocarAdmin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -34,11 +42,20 @@ data class MessageUiState(
     val createdAt: String,
     val isFromMe: Boolean,
     val isOptimistic: Boolean = false,
+    val isRead: Boolean = false,
     val localId: String? = null
 )
 
+sealed class ConversationEvent {
+    data class Success(val msgResId: Int, val args: List<Any> = emptyList()) : ConversationEvent()
+    data class Error(val msgResId: Int, val args: List<Any> = emptyList()) : ConversationEvent()
+    data class Info(val msgResId: Int, val args: List<Any> = emptyList()) : ConversationEvent()
+    data class NotAdmin(val msgResId: Int, val args: List<Any> = emptyList()) : ConversationEvent()
+}
+
 data class ConversationUiState(
-    val isLoadingHistory: Boolean = true,
+    val isLoadingHistory: Boolean = false,
+    val isReady: Boolean = false,
     val loadFailed: Boolean = false,
     val messages: List<MessageUiState> = emptyList(),
     val inputText: String = "",
@@ -46,12 +63,23 @@ data class ConversationUiState(
     val sendFailed: Boolean = false,
     val otherParticipantName: String = "",
     val isGroup: Boolean = false,
-    val participantNames: List<String> = emptyList()
+    val participantNames: List<String> = emptyList(),
+    val participantGoogleIds: List<String> = emptyList(),
+    val otherParticipantGoogleId: String? = null,
+
+    val adminGoogleIds: Set<String> = emptySet(),
+    val creatorGoogleId: String? = null,
+    val currentUserIsAdmin: Boolean = false,
+    val currentUserIsCreator: Boolean = false,
+    val isProcessingAdmin: Boolean = false,
+
+    val addableFriends: List<FriendForChat> = emptyList(),
+    val isLoadingAddableFriends: Boolean = false
 )
 
 private const val POLLING_INTERVAL_MS = 3_000L
 
-class ConversationViewModel(
+class ChatConversationViewModel(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
@@ -61,17 +89,43 @@ class ConversationViewModel(
     private val _avatars = MutableStateFlow<Map<String, String>>(emptyMap())
     val avatars: StateFlow<Map<String, String>> = _avatars.asStateFlow()
 
+    private val _events = MutableSharedFlow<ConversationEvent>(extraBufferCapacity = 8)
+    val events: SharedFlow<ConversationEvent> = _events.asSharedFlow()
+
+
     private var chatId: Long = -1
     private var myGoogleId: String = ""
     private var myUsername: String = ""
     private var pollingJob: Job? = null
+    private var realtimeEventsJob: Job? = null
+    private var historyJob: Job? = null
+    private var detailsJob: Job? = null
+    private val alreadyMarkedIds = mutableSetOf<Long>()
+    private var historyLoaded = false
+    private var detailsLoaded = false
 
     fun init(chatId: Long, myGoogleId: String, myUsername: String, otherParticipantName: String) {
-        if (this.chatId == chatId && this.myGoogleId == myGoogleId) return
+        if (this.chatId == chatId && this.myGoogleId == myGoogleId) {
+            return
+        }
+
+        historyJob?.cancel()
+        detailsJob?.cancel()
+
         this.chatId = chatId
         this.myGoogleId = myGoogleId
         this.myUsername = myUsername
-        _uiState.update { it.copy(otherParticipantName = otherParticipantName) }
+        alreadyMarkedIds.clear()
+        historyLoaded = false
+        detailsLoaded = false
+
+        _uiState.value = ConversationUiState(
+            otherParticipantName = otherParticipantName,
+            isLoadingHistory = true,
+            isReady = false,
+            messages = emptyList()
+        )
+
         loadHistory()
         loadChatDetails()
     }
@@ -79,65 +133,34 @@ class ConversationViewModel(
     fun onScreenVisible() { startPolling() }
     fun onScreenHidden() { stopPolling() }
 
-
-    fun carregarAvatarSiCal(googleId: String) {
-        // Si ja el tenim al mapa o el ID és buit, no fem res
-        if (googleId.isBlank() || _avatars.value.containsKey(googleId)) return
-
-        viewModelScope.launch {
-            try {
-                // FEM SERVIR LA MATEIXA FUNCIÓ QUE A FRIENDS
-                // Busquem l'usuari a la llista d'amics, que sabem que té photoUrl
-                val amics = withContext(ioDispatcher) { cargarAmigosUsuario(myGoogleId) }
-                val amicTrobat = amics.find { it.googleId == googleId }
-
-                if (amicTrobat != null && !amicTrobat.photoUrl.isNullOrBlank()) {
-                    Log.d("AVATAR_FIX", "Foto trobada via Friends per a $googleId: ${amicTrobat.photoUrl}")
-                    _avatars.update { it + (googleId to amicTrobat.photoUrl) }
-                } else {
-                    // Si no és amic o no té foto, intentem la cerca general (que també funciona a Friends)
-                    val resultatsCerca = withContext(ioDispatcher) { buscarUsuariosParaAmistad(googleId) }
-                    val usuariCerca = resultatsCerca.firstOrNull { it.googleId == googleId }
-
-                    val urlFinal = usuariCerca?.photoUrl
-
-                    if (!urlFinal.isNullOrBlank()) {
-                        Log.d("AVATAR_FIX", "Foto trobada via Cerca per a $googleId: $urlFinal")
-                        _avatars.update { it + (googleId to urlFinal) }
-                    } else {
-                        // Si realment no hi ha foto enlloc, posem una cadena buida perquè no ho torni a intentar
-                        Log.w("AVATAR_FIX", "No s'ha trobat cap foto per a $googleId en cap endpoint")
-                        _avatars.update { it + (googleId to "") }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("AVATAR_FIX", "Error en la cascada de càrrega per a $googleId: ${e.message}")
-                _avatars.update { it + (googleId to "") }
-            }
-        }
-    }
-
-    fun onInputChanged(text: String) {
-        _uiState.update { it.copy(inputText = text, sendFailed = false) }
-    }
+    fun onInputChanged(text: String) = _uiState.update { it.copy(inputText = text, sendFailed = false) }
 
     fun sendMessage() {
         val text = _uiState.value.inputText.trim()
         if (text.isBlank() || _uiState.value.isSending || chatId == -1L || myGoogleId.isBlank()) return
+
         val localId = UUID.randomUUID().toString()
-        val optimistic = MessageUiState(
-            id = -1L, content = text,
-            senderGoogleId = myGoogleId, senderUsername = myUsername,
-            createdAt = formatDate(obtenirDataActual()),
-            isFromMe = true, isOptimistic = true, localId = localId
-        )
+        val optimistic =
+            MessageUiState(
+                id = -1L,
+                content = text,
+                senderGoogleId = myGoogleId,
+                senderUsername = myUsername,
+                createdAt = formatDate(obtenirDataActual()),
+                isFromMe = true,
+                isOptimistic = true,
+                localId = localId
+            )
+
         _uiState.update { it.copy(messages = it.messages + optimistic, inputText = "", isSending = true, sendFailed = false) }
         viewModelScope.launch {
             try {
                 val sent = withContext(ioDispatcher) { enviarMissatge(chatId, myGoogleId, text) }
                 _uiState.update { state ->
                     state.copy(
-                        messages = state.messages.map { if (it.localId == localId) sent.toUiState() else it },
+                        messages = state.messages.map { msg ->
+                            if (msg.localId == localId) sent.toUiState() else msg
+                        },
                         isSending = false
                     )
                 }
@@ -145,90 +168,394 @@ class ConversationViewModel(
             } catch (e: Exception) {
                 Log.e("CHAT_CONV", "Error enviant: ${e.message}")
                 _uiState.update { state ->
-                    state.copy(messages = state.messages.filterNot { it.localId == localId },
-                        isSending = false, sendFailed = true, inputText = text)
+                    state.copy(
+                        messages = state.messages.filterNot { it.localId == localId },
+                        isSending = false, sendFailed = true, inputText = text
+                    )
                 }
+                _events.emit(ConversationEvent.Error(R.string.error_sending_message))
             }
         }
     }
+
+    fun carregarAvatarSiCal(googleId: String) {
+        if (googleId.isBlank()) return
+        val cached = _avatars.value[googleId]
+        if (!cached.isNullOrBlank()) return
+        viewModelScope.launch {
+            try {
+                val profile = withContext(ioDispatcher) { cargarPerfilDeUsuario(googleId) }
+                val url = profile?.pictureUrl?.trim()
+                if (!url.isNullOrBlank()) {
+                    Log.d("AVATAR", "cargarPerfil($googleId) → $url")
+                    _avatars.update { it + (googleId to url) }
+                    return@launch
+                }
+                val amics = withContext(ioDispatcher) { cargarAmigosUsuario(myGoogleId) }
+                val urlAmics = amics.firstOrNull { it.googleId == googleId }?.photoUrl?.trim()
+                Log.d("AVATAR", "amics($googleId) → $urlAmics")
+                if (!urlAmics.isNullOrBlank()) {
+                    _avatars.update { it + (googleId to urlAmics) }
+                } else {
+                    _avatars.update { it + (googleId to "") }
+                }
+            } catch (e: Exception) {
+                Log.e("AVATAR", "Error per $googleId: ${e.message}")
+            }
+        }
+    }
+
+    fun loadFriendsToAdd() {
+        val s = _uiState.value
+        if (!s.currentUserIsAdmin && !s.currentUserIsCreator) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_not_admin_add)) }
+            return
+        }
+        _uiState.update { it.copy(isLoadingAddableFriends = true, addableFriends = emptyList()) }
+        viewModelScope.launch {
+            try {
+                val amics = withContext(ioDispatcher) { cargarAmigosUsuario(myGoogleId) }
+                val members = _uiState.value.participantGoogleIds.toSet()
+                val addable = amics
+                    .filter { it.googleId !in members && it.googleId.isNotBlank() }
+                    .map { FriendForChat(it.googleId, it.username) }
+                _uiState.update { it.copy(isLoadingAddableFriends = false, addableFriends = addable) }
+            } catch (e: Exception) {
+                Log.e("CHAT_CONV", "Error carregant amics: ${e.message}")
+                _uiState.update { it.copy(isLoadingAddableFriends = false, addableFriends = emptyList()) }
+                _events.emit(ConversationEvent.Error(R.string.error_loading_friends))
+            }
+        }
+    }
+
+    fun clearAddableFriends() = _uiState.update { it.copy(addableFriends = emptyList()) }
+
+    fun addParticipant(newGoogleId: String, newUsername: String) {
+        val s = _uiState.value
+        if (newGoogleId.isBlank()) return
+        if (!s.currentUserIsAdmin && !s.currentUserIsCreator) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_not_admin_add)) }
+            return
+        }
+        _uiState.update { it.copy(isProcessingAdmin = true) }
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) { afegirParticipant(chatId, myGoogleId, newGoogleId) }
+                _uiState.update { st -> st.copy(
+                    participantNames = st.participantNames + newUsername,
+                    participantGoogleIds = st.participantGoogleIds + newGoogleId,
+                    isProcessingAdmin = false
+                )}
+                _events.emit(ConversationEvent.Success(R.string.success_participant_added, listOf(newUsername)))
+                carregarAvatarSiCal(newGoogleId)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isProcessingAdmin = false) }
+                _events.emit(ConversationEvent.Error(R.string.error_server_operation))
+            }
+        }
+    }
+
+    fun kickParticipant(targetGoogleId: String, targetUsername: String) {
+        val s = _uiState.value
+        if (targetGoogleId.isBlank()) return
+        if (targetGoogleId == s.creatorGoogleId) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_kick_creator)) }
+            return
+        }
+        if (!s.currentUserIsAdmin && !s.currentUserIsCreator) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_not_admin_kick)) }
+            return
+        }
+        if (targetGoogleId in s.adminGoogleIds && !s.currentUserIsCreator) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_not_creator_kick)) }
+            return
+        }
+        _uiState.update { it.copy(isProcessingAdmin = true) }
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) { expulsarParticipant(chatId, targetGoogleId, myGoogleId) }
+                _uiState.update { st -> st.copy(
+                    participantNames = st.participantNames.filterNot { it == targetUsername },
+                    participantGoogleIds = st.participantGoogleIds.filterNot { it == targetGoogleId },
+                    adminGoogleIds = st.adminGoogleIds - targetGoogleId,
+                    isProcessingAdmin = false
+                )}
+                _events.emit(ConversationEvent.Success(R.string.success_participant_kicked, listOf(targetUsername)))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isProcessingAdmin = false) }
+                _events.emit(ConversationEvent.Error(R.string.error_server_operation))
+            }
+        }
+    }
+
+    fun promoteToAdmin(targetGoogleId: String, targetUsername: String) {
+        val s = _uiState.value
+        if (targetGoogleId.isBlank()) return
+        if (!s.currentUserIsAdmin && !s.currentUserIsCreator) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_not_admin_promote)) }
+            return
+        }
+        if (targetGoogleId in s.adminGoogleIds) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_already_admin, listOf(targetUsername))) }
+            return
+        }
+        _uiState.update { it.copy(isProcessingAdmin = true) }
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) { promocionarAdmin(chatId, targetGoogleId, myGoogleId) }
+                _uiState.update { st -> st.copy(
+                    adminGoogleIds = st.adminGoogleIds + targetGoogleId,
+                    isProcessingAdmin = false
+                )}
+                _events.emit(ConversationEvent.Success(R.string.success_admin_promoted, listOf(targetUsername)))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isProcessingAdmin = false) }
+                _events.emit(ConversationEvent.Error(R.string.error_server_operation))
+            }
+        }
+    }
+
+    fun revokeAdmin(targetGoogleId: String, targetUsername: String) {
+        val s = _uiState.value
+        if (targetGoogleId.isBlank()) return
+        if (targetGoogleId !in s.adminGoogleIds) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_not_admin_revoke, listOf(targetUsername))) }
+            return
+        }
+        if (!s.currentUserIsCreator) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_not_creator_revoke)) }
+            return
+        }
+        if (targetGoogleId == s.creatorGoogleId) {
+            viewModelScope.launch { _events.emit(ConversationEvent.NotAdmin(R.string.error_revoke_creator)) }
+            return
+        }
+        _uiState.update { it.copy(isProcessingAdmin = true) }
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) { revocarAdmin(chatId, targetGoogleId, myGoogleId) }
+                _uiState.update { st -> st.copy(
+                    adminGoogleIds = st.adminGoogleIds - targetGoogleId,
+                    isProcessingAdmin = false
+                )}
+                _events.emit(ConversationEvent.Success(R.string.success_admin_revoked, listOf(targetUsername)))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isProcessingAdmin = false) }
+                _events.emit(ConversationEvent.Error(R.string.error_server_operation))
+            }
+        }
+    }
+
 
     private fun startPolling() {
+        launchMessagePolling()
+        launchRealtimeEventsObserver()
+    }
+
+    private fun launchMessagePolling() {
         if (pollingJob?.isActive == true) return
-        pollingJob = viewModelScope.launch { while (true) { refreshMessages(); delay(POLLING_INTERVAL_MS) } }
-        // Escolta el WebSocket EventBus per a refresh immediat (redueix latència de 3s a ~0s)
-        viewModelScope.launch {
-            ChatEventBus.newMessageEvent.collect {
+        pollingJob = viewModelScope.launch {
+            while (isActive) {
                 refreshMessages()
+                delay(POLLING_INTERVAL_MS)
             }
         }
     }
 
-    private fun stopPolling() { pollingJob?.cancel(); pollingJob = null }
+    private fun launchRealtimeEventsObserver() {
+        if (realtimeEventsJob?.isActive == true) return
+        realtimeEventsJob = viewModelScope.launch {
+            ChatEventBus.events.collect { event ->
+                if (event.chatId != null && event.chatId != chatId) return@collect
+                handleRealtimeEvent(event)
+            }
+        }
+    }
+
+    private suspend fun handleRealtimeEvent(event: ChatRealtimeEvent) {
+        when (event) {
+            is ChatRealtimeEvent.NewMessage -> refreshMessages()
+            is ChatRealtimeEvent.ParticipantLeft -> handleParticipantRealtimeEvent(
+                event.username,
+                R.string.info_realtime_participant_left,
+                R.string.info_realtime_participant_left_unknown
+            )
+            is ChatRealtimeEvent.ParticipantKicked -> handleParticipantRealtimeEvent(
+                event.username,
+                R.string.info_realtime_participant_kicked,
+                R.string.info_realtime_participant_kicked_unknown
+            )
+            is ChatRealtimeEvent.ParticipantJoined -> handleParticipantRealtimeEvent(
+                event.username,
+                R.string.info_realtime_participant_joined,
+                R.string.info_realtime_participant_joined_unknown
+            )
+            is ChatRealtimeEvent.AdminPromoted -> handleAdminRoleRealtimeEvent(event.username, isPromote = true)
+            is ChatRealtimeEvent.AdminRevoked -> handleAdminRoleRealtimeEvent(event.username, isPromote = false)
+            is ChatRealtimeEvent.GroupCreated -> {  }
+        }
+    }
+
+    private suspend fun handleParticipantRealtimeEvent(username: String?, stringRes: Int, fallbackRes: Int) {
+        val event = if (!username.isNullOrBlank()) {
+            ConversationEvent.Info(stringRes, listOf(username))
+        } else {
+            ConversationEvent.Info(fallbackRes)
+        }
+        _events.emit(event)
+        loadChatDetails()
+    }
+
+    private suspend fun handleAdminRoleRealtimeEvent(username: String?, isPromote: Boolean) {
+        val targetGid = _uiState.value.participantGoogleIds.firstOrNull { it == username }
+        if (targetGid != null) {
+            _uiState.update { state ->
+                val updatedAdmins = if (isPromote) state.adminGoogleIds + targetGid else state.adminGoogleIds - targetGid
+                state.copy(adminGoogleIds = updatedAdmins)
+            }
+        }
+
+        val stringRes = if (isPromote) R.string.success_admin_promoted else R.string.success_admin_revoked
+        val fallbackRes = if (isPromote) R.string.success_admin_promoted_unknown else R.string.success_admin_revoked_unknown
+
+        val event = if (!username.isNullOrBlank()) {
+            ConversationEvent.Info(stringRes, listOf(username))
+        } else {
+            ConversationEvent.Info(fallbackRes)
+        }
+        _events.emit(event)
+    }
+
+    private fun stopPolling() {
+        pollingJob?.cancel(); pollingJob = null
+        realtimeEventsJob?.cancel(); realtimeEventsJob = null
+    }
 
     private suspend fun refreshMessages() {
         if (chatId == -1L) return
         try {
             val msgs = withContext(ioDispatcher) { obtenirMissatges(chatId) }
-            val others = msgs.filter { it.senderGoogleId != myGoogleId && it.senderGoogleId.isNotBlank() }
-            if (others.isNotEmpty()) {
-                Log.d("CHAT_MSG", "Rebuts ${msgs.size} missatges: ${others.size} d'altres (${others.map { it.senderGoogleId }.distinct()})")
-            }
             _uiState.update { state ->
                 val pending = state.messages.filter { it.isOptimistic }
-                state.copy(isLoadingHistory = false, loadFailed = false, messages = msgs.map { it.toUiState() } + pending)
+                state.copy(
+                    isLoadingHistory = false, loadFailed = false,
+                    messages = msgs.map { it.toUiState() } + pending
+                )
             }
             viewModelScope.launch { markIncomingAsRead(msgs) }
-        } catch (e: CancellationException) { throw e } catch (e: Exception) {
+        } catch (e: CancellationException) { throw e
+        } catch (e: Exception) {
             Log.e("CHAT_CONV", "Error refrescant: ${e.message}")
+            _uiState.update { if (it.messages.isEmpty()) it.copy(isLoadingHistory = false, loadFailed = true) else it }
         }
     }
 
     private fun loadHistory() {
-        _uiState.update { it.copy(isLoadingHistory = true, loadFailed = false) }
-        viewModelScope.launch {
+        historyJob = viewModelScope.launch {
             try {
                 val msgs = withContext(ioDispatcher) { obtenirMissatges(chatId) }
-                _uiState.update { it.copy(isLoadingHistory = false, messages = msgs.map { m -> m.toUiState() }) }
+                _uiState.update {
+                    it.copy(isLoadingHistory = false, loadFailed = false,
+                        messages = msgs.map { m -> m.toUiState() })
+                }
+                historyLoaded = true
+                updateReadiness()
                 startPolling()
-                launch { markIncomingAsRead(msgs) }
+                viewModelScope.launch { markIncomingAsRead(msgs) }
             } catch (e: CancellationException) { throw e
-            } catch (_: Exception) { _uiState.update { it.copy(isLoadingHistory = false, loadFailed = true) } }
+            } catch (_: Exception) {
+                _uiState.update { it.copy(isLoadingHistory = false, loadFailed = true) }
+                historyLoaded = true
+                updateReadiness()
+            }
         }
     }
 
+
     private fun loadChatDetails() {
         if (myGoogleId.isBlank() || chatId == -1L) return
-        viewModelScope.launch {
+        detailsJob = viewModelScope.launch {
             try {
                 val chats = withContext(ioDispatcher) { obtenirXatsUsuari(myGoogleId) }
                 val thisChat = chats.firstOrNull { it.id == chatId } ?: return@launch
-                _uiState.update {
-                    it.copy(
-                        isGroup = thisChat.type == "GROUP",
-                        participantNames = thisChat.participantUsernames ?: emptyList()
-                    )
-                }
+
+                updateChatDetailsState(thisChat)
+                preloadAvatarsForChat(thisChat)
+
+                detailsLoaded = true
+                updateReadiness()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("CHAT_CONV", "Error carregant detalls: ${e.message}")
+                detailsLoaded = true
+                updateReadiness()
             }
+        }
+    }
+
+    private fun updateChatDetailsState(chat: ChatDto) {
+        val isGroup = chat.type == "GROUP"
+        val googleIds = chat.participantGoogleIds
+
+        val otherGoogleId = if (!isGroup) {
+            googleIds.firstOrNull { it != myGoogleId && it.isNotBlank() }
+        } else null
+
+        val creatorId = if (isGroup) googleIds.firstOrNull { it.isNotBlank() } else null
+
+        _uiState.update { state ->
+            val currentAdmins = state.adminGoogleIds
+            val newAdmins = if (currentAdmins.isEmpty() && creatorId != null) setOf(creatorId)
+            else currentAdmins + listOfNotNull(creatorId)
+
+            state.copy(
+                isGroup = isGroup,
+                participantNames = chat.participantUsernames,
+                participantGoogleIds = googleIds,
+                otherParticipantGoogleId = otherGoogleId,
+                creatorGoogleId = creatorId,
+                adminGoogleIds = newAdmins,
+                currentUserIsCreator = (creatorId == myGoogleId),
+                currentUserIsAdmin = (myGoogleId in newAdmins)
+            )
+        }
+    }
+
+    private fun preloadAvatarsForChat(chat: ChatDto) {
+        val isGroup = chat.type == "GROUP"
+        val googleIds = chat.participantGoogleIds
+
+        if (!isGroup) {
+            val otherGoogleId = googleIds.firstOrNull { it != myGoogleId && it.isNotBlank() }
+            otherGoogleId?.let { carregarAvatarSiCal(it) }
+        } else {
+            googleIds.filter { it.isNotBlank() && it != myGoogleId }
+                .forEach { carregarAvatarSiCal(it) }
+        }
+    }
+
+
+    private fun updateReadiness() {
+        if (historyLoaded && detailsLoaded) {
+            _uiState.update { it.copy(isReady = true) }
         }
     }
 
     private suspend fun markIncomingAsRead(messages: List<MessageDto>) {
-        messages.filter { it.senderGoogleId != myGoogleId }.forEach { msg ->
-            try { marcarMissatgeLlegit(chatId, msg.id, myGoogleId) } catch (e: Exception) {
-                Log.e("CHAT_CONV", "Error marcant com llegit: ${e.message}")
+        messages.filter { it.senderGoogleId != myGoogleId && it.id !in alreadyMarkedIds }
+            .forEach { msg ->
+                try {
+                    marcarMissatgeLlegit(chatId, msg.id, myGoogleId)
+                    alreadyMarkedIds.add(msg.id)
+                } catch (_: Exception) { }
             }
-        }
     }
 
     private fun MessageDto.toUiState() = MessageUiState(
-        id = id,
-        content = content,
-        senderGoogleId = senderGoogleId,
-        senderUsername = senderUsername,
-        createdAt = formatDate(createdAt),
-        isFromMe = senderGoogleId == myGoogleId
+        id = id, content = content, senderGoogleId = senderGoogleId,
+        senderUsername = senderUsername, createdAt = formatDate(createdAt),
+        isFromMe = senderGoogleId == myGoogleId, isRead = false
     )
 
     private fun formatDate(date: String): String {

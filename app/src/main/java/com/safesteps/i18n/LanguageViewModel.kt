@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.update
 
 data class LanguageUiState(
     val currentLanguage: AppLanguage = AppLanguage.default,
-    val canChangeLanguage: Boolean = false
+    val canChangeLanguage: Boolean = true // Guest users can also change language now
 )
 
 class LanguageViewModel(
@@ -29,6 +29,12 @@ class LanguageViewModel(
 
     private var currentUser: UserInfo? = null
     private var currentBackendLanguageTag: String? = null
+
+    init {
+        // Carga inicial (Guest mode por defecto)
+        val initialLanguage = repository.getLanguageForUser(null)
+        _uiState.update { it.copy(currentLanguage = initialLanguage) }
+    }
 
     fun onUserChanged(user: UserInfo?) {
         val googleId = user?.googleId
@@ -58,8 +64,7 @@ class LanguageViewModel(
 
         _uiState.update {
             it.copy(
-                currentLanguage = resolvedLanguage,
-                canChangeLanguage = !email.isNullOrBlank()
+                currentLanguage = resolvedLanguage
             )
         }
     }
@@ -68,17 +73,17 @@ class LanguageViewModel(
         language: AppLanguage,
         onLanguageUpdated: (String, String) -> Unit = { _, _ -> }
     ) {
-        val user = currentUser ?: return
-        val email = user.email
+        val email = currentUser?.email
 
         repository.saveLanguageForUser(email, language)
         currentBackendLanguageTag = language.languageTag
         _uiState.update { it.copy(currentLanguage = language) }
+
+        val user = currentUser ?: return
+        
         if (user.googleId.isNotBlank()) {
             onLanguageUpdated(user.googleId, language.languageTag)
-        }
-
-        if (user.googleId.isBlank()) {
+        } else {
             return
         }
 

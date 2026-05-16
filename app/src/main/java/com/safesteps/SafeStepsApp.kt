@@ -1,5 +1,6 @@
 ﻿package com.safesteps
 
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,10 +22,10 @@ import com.safesteps.auth.UserInfo
 import com.safesteps.auth.rememberGoogleSignOutAction
 import com.safesteps.auth.rememberGoogleSignInAction
 import com.safesteps.chat.ChatListScreen
+import com.safesteps.chat.ChatListViewModel
 import com.safesteps.chat.ConversationScreen
 import com.safesteps.chat.CreateChatScreen
 import com.safesteps.data.RouteCompletionResponse
-import com.safesteps.profile.ChatListViewModel
 import com.safesteps.profile.FriendListItemUiState
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.LanguagePreferencesRepository
@@ -35,6 +36,9 @@ import com.safesteps.i18n.appString
 import com.safesteps.map.CommunityMenuScreen
 import com.safesteps.map.MapLibreScreen
 import com.safesteps.notifications.BackendWebSocketManager
+import com.safesteps.notifications.persistEmergencyNotificationLanguage
+import com.safesteps.notifications.persistEmergencyNotificationUser
+import com.safesteps.notifications.syncCurrentFcmTokenForUser
 import com.safesteps.profile.ProfileFilterState
 import com.safesteps.profile.ProfileGamificationCallbacks
 import com.safesteps.profile.ProfileGamificationState
@@ -243,6 +247,12 @@ fun SafeStepsApp(
         onProfileOpened = profileViewModel::onProfileScreenOpened
     )
     HandleBackendWebSocketEffect(currentUser = authUiState.currentUser)
+
+    HandleNotificationRegistrationEffect(
+        currentUser = authUiState.currentUser,
+        currentLanguage = languageUiState.currentLanguage
+    )
+
     val onLanguageSelected: (AppLanguage) -> Unit = remember(languageViewModel, authViewModel) {
         { language ->
             languageViewModel.onLanguageSelected(
@@ -370,6 +380,31 @@ private fun HandleBackendWebSocketEffect(currentUser: UserInfo?) {
     androidx.compose.runtime.DisposableEffect(Unit) {
         onDispose {
             BackendWebSocketManager.disconnect()
+        }
+    }
+}
+
+@Composable
+private fun HandleNotificationRegistrationEffect(
+    currentUser: UserInfo?,
+    currentLanguage: AppLanguage
+) {
+    val appContext = LocalContext.current.applicationContext
+    val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
+
+    LaunchedEffect(appContext, googleId, currentLanguage) {
+        persistEmergencyNotificationLanguage(appContext, currentLanguage.languageTag)
+        persistEmergencyNotificationUser(appContext, googleId)
+        if (googleId != null) {
+            runCatching {
+                syncCurrentFcmTokenForUser(appContext, googleId)
+            }.onFailure { error ->
+                Log.w(
+                    "EMERGENCY_NOTIFICATIONS",
+                    "No se pudo sincronizar el token FCM del usuario actual",
+                    error
+                )
+            }
         }
     }
 }

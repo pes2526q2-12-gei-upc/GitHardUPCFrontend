@@ -12,9 +12,15 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.safesteps.auth.AuthViewModel
+import com.safesteps.notifications.BackendWebSocketManager
 import com.safesteps.notifications.initializeEmergencyMessaging
 import com.safesteps.ui.theme.SafeStepsTheme
 import com.safesteps.ui.notifications.ScreenNotificationHost
@@ -32,6 +38,14 @@ class MainActivity : AppCompatActivity() {
 
         enableEdgeToEdge()
         setContent {
+            val authViewModel: AuthViewModel = viewModel()
+            val authState by authViewModel.uiState.collectAsState()
+            LaunchedEffect(authState.currentUser?.googleId) {
+                val gid = authState.currentUser?.googleId
+                if (!gid.isNullOrBlank()) BackendWebSocketManager.connect(applicationContext, gid)
+                else BackendWebSocketManager.disconnect()
+            }
+
             SafeStepsTheme {
                 Scaffold(
                     modifier = Modifier
@@ -45,6 +59,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        BackendWebSocketManager.disconnect()
     }
 
     private fun requestNotificationPermissionIfNeeded() {

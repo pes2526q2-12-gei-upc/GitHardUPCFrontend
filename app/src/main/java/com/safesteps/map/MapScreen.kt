@@ -53,8 +53,6 @@ import com.safesteps.data.obtenerEstadoEmergenciaUsuario
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
 import com.safesteps.i18n.appString
-import com.safesteps.notifications.persistEmergencyNotificationUser
-import com.safesteps.notifications.syncCurrentFcmTokenForUser
 import org.maplibre.android.annotations.IconFactory
 import com.safesteps.ui.notifications.ScreenNotificationManager
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -584,22 +582,6 @@ fun MapLibreScreen(
 
     LaunchedEffect(currentUser?.googleId) {
         viewModel.onCurrentUserChanged(currentUser)
-    }
-
-    LaunchedEffect(currentUser?.googleId) {
-        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
-        persistEmergencyNotificationUser(context, googleId)
-        if (googleId != null) {
-            runCatching {
-                syncCurrentFcmTokenForUser(context, googleId)
-            }.onFailure { error ->
-                Log.w(
-                    "EMERGENCY_NOTIFICATIONS",
-                    "No se pudo sincronizar el token FCM del usuario actual",
-                    error
-                )
-            }
-        }
     }
 
     LaunchedEffect(currentUser?.googleId) {

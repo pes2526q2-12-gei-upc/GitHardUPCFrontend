@@ -1,4 +1,4 @@
-﻿﻿<resources>
+﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="change_language">Cambiar idioma</string>
     <string name="log_in">Iniciar sesi&#243;n</string>
@@ -270,6 +270,39 @@
     <string name="friends_emergency_unmark_action">Quitar de emergencia</string>
 
 
+
+    <string name="chat_notif_channel_name">Mensajes de chat</string>
+    <string name="chat_notif_channel_description">Notificaciones de mensajes entrantes en tus chats</string>
+    <string name="chat_notif_default_message">Nuevo mensaje</string>
+    <string name="chat_notif_someone">Alguien</string>
+    <string name="chat_notif_me">Tú</string>
+    <string name="chat_notif_group_fallback">Grupo</string>
+    <string name="chat_loading_conversation">Cargando conversación…</string>
+    <string name="chat_list_left">Has salido del chat</string>
+    <string name="chat_event_a_participant">Un participante</string>
+    <string name="chat_event_someone">Alguien</string>
+    <string name="chat_event_participant_left">%1$s ha salido del grupo</string>
+    <string name="chat_event_participant_kicked_info">%1$s ha sido expulsado</string>
+    <string name="chat_event_participant_joined">%1$s se ha unido al grupo</string>
+    <string name="chat_event_admin_promoted_info">%1$s es ahora administrador</string>
+    <string name="chat_event_admin_revoked_info">Permisos de administrador de %1$s revocados</string>
+    <string name="chat_admin_missing_googleid">Falta el GoogleId del participante</string>
+    <string name="chat_admin_op_failed">Operación fallida en el servidor</string>
+    <string name="chat_admin_cant_kick_creator">No puedes expulsar al creador del grupo.</string>
+    <string name="chat_admin_only_admins_can_kick">Solo los administradores pueden expulsar participantes.</string>
+    <string name="chat_admin_only_creator_can_kick_admin">Solo el creador del grupo puede expulsar administradores.</string>
+    <string name="chat_admin_kicked_success">%1$s ha sido expulsado</string>
+    <string name="chat_admin_only_admins_can_promote">Solo los administradores pueden ascender a miembros.</string>
+    <string name="chat_admin_already_admin">%1$s ya es administrador.</string>
+    <string name="chat_admin_promoted_success">%1$s es ahora administrador</string>
+    <string name="chat_admin_target_not_admin">%1$s no es administrador. No se puede revocar.</string>
+    <string name="chat_admin_only_creator_can_revoke">Solo el creador del grupo puede revocar administradores.</string>
+    <string name="chat_admin_creator_cant_lose_rank">El creador no puede perder su rango.</string>
+    <string name="chat_admin_revoked_success">Permisos de administrador de %1$s revocados</string>
+    <string name="chat_admin_only_admins_can_add">Solo los administradores pueden añadir miembros.</string>
+    <string name="chat_admin_only_admins_can_add_participants">Solo los administradores pueden añadir participantes.</string>
+    <string name="chat_admin_added_success">%1$s añadido al grupo</string>
+    <string name="chat_admin_load_friends_failed">No se han podido cargar los amigos</string>
     <string name="chat_load_failed">No se han podido cargar los chats.</string>
     <string name="chat_messages_load_failed">No se han podido cargar los mensajes.</string>
     <string name="chat_no_conversations">Aún no tienes ninguna conversación</string>
@@ -297,6 +330,77 @@
     <string name="chat_group_label">Grupo</string>
     <string name="chat_private_label">Conversación privada</string>
     <string name="chat_participants_label">Participantes</string>
+
+    <string name="default_chat_name">Chat</string>
+    <string name="default_group_name">Grupo</string>
+    <string name="default_participant_name">Un participante</string>
+    <string name="default_someone_name">Alguien</string>
+
+    <string name="error_sending_message">No se pudo enviar el mensaje</string>
+    <string name="error_loading_friends">No se pudieron cargar los amigos</string>
+    <string name="error_server_operation">Operación fallida en el servidor</string>
+
+    <string name="error_not_admin_add">Solo los administradores pueden añadir participantes.</string>
+    <string name="error_not_admin_kick">Solo los administradores pueden expulsar.</string>
+    <string name="error_not_creator_kick">Solo el creador puede expulsar a administradores.</string>
+    <string name="error_kick_creator">No puedes expulsar al creador del grupo.</string>
+    <string name="error_not_admin_promote">Solo los administradores pueden promover.</string>
+    <string name="error_already_admin">%1$s ya es administrador.</string>
+    <string name="error_not_admin_revoke">%1$s no es administrador. No se puede revocar.</string>
+    <string name="error_not_creator_revoke">Solo el creador puede revocar a administradores.</string>
+    <string name="error_revoke_creator">El creador no puede perder su rango.</string>
+
+    <string name="success_participant_added">%1$s añadido al grupo</string>
+    <string name="success_participant_kicked">%1$s ha sido expulsado</string>
+    <string name="success_admin_promoted">%1$s ahora es administrador</string>
+    <string name="success_admin_revoked">Permisos de administrador de %1$s revocados</string>
+    <string name="info_left_chat">Has salido del chat</string>
+
+    <string name="info_realtime_participant_left_unknown">Un participante ha salido del grupo</string>
+
+    <string name="info_realtime_participant_kicked_unknown">Un participante ha sido expulsado</string>
+
+    <string name="info_realtime_participant_joined_unknown">Alguien se ha unido al grupo</string>
+
+    <string name="success_admin_promoted_unknown">Un participante ahora es administrador</string>
+    <string name="success_admin_revoked_unknown">Admin de un participante revocado</string>
+
+    <string name="info_realtime_participant_left">%1$s ha salido del grupo</string>
+    <string name="info_realtime_participant_kicked">%1$s ha sido expulsado</string>
+    <string name="info_realtime_participant_joined">%1$s se ha unido al grupo</string>
+
+    <string name="chat_role_leader">Líder del grupo</string>
+    <string name="chat_role_admin">Administrador</string>
+    <string name="chat_self_indicator">(tú)</string>
+    <string name="chat_unknown_sender">Desconocido</string>
+
+    <string name="chat_group_subtitle">Grupo · %1$d miembros</string>
+    <string name="chat_private_subtitle">Chat privado</string>
+    <string name="chat_members_label">Miembros</string>
+
+    <string name="understood_action">Entendido</string>
+    <string name="chat_action_not_allowed">Acción no permitida</string>
+    <string name="chat_kick_action">Expulsar</string>
+    <string name="chat_promote_action">Promover</string>
+    <string name="chat_revoke_action">Revocar</string>
+    <string name="chat_revoke_admin_action">Revocar admin</string>
+    <string name="chat_add_action">Añadir</string>
+    <string name="chat_message_sender_label">Emisor del mensaje</string>
+    <string name="chat_sending_status">Enviando</string>
+    <string name="chat_sent_status">Enviado</string>
+
+    <string name="chat_add_participant_action">Añadir participante</string>
+    <string name="chat_add_to_group_title">Añadir al grupo</string>
+    <string name="chat_no_more_friends_to_add">No tienes más amigos para añadir al grupo.</string>
+
+    <string name="chat_kick_title">Expulsar a %1$s</string>
+    <string name="chat_kick_confirmation">¿Seguro que quieres expulsar a %1$s del grupo? Esta acción no se puede deshacer.</string>
+
+    <string name="chat_promote_title">Promover a %1$s</string>
+    <string name="chat_promote_confirmation">¿Otorgar rango de administrador a %1$s? Podrá gestionar el grupo, expulsar miembros y promover a otros.</string>
+
+    <string name="chat_revoke_title">Revocar admin de %1$s</string>
+    <string name="chat_revoke_confirmation">¿Quieres retirar el rango de administrador a %1$s? Ya no podrá gestionar el grupo.</string>
 
     <plurals name="poi_fountains">
         <item quantity="one">%d fuente</item>

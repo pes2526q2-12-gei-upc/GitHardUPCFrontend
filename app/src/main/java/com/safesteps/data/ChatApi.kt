@@ -19,26 +19,15 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private const val CHAT_BASE_URL = "http://nattech.fib.upc.edu:40382/"
+private const val CHAT_BASE_URL = "http://nattech.fib.upc.edu:40386/"
 
-// ── DTOs ──────────────────────────────────────────────────────────────────────
-
-/**
- * Representació d'un xat retornada pel backend.
- *
- * NOTA PENDENT BACKEND: afegir [participantGoogleIds] a ChatResponseDTO.java:
- *   private List<String> participantGoogleIds;
- *   // al constructor: this.participantGoogleIds = chat.getParticipants().stream()
- *   //     .map(p -> p.getUser().getGoogleId()).toList();
- * Sense això, la identificació de l'altre participant es fa per username (fràgil).
- */
 data class ChatDto(
     val id: Long,
     val type: String,
     val name: String? = null,
     val createdAt: String? = null,
     val participantUsernames: List<String> = emptyList(),
-    val participantGoogleIds: List<String> = emptyList() // pendent d'afegir al backend
+    val participantGoogleIds: List<String> = emptyList()
 )
 
 fun obtenirDataActual(): String {
@@ -128,35 +117,30 @@ private interface ChatApiService {
 private object ChatBackend {
     private val gson = GsonBuilder()
         .registerTypeAdapter(MessageDto::class.java,
-            JsonDeserializer<MessageDto> { json, _, context ->
+            JsonDeserializer { json, _, _ ->
                 val obj = json.asJsonObject
 
-                // Verificació de seguretat per al camp createdAt
                 if (!obj.has("createdAt") || obj.get("createdAt").isJsonNull) {
-                    // Si el servidor no l'envia (com passa al POST), el generem aquí
                     obj.addProperty("createdAt", obtenirDataActual())
                 }
 
-                // IMPORTANT: No creis un nou Gson(). Usa context.deserialize per evitar bucles infinits.
-                // Per evitar que torni a cridar aquest adaptador, hem de parsejar els camps manualment
-                // o fer que el DTO sigui una classe simple.
-
-                // jsonStr: obté String segur d'un camp (gestiona Java-null i JsonNull)
                 fun str(key: String): String {
                     val el = obj.get(key) ?: return ""
                     return if (el.isJsonNull) "" else try { el.asString ?: "" } catch (_: Exception) { "" }
                 }
+
                 fun safeLong(key: String): Long {
                     val el = obj.get(key) ?: return -1L
                     return if (el.isJsonNull) -1L else try { el.asLong } catch (_: Exception) { -1L }
                 }
+
                 MessageDto(
                     id             = safeLong("id"),
                     chatId         = safeLong("chatId"),
                     senderUsername = str("senderUsername"),
                     senderGoogleId = str("senderGoogleId"),
                     content        = str("content"),
-                    createdAt      = str("createdAt")   // buit si el POST no el retorna; el VM usa hora local
+                    createdAt      = str("createdAt")
                 )
             })
         .create()
@@ -164,7 +148,7 @@ private object ChatBackend {
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(CHAT_BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create(gson)) // FIX: usar el gson custom amb el deserialitzador de MessageDto
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
 
@@ -192,12 +176,23 @@ suspend fun obtenirXatsUsuari(googleId: String): List<ChatDto> {
 }
 
 suspend fun crearXatPrivat(myGoogleId: String, otherGoogleId: String): ChatDto =
-    crearXat(type = "PRIVATE", name = null, participantGoogleIds = listOf(myGoogleId, otherGoogleId))
+    crearXat(
+        type = "PRIVATE",
+        name = null,
+        participantGoogleIds = listOf(myGoogleId, otherGoogleId)
+    )
 
 suspend fun crearXat(type: String, name: String?, participantGoogleIds: List<String>): ChatDto {
     Log.d("CHAT_API", "Creant xat type=$type name=$name participants=$participantGoogleIds")
-    val request = CreateChatRequest(type = type, name = name, participantGoogleIds = participantGoogleIds)
+
+    val request =
+        CreateChatRequest(
+            type = type,
+            name = name,
+            participantGoogleIds = participantGoogleIds
+        )
     val response = ChatBackend.service.createChat(request)
+
     if (!response.isSuccessful) {
         val error = response.errorBody()?.string().orEmpty()
         Log.e("CHAT_API", "Error creant xat: code=${response.code()} body=$error")
@@ -208,6 +203,7 @@ suspend fun crearXat(type: String, name: String?, participantGoogleIds: List<Str
 
 suspend fun obtenirMissatges(chatId: Long): List<MessageDto> {
     val response = ChatBackend.service.getMessages(chatId)
+
     if (!response.isSuccessful) {
         throw IOException("Error obtenint missatges: ${response.code()}")
     }
@@ -216,17 +212,21 @@ suspend fun obtenirMissatges(chatId: Long): List<MessageDto> {
 
 suspend fun  enviarMissatge(chatId: Long, senderGoogleId: String, content: String): MessageDto {
     Log.d("CHAT_API", "Enviant missatge a chatId=$chatId")
+
     val response = ChatBackend.service.sendMessage(
         chatId = chatId,
         request = SendMessageRequest(content = content, senderGoogleId = senderGoogleId)
     )
+
     if (!response.isSuccessful) {
         val error = response.errorBody()?.string().orEmpty()
         Log.e("CHAT_API", "Error enviant missatge: code=${response.code()} body=$error")
         throw IOException("Error enviant missatge: ${response.code()}")
     }
+
     val body = response.body() ?: throw IOException("Resposta buida al enviar missatge")
     val date = body.createdAt as String?
+
     return if (date.isNullOrBlank()) {
         body.copy(createdAt = obtenirDataActual())
     } else {
@@ -236,6 +236,7 @@ suspend fun  enviarMissatge(chatId: Long, senderGoogleId: String, content: Strin
 
 suspend fun marcarMissatgeLlegit(chatId: Long, messageId: Long, googleId: String) {
     val response = ChatBackend.service.markAsRead(chatId, messageId, googleId)
+
     if (!response.isSuccessful) {
         Log.w("CHAT_API", "No s'ha pogut marcar missatge $messageId com a llegit")
     }
@@ -244,7 +245,9 @@ suspend fun marcarMissatgeLlegit(chatId: Long, messageId: Long, googleId: String
 
 suspend fun afegirParticipant(chatId: Long, adminId: String, newUserGoogleId: String) {
     Log.d("CHAT_API", "Afegint participant $newUserGoogleId al xat $chatId (admin=$adminId)")
+
     val response = ChatBackend.service.addParticipant(chatId, adminId, newUserGoogleId)
+
     if (!response.isSuccessful) {
         throw IOException("Error afegint participant: ${response.code()}")
     }
@@ -252,7 +255,9 @@ suspend fun afegirParticipant(chatId: Long, adminId: String, newUserGoogleId: St
 
 suspend fun sortirDelXat(chatId: Long, googleId: String) {
     Log.d("CHAT_API", "Sortint del xat $chatId (googleId=$googleId)")
+
     val response = ChatBackend.service.exitChat(chatId, googleId)
+
     if (!response.isSuccessful) {
         throw IOException("Error sortint del xat: ${response.code()}")
     }
@@ -260,7 +265,9 @@ suspend fun sortirDelXat(chatId: Long, googleId: String) {
 
 suspend fun expulsarParticipant(chatId: Long, targetId: String, adminId: String) {
     Log.d("CHAT_API", "Expulsant $targetId del xat $chatId (admin=$adminId)")
+
     val response = ChatBackend.service.kickParticipant(chatId, targetId, adminId)
+
     if (!response.isSuccessful) {
         throw IOException("Error expulsant participant: ${response.code()}")
     }
@@ -268,6 +275,7 @@ suspend fun expulsarParticipant(chatId: Long, targetId: String, adminId: String)
 
 suspend fun promocionarAdmin(chatId: Long, targetId: String, adminId: String) {
     val response = ChatBackend.service.promoteToAdmin(chatId, targetId, adminId)
+
     if (!response.isSuccessful) {
         throw IOException("Error promocionant admin: ${response.code()}")
     }
@@ -275,6 +283,7 @@ suspend fun promocionarAdmin(chatId: Long, targetId: String, adminId: String) {
 
 suspend fun revocarAdmin(chatId: Long, targetId: String, adminId: String) {
     val response = ChatBackend.service.demoteFromAdmin(chatId, targetId, adminId)
+
     if (!response.isSuccessful) {
         throw IOException("Error revocant admin: ${response.code()}")
     }

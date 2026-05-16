@@ -36,7 +36,22 @@ enum class SocketChannelPreference(
 
     companion object {
         fun fromDestination(destination: String?): SocketChannelPreference? {
-            return values().firstOrNull { it.destination == destination }
+            if (destination.isNullOrBlank()) return null
+            values().firstOrNull { it.destination == destination }?.let { return it }
+
+            val normalized = destination.lowercase()
+            return when {
+                normalized.contains("/messages") || normalized.endsWith("messages") -> MESSAGES
+                normalized.contains("/emergency") || normalized.endsWith("emergency") -> EMERGENCY
+                normalized.contains("/requests") || normalized.contains("/friend") -> FRIEND_REQUESTS
+                normalized.contains("/location") -> LOCATION
+                else -> null
+            }
+        }
+
+        fun fromSubscriptionId(subscriptionId: String?): SocketChannelPreference? {
+            if (subscriptionId.isNullOrBlank()) return null
+            return values().firstOrNull { it.subscriptionId.equals(subscriptionId, ignoreCase = true) }
         }
     }
 }
