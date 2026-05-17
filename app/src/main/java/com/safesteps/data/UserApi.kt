@@ -27,9 +27,24 @@ enum class UserSyncResult {
     ACCOUNT_BANNED
 }
 
+enum class PrizeRarity {
+    COMMON, RARE, EPIC, LEGENDARY;
+
+    companion object {
+        // TODO: cuando backend envíe rarity, usar:
+        // fun fromString(value: String?) = values().find { it.name == value } ?: COMMON
+
+        // Hardcodeado temporalmente para probar animaciones
+        fun fromPremi(premi: PremiResponse): PrizeRarity {
+            return EPIC // Cambia esto para probar cada rareza
+        }
+    }
+}
+
 data class PremiResponse(
     val id: String? = null,
     val url: String? = null
+    // val rarity: String? = null  // TODO: descomentar cuando backend lo añada
 )
 data class UserSyncOutcome(
     val result: UserSyncResult,

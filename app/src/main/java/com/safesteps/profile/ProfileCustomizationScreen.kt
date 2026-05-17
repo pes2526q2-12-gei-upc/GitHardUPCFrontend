@@ -31,6 +31,7 @@ import coil.compose.AsyncImage
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
 import com.safesteps.i18n.appString
+import kotlin.collections.any
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -494,16 +495,6 @@ private fun getNameStyleString(fontWeight: FontWeight): String {
         FontWeight.ExtraBold -> "ExtraBold"
         else -> "SemiBold"
     }
-}
-
-private fun parseColorFromPremiId(id: String?): Color? {
-    if (id == null) return null
-    val regex = Regex("R(\\d+)G(\\d+)B(\\d+)")
-    val match = regex.find(id) ?: return null
-    val r = match.groupValues[1].toIntOrNull() ?: return null
-    val g = match.groupValues[2].toIntOrNull() ?: return null
-    val b = match.groupValues[3].toIntOrNull() ?: return null
-    return Color(r, g, b)
 }
 
 private fun isSameColor(a: Color, b: Color): Boolean {
