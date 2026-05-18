@@ -58,6 +58,7 @@ import com.safesteps.notifications.persistEmergencyNotificationUser
 import com.safesteps.notifications.syncCurrentFcmTokenForUser
 import org.maplibre.android.annotations.IconFactory
 import com.safesteps.ui.notifications.ScreenNotificationManager
+import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
@@ -172,12 +173,21 @@ private data class NavigationTrackingState(
     val currentLocation: Location?
 )
 
+private data class RouteExitCameraSnapshot(
+    val latitude: Double,
+    val longitude: Double,
+    val zoom: Double,
+    val tilt: Double,
+    val bearing: Double
+)
+
 private data class MapScreenActions(
     val requestLocationPermissions: () -> Unit,
     val resetToMainMenu: () -> Unit,
     val onPrioritySelected: (RoutePriority) -> Unit,
     val onAddressSelected: (Feature) -> Unit,
-    val onCenterCurrentLocation: () -> Unit
+    val onCenterCurrentLocation: () -> Unit,
+    val clearRouteExitCameraSnapshot: () -> Unit
 )
 
 @Composable
@@ -185,9 +195,13 @@ private fun rememberMapScreenActions(
     uiState: MapUiState,
     viewModel: MapViewModel,
     mapView: MapView,
+    map: MapLibreMap?,
     context: Context,
     strings: MapScreenStrings,
-    navigationHeadingDegrees: Float?
+    navigationHeadingDegrees: Float?,
+    routeExitCameraSnapshot: RouteExitCameraSnapshot?,
+    onRouteExitCameraSnapshotCaptured: (RouteExitCameraSnapshot?) -> Unit,
+    onRouteExitCameraSnapshotConsumed: () -> Unit
 ): MapScreenActions {
     val requestLocationPermissions = rememberLocationPermissionRequester(
         context = context,
@@ -199,8 +213,10 @@ private fun rememberMapScreenActions(
         resetMapToMainMenu(
             viewModel = viewModel,
             mapView = mapView,
-            currentLocation = uiState.ultimaUbicacion
+            currentLocation = uiState.ultimaUbicacion,
+            routeExitCameraSnapshot = routeExitCameraSnapshot
         )
+        onRouteExitCameraSnapshotConsumed()
     }
     val onPrioritySelected: (RoutePriority) -> Unit = { priority ->
         processPrioritySelection(
@@ -224,10 +240,12 @@ private fun rememberMapScreenActions(
             uiState = uiState,
             viewModel = viewModel,
             mapView = mapView,
+            map = map,
             requestLocationPermissions = requestLocationPermissions,
             navigationHeadingDegrees = navigationHeadingDegrees,
             notificationTitle = strings.mapNotificationTitle,
-            searchingGpsSignalMessage = strings.searchingGpsSignalMessage
+            searchingGpsSignalMessage = strings.searchingGpsSignalMessage,
+            onRouteExitCameraSnapshotCaptured = onRouteExitCameraSnapshotCaptured
         )
     }
     return MapScreenActions(
@@ -235,7 +253,8 @@ private fun rememberMapScreenActions(
         resetToMainMenu = resetToMainMenu,
         onPrioritySelected = onPrioritySelected,
         onAddressSelected = onAddressSelected,
-        onCenterCurrentLocation = onCenterCurrentLocation
+        onCenterCurrentLocation = onCenterCurrentLocation,
+        clearRouteExitCameraSnapshot = { onRouteExitCameraSnapshotCaptured(null) }
     )
 }
 
@@ -345,6 +364,7 @@ private fun MapScreenContent(
     isEmergencyActive: Boolean,
     strings: MapScreenStrings,
     actions: MapScreenActions,
+    onMapReady: (MapLibreMap) -> Unit,
     navigationHeadingDegrees: Float?,
     onEmergencyClick: () -> Unit,
     onLoginClick: () -> Unit,
@@ -395,7 +415,8 @@ private fun MapScreenContent(
             mapView = mapView,
             uiState = uiState,
             viewModel = viewModel,
-            restrictedLocationMessage = strings.mapLocationSelectionRestrictedMessage
+            restrictedLocationMessage = strings.mapLocationSelectionRestrictedMessage,
+            onMapReady = onMapReady
         )
 
         MainMapOverlay(
@@ -437,6 +458,7 @@ private fun MapScreenContent(
             showProfilePreferences = !currentUser?.googleId.isNullOrBlank(),
             onPrioritySelected = actions.onPrioritySelected,
             onStartRoute = {
+                actions.clearRouteExitCameraSnapshot()
                 when (viewModel.iniciarRuta()) {
                     ActiveRouteMode.USER_LOCATION_NAVIGATION -> {
                         uiState.ultimaUbicacion?.let { location ->
@@ -595,6 +617,8 @@ fun MapLibreScreen(
     var levelUpLevel by remember { mutableStateOf(1L) }
     var hasEmergencyContacts by remember(currentUser?.googleId) { mutableStateOf(false) }
     var isEmergencyActive by remember(currentUser?.googleId) { mutableStateOf(false) }
+    var attachedMap by remember { mutableStateOf<MapLibreMap?>(null) }
+    var routeExitCameraSnapshot by remember { mutableStateOf<RouteExitCameraSnapshot?>(null) }
 
     LaunchedEffect(routeCompletionResult) {
         if (routeCompletionResult != null) {
@@ -618,9 +642,17 @@ fun MapLibreScreen(
         uiState = uiState,
         viewModel = viewModel,
         mapView = mapView,
+        map = attachedMap,
         context = context,
         strings = strings,
-        navigationHeadingDegrees = navigationHeadingDegrees
+        navigationHeadingDegrees = navigationHeadingDegrees,
+        routeExitCameraSnapshot = routeExitCameraSnapshot,
+        onRouteExitCameraSnapshotCaptured = { snapshot ->
+            routeExitCameraSnapshot = snapshot
+        },
+        onRouteExitCameraSnapshotConsumed = {
+            routeExitCameraSnapshot = null
+        }
     )
 
     val renderContext = MapRenderContext(
@@ -717,6 +749,7 @@ fun MapLibreScreen(
         isEmergencyActive = isEmergencyActive,
         strings = strings,
         actions = actions,
+        onMapReady = { map -> attachedMap = map },
         navigationHeadingDegrees = navigationHeadingDegrees,
         onEmergencyClick = onEmergencyClick,
         onLoginClick = onLoginClick,
@@ -1585,7 +1618,8 @@ private fun MapViewSurface(
     mapView: MapView,
     uiState: MapUiState,
     viewModel: MapViewModel,
-    restrictedLocationMessage: String
+    restrictedLocationMessage: String,
+    onMapReady: (MapLibreMap) -> Unit
 ) {
     val currentUiState by rememberUpdatedState(uiState)
     val context = LocalContext.current
@@ -1594,6 +1628,7 @@ private fun MapViewSurface(
         factory = {
             mapView.apply {
                 getMapAsync { map ->
+                    onMapReady(map)
                     configureMapUi(map)
                     configurePoiSelection(map, viewModel) { currentUiState }
                     configureMapClickHandling(
@@ -1732,16 +1767,32 @@ private fun processLocationPermissionResult(
 private fun resetMapToMainMenu(
     viewModel: MapViewModel,
     mapView: MapView,
-    currentLocation: Location?
+    currentLocation: Location?,
+    routeExitCameraSnapshot: RouteExitCameraSnapshot?
 ) {
     viewModel.clearRuta()
     viewModel.limpiarOrigen()
     disableNavigationCameraTracking(mapView)
     mapView.getMapAsync { map ->
         clearLegacyAnnotations(map)
-    }
-    currentLocation?.let { location ->
-        centerMapOnLocation(mapView, location)
+
+        when {
+            routeExitCameraSnapshot != null -> {
+                map.animateCamera(
+                    CameraUpdateFactory.newCameraPosition(routeExitCameraSnapshot.toCameraPosition()),
+                    1000
+                )
+            }
+            currentLocation != null -> {
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        LatLng(currentLocation.latitude, currentLocation.longitude),
+                        15.0
+                    ),
+                    1000
+                )
+            }
+        }
     }
 }
 
@@ -1820,10 +1871,12 @@ private fun recenterOnCurrentLocation(
     uiState: MapUiState,
     viewModel: MapViewModel,
     mapView: MapView,
+    map: MapLibreMap?,
     requestLocationPermissions: () -> Unit,
     navigationHeadingDegrees: Float?,
     notificationTitle: String,
-    searchingGpsSignalMessage: String
+    searchingGpsSignalMessage: String,
+    onRouteExitCameraSnapshotCaptured: (RouteExitCameraSnapshot?) -> Unit
 ) {
     if (!uiState.locationGranted) {
         requestLocationPermissions()
@@ -1833,6 +1886,10 @@ private fun recenterOnCurrentLocation(
     val currentLocation = uiState.ultimaUbicacion
 
     if (uiState.modoRuta) {
+        if ((uiState.usesLiveNavigation && !uiState.routeCompleted) || currentLocation != null) {
+            onRouteExitCameraSnapshotCaptured(map?.cameraPosition?.toRouteExitCameraSnapshot())
+        }
+
         if (uiState.usesLiveNavigation && !uiState.routeCompleted) {
             viewModel.resumeNavigationCameraTracking()
             enableNavigationCameraTracking(
@@ -1892,6 +1949,27 @@ private fun recenterOnCurrentLocation(
     }
 
     centerMapOnLocation(mapView, currentLocation)
+}
+
+private fun CameraPosition.toRouteExitCameraSnapshot(): RouteExitCameraSnapshot? {
+    val target = target ?: return null
+
+    return RouteExitCameraSnapshot(
+        latitude = target.latitude,
+        longitude = target.longitude,
+        zoom = zoom,
+        tilt = tilt,
+        bearing = bearing
+    )
+}
+
+private fun RouteExitCameraSnapshot.toCameraPosition(): CameraPosition {
+    return CameraPosition.Builder()
+        .target(LatLng(latitude, longitude))
+        .zoom(zoom)
+        .tilt(tilt)
+        .bearing(bearing)
+        .build()
 }
 
 private fun requestRouteCalculation(
