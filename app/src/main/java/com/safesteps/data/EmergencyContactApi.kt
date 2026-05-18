@@ -11,7 +11,7 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val EMERGENCY_CONTACT_BASE_URL = "http://nattech.fib.upc.edu:40384/"
+private const val EMERGENCY_CONTACT_BASE_URL = "http://nattech.fib.upc.edu:40381/"
 private const val EMERGENCY_USERS_PATH = "api/v1/users"
 
 data class EmergencyContactProfile(

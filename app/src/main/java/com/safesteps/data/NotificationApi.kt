@@ -9,7 +9,7 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val NOTIFICATION_BASE_URL = "http://nattech.fib.upc.edu:40385/"
+private const val NOTIFICATION_BASE_URL = "http://nattech.fib.upc.edu:40381/"
 private const val NOTIFICATION_USERS_PATH = "api/v1/users"
 private const val NotificationApiTag = "NOTIFICATION_API"
 
