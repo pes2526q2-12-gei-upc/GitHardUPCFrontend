@@ -602,17 +602,6 @@ private fun ProfileSocketSettingsSection(
                         onChannelEnabledChange(SocketChannelPreference.FRIEND_REQUESTS, enabled)
                     }
                 )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                SocketChannelSettingRow(
-                    title = appString(R.string.profile_socket_location_title),
-                    description = appString(R.string.profile_socket_location_description),
-                    enabled = settings.locationEnabled,
-                    onEnabledChange = { enabled ->
-                        onChannelEnabledChange(SocketChannelPreference.LOCATION, enabled)
-                    }
-                )
             }
         }
     }
