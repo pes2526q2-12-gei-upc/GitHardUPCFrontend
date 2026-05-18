@@ -33,6 +33,10 @@ private const val LocationNotificationId = 2_404
 private const val EmergencyNotificationsTag = "EMERGENCY_NOTIFICATIONS"
 private const val EmergencyNotificationsPrefs = "emergency_notifications"
 private const val CurrentGoogleIdKey = "current_google_id"
+private const val EmergencyStartedTitleKey = "EMERGENCY_TITLE"
+private const val EmergencyStartedBodyKey = "EMERGENCY_BODY"
+private const val EmergencyEndedTitleKey = "EMERGENCY_END_TITLE"
+private const val EmergencyEndedBodyKey = "EMERGENCY_END_BODY"
 
 private val emergencyNotificationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -131,15 +135,86 @@ fun showTriggeredEmergencyNotification(
 fun showIncomingEmergencyNotification(
     context: Context,
     title: String?,
-    body: String?
+    body: String?,
+    senderName: String? = null,
+    titleKey: String? = null,
+    bodyKey: String? = null
 ) {
+    val resolvedSenderName = senderName?.trim()?.takeIf { it.isNotBlank() }
+    val emergencyState = resolveIncomingEmergencyState(
+        title = title,
+        body = body,
+        titleKey = titleKey,
+        bodyKey = bodyKey
+    )
     showEmergencyNotification(
         context = context,
         title = title?.takeIf(String::isNotBlank)
+            ?.takeUnless(::isEmergencyTemplateKey)
             ?: context.getString(R.string.emergency_notification_received_title),
         body = body?.takeIf(String::isNotBlank)
-            ?: context.getString(R.string.emergency_notification_received_body)
+            ?.takeUnless(::isEmergencyTemplateKey)
+            ?: resolveIncomingEmergencyBody(
+                context = context,
+                emergencyState = emergencyState,
+                senderName = resolvedSenderName
+            )
     )
+}
+
+private enum class IncomingEmergencyState {
+    ACTIVATED,
+    DEACTIVATED,
+    UNKNOWN
+}
+
+private fun resolveIncomingEmergencyState(
+    title: String?,
+    body: String?,
+    titleKey: String?,
+    bodyKey: String?
+): IncomingEmergencyState {
+    val candidates = listOf(title, body, titleKey, bodyKey)
+    return when {
+        candidates.any { it.equals(EmergencyEndedTitleKey, ignoreCase = true) } ||
+            candidates.any { it.equals(EmergencyEndedBodyKey, ignoreCase = true) } -> {
+            IncomingEmergencyState.DEACTIVATED
+        }
+
+        candidates.any { it.equals(EmergencyStartedTitleKey, ignoreCase = true) } ||
+            candidates.any { it.equals(EmergencyStartedBodyKey, ignoreCase = true) } -> {
+            IncomingEmergencyState.ACTIVATED
+        }
+
+        else -> IncomingEmergencyState.UNKNOWN
+    }
+}
+
+private fun resolveIncomingEmergencyBody(
+    context: Context,
+    emergencyState: IncomingEmergencyState,
+    senderName: String?
+): String {
+    return when (emergencyState) {
+        IncomingEmergencyState.ACTIVATED -> senderName?.let {
+            context.getString(R.string.emergency_notification_contact_activated_body, it)
+        } ?: context.getString(R.string.emergency_notification_contact_activated_body_generic)
+
+        IncomingEmergencyState.DEACTIVATED -> senderName?.let {
+            context.getString(R.string.emergency_notification_contact_deactivated_body, it)
+        } ?: context.getString(R.string.emergency_notification_contact_deactivated_body_generic)
+
+        IncomingEmergencyState.UNKNOWN -> senderName?.let {
+            context.getString(R.string.emergency_notification_contact_activated_body, it)
+        } ?: context.getString(R.string.emergency_notification_received_body)
+    }
+}
+
+private fun isEmergencyTemplateKey(value: String): Boolean {
+    return value.equals(EmergencyStartedTitleKey, ignoreCase = true) ||
+        value.equals(EmergencyStartedBodyKey, ignoreCase = true) ||
+        value.equals(EmergencyEndedTitleKey, ignoreCase = true) ||
+        value.equals(EmergencyEndedBodyKey, ignoreCase = true)
 }
 
 fun showIncomingMessageNotification(

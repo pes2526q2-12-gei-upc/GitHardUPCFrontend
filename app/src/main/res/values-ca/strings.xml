@@ -102,6 +102,10 @@
     <string name="emergency_notification_triggered_body">%1$s ha activat el bot&#243; d\'emerg&#232;ncia.</string>
     <string name="emergency_notification_received_title">Alerta d\'emerg&#232;ncia</string>
     <string name="emergency_notification_received_body">Un dels teus contactes d\'emerg&#232;ncia ha demanat ajuda.</string>
+    <string name="emergency_notification_contact_activated_body">El teu contacte d\'emerg&#232;ncia %1$s ha activat el bot&#243; d\'emerg&#232;ncia.</string>
+    <string name="emergency_notification_contact_activated_body_generic">Un contacte d\'emerg&#232;ncia ha activat el bot&#243; d\'emerg&#232;ncia.</string>
+    <string name="emergency_notification_contact_deactivated_body">El teu contacte d\'emerg&#232;ncia %1$s ha desactivat el bot&#243; d\'emerg&#232;ncia.</string>
+    <string name="emergency_notification_contact_deactivated_body_generic">Un contacte d\'emerg&#232;ncia ha desactivat el bot&#243; d\'emerg&#232;ncia.</string>
     <string name="message_notification_received_title">Missatge nou</string>
     <string name="message_notification_received_body">Has rebut un missatge nou a SafeSteps.</string>
     <string name="friend_request_notification_received_title">Sol&#183;licitud d\'amistat</string>

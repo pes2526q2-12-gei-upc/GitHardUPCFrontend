@@ -102,6 +102,10 @@
     <string name="emergency_notification_triggered_body">%1$s activated the emergency button.</string>
     <string name="emergency_notification_received_title">Emergency alert</string>
     <string name="emergency_notification_received_body">One of your emergency contacts has requested help.</string>
+    <string name="emergency_notification_contact_activated_body">Your emergency contact %1$s activated the emergency button.</string>
+    <string name="emergency_notification_contact_activated_body_generic">An emergency contact activated the emergency button.</string>
+    <string name="emergency_notification_contact_deactivated_body">Your emergency contact %1$s deactivated the emergency button.</string>
+    <string name="emergency_notification_contact_deactivated_body_generic">An emergency contact deactivated the emergency button.</string>
     <string name="message_notification_received_title">New message</string>
     <string name="message_notification_received_body">You have received a new message in SafeSteps.</string>
     <string name="friend_request_notification_received_title">Friend request</string>

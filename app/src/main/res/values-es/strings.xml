@@ -102,6 +102,10 @@
     <string name="emergency_notification_triggered_body">%1$s ha activado el bot&#243;n de emergencia.</string>
     <string name="emergency_notification_received_title">Alerta de emergencia</string>
     <string name="emergency_notification_received_body">Uno de tus contactos de emergencia ha pedido ayuda.</string>
+    <string name="emergency_notification_contact_activated_body">Tu contacto de emergencia %1$s ha activado el bot&#243;n de emergencia.</string>
+    <string name="emergency_notification_contact_activated_body_generic">Un contacto de emergencia ha activado el bot&#243;n de emergencia.</string>
+    <string name="emergency_notification_contact_deactivated_body">Tu contacto de emergencia %1$s ha desactivado el bot&#243;n de emergencia.</string>
+    <string name="emergency_notification_contact_deactivated_body_generic">Un contacto de emergencia ha desactivado el bot&#243;n de emergencia.</string>
     <string name="message_notification_received_title">Nuevo mensaje</string>
     <string name="message_notification_received_body">Has recibido un nuevo mensaje en SafeSteps.</string>
     <string name="friend_request_notification_received_title">Solicitud de amistad</string>

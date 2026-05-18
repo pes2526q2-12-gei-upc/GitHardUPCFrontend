@@ -308,10 +308,14 @@ object BackendWebSocketManager {
             SocketChannelPreference.EMERGENCY -> {
                 val resolvedTitle = payload.resolveTitle(EmergencyTitleKey)
                 val resolvedBody = payload.resolveBody(EmergencyBodyKey)
+                val resolvedUsername = payload.resolveUsername()
                 showIncomingEmergencyNotification(
                     context = context,
                     title = resolvedTitle,
-                    body = resolvedBody
+                    body = resolvedBody,
+                    senderName = resolvedUsername,
+                    titleKey = payload.resolveTitleKey(),
+                    bodyKey = payload.resolveBodyKey()
                 )
                 _emergencyEvents.tryEmit(
                     BackendEmergencySocketEvent(
@@ -551,6 +555,16 @@ object BackendWebSocketManager {
         private val dataObject: JSONObject?
             get() = root?.optJSONObject("data")
 
+        fun resolveTitleKey(): String? {
+            return root?.optString("titleKey")
+                ?.takeIf { it.isMeaningfulPayloadText() }
+        }
+
+        fun resolveBodyKey(): String? {
+            return root?.optString("bodyKey")
+                ?.takeIf { it.isMeaningfulPayloadText() }
+        }
+
         fun resolveTitle(defaultKey: String?): String? {
             val directTitle = sequenceOf(root, dataObject)
                 .mapNotNull { objectNode ->
@@ -562,8 +576,7 @@ object BackendWebSocketManager {
                 return directTitle
             }
 
-            val titleKey = root?.optString("titleKey")
-                ?.takeIf { it.isMeaningfulPayloadText() }
+            val titleKey = resolveTitleKey()
                 ?: return null
 
             return titleKey.takeUnless { it == defaultKey }
@@ -580,8 +593,7 @@ object BackendWebSocketManager {
                 return directBody
             }
 
-            val bodyKey = root?.optString("bodyKey")
-                ?.takeIf { it.isMeaningfulPayloadText() }
+            val bodyKey = resolveBodyKey()
                 ?: return null
 
             return bodyKey.takeUnless { it == defaultKey }
