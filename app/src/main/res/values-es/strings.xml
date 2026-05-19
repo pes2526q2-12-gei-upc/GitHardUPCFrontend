@@ -1,4 +1,4 @@
-﻿﻿<resources>
+﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="change_language">Cambiar idioma</string>
     <string name="log_in">Iniciar sesi&#243;n</string>
@@ -110,6 +110,12 @@
     <string name="message_notification_received_body">Has recibido un nuevo mensaje en SafeSteps.</string>
     <string name="friend_request_notification_received_title">Solicitud de amistad</string>
     <string name="friend_request_notification_received_body">Alguien te ha enviado una solicitud de amistad.</string>
+    <string name="friend_request_notification_received_body_with_name">%1$s te ha enviado una solicitud de amistad.</string>
+    <string name="friend_request_notification_activity_title">Actividad de amistad</string>
+    <string name="friend_request_notification_accepted_body">Han aceptado tu solicitud de amistad.</string>
+    <string name="friend_request_notification_accepted_body_with_name">%1$s ha aceptado tu solicitud de amistad.</string>
+    <string name="friend_request_notification_rejected_body">Han rechazado tu solicitud de amistad.</string>
+    <string name="friend_request_notification_rejected_body_with_name">%1$s ha rechazado tu solicitud de amistad.</string>
     <string name="location_notification_received_title">Actualizaci&#243;n de ubicaci&#243;n</string>
     <string name="location_notification_received_body">Un contacto ha compartido una actualizaci&#243;n de ubicaci&#243;n contigo.</string>
     <string name="location_notification_received_body_with_coords">Actualizaci&#243;n de ubicaci&#243;n: %1$.5f, %2$.5f</string>

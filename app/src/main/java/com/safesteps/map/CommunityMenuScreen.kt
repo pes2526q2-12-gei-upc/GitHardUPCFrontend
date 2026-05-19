@@ -23,7 +23,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.filled.Tune
@@ -115,16 +114,6 @@ fun CommunityMenuScreen(
                 title = appString(R.string.community_menu_route_title),
                 description = appString(R.string.community_menu_route_description),
                 onClick = onRouteFiltersClick
-            )
-        }
-
-        item {
-            CommunityMenuCard(
-                icon = Icons.Default.NotificationsNone,
-                iconTint = Color(0xFFB36D3C),
-                title = appString(R.string.community_menu_notifications_title),
-                description = appString(R.string.community_menu_notifications_description),
-                onClick = {}
             )
         }
     }

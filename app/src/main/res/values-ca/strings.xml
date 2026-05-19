@@ -1,4 +1,4 @@
-﻿﻿<resources>
+﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
     <string name="change_language">Canvia l\'idioma</string>
     <string name="log_in">Inicia sessi&#243;</string>
@@ -110,6 +110,12 @@
     <string name="message_notification_received_body">Has rebut un missatge nou a SafeSteps.</string>
     <string name="friend_request_notification_received_title">Sol&#183;licitud d\'amistat</string>
     <string name="friend_request_notification_received_body">Alg&#250; t\'ha enviat una sol&#183;licitud d\'amistat.</string>
+    <string name="friend_request_notification_received_body_with_name">%1$s t\'ha enviat una sol&#183;licitud d\'amistat.</string>
+    <string name="friend_request_notification_activity_title">Activitat d\'amistats</string>
+    <string name="friend_request_notification_accepted_body">Han acceptat la teva sol&#183;licitud d\'amistat.</string>
+    <string name="friend_request_notification_accepted_body_with_name">%1$s ha acceptat la teva sol&#183;licitud d\'amistat.</string>
+    <string name="friend_request_notification_rejected_body">Han rebutjat la teva sol&#183;licitud d\'amistat.</string>
+    <string name="friend_request_notification_rejected_body_with_name">%1$s ha rebutjat la teva sol&#183;licitud d\'amistat.</string>
     <string name="location_notification_received_title">Actualitzaci&#243; d\'ubicaci&#243;</string>
     <string name="location_notification_received_body">Un contacte ha compartit una actualitzaci&#243; d\'ubicaci&#243; amb tu.</string>
     <string name="location_notification_received_body_with_coords">Actualitzaci&#243; d\'ubicaci&#243;: %1$.5f, %2$.5f</string>

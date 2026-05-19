@@ -331,10 +331,14 @@ object BackendWebSocketManager {
             }
 
             SocketChannelPreference.FRIEND_REQUESTS -> {
+                val resolvedTitle = payload.resolveTitle(FriendRequestTitleKey)
+                val resolvedBody = payload.resolveBody(FriendRequestBodyKey)
                 showIncomingFriendRequestNotification(
                     context = context,
-                    title = payload.resolveTitle(FriendRequestTitleKey),
-                    body = payload.resolveBody(FriendRequestBodyKey)
+                    title = resolvedTitle,
+                    body = resolvedBody,
+                    senderName = payload.resolveFriendRequestActorName(),
+                    status = payload.resolveFriendRequestStatus()
                 )
             }
 
@@ -628,6 +632,56 @@ object BackendWebSocketManager {
                 "userName",
                 "displayName",
                 "name"
+            )
+
+            return sequenceOf(
+                dataObject,
+                dataObject?.optJSONObject("payload"),
+                root,
+                root?.optJSONObject("payload")
+            )
+                .flatMap { objectNode ->
+                    candidateKeys.asSequence().mapNotNull { key ->
+                        objectNode?.optString(key)
+                            ?.takeIf { it.isMeaningfulPayloadText() }
+                    }
+                }
+                .firstOrNull()
+        }
+
+        fun resolveFriendRequestActorName(): String? {
+            val candidateKeys = listOf(
+                "fromUser",
+                "fromUsername",
+                "fromDisplayName",
+                "senderName",
+                "senderUsername",
+                "username",
+                "userName",
+                "displayName",
+                "name"
+            )
+
+            return sequenceOf(
+                dataObject,
+                dataObject?.optJSONObject("payload"),
+                root,
+                root?.optJSONObject("payload")
+            )
+                .flatMap { objectNode ->
+                    candidateKeys.asSequence().mapNotNull { key ->
+                        objectNode?.optString(key)
+                            ?.takeIf { it.isMeaningfulPayloadText() }
+                    }
+                }
+                .firstOrNull()
+        }
+
+        fun resolveFriendRequestStatus(): String? {
+            val candidateKeys = listOf(
+                "status",
+                "friendshipStatus",
+                "requestStatus"
             )
 
             return sequenceOf(
