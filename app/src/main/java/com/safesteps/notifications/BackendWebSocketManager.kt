@@ -306,9 +306,13 @@ object BackendWebSocketManager {
             }
 
             SocketChannelPreference.EMERGENCY -> {
+                Log.d(BackendWebSocketTag, "Notificación de EMERGENCIA recibida (raw): ${frame.body}")
+
                 val resolvedTitle = payload.resolveTitle(EmergencyTitleKey)
                 val resolvedBody = payload.resolveBody(EmergencyBodyKey)
-                val resolvedUsername = payload.resolveUsername()
+                val resolvedUsername = payload.root?.optString("data")?.takeIf { it.isNotBlank() && it != "null" }
+                    ?: payload.resolveUsername()
+
                 showIncomingEmergencyNotification(
                     context = context,
                     title = resolvedTitle,

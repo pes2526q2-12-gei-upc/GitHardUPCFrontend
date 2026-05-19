@@ -147,18 +147,23 @@ fun showIncomingEmergencyNotification(
         titleKey = titleKey,
         bodyKey = bodyKey
     )
+
+    val finalTitle = title?.takeIf(String::isNotBlank)
+        ?.takeUnless(::isEmergencyTemplateKey)
+        ?: context.getString(R.string.emergency_notification_received_title)
+
+    val finalBody = resolveIncomingEmergencyBody(
+        context = context,
+        emergencyState = emergencyState,
+        senderName = resolvedSenderName
+    ).takeIf { it.isNotBlank() }
+        ?: body?.takeIf(String::isNotBlank)
+        ?: context.getString(R.string.emergency_notification_received_body)
+
     showEmergencyNotification(
         context = context,
-        title = title?.takeIf(String::isNotBlank)
-            ?.takeUnless(::isEmergencyTemplateKey)
-            ?: context.getString(R.string.emergency_notification_received_title),
-        body = body?.takeIf(String::isNotBlank)
-            ?.takeUnless(::isEmergencyTemplateKey)
-            ?: resolveIncomingEmergencyBody(
-                context = context,
-                emergencyState = emergencyState,
-                senderName = resolvedSenderName
-            )
+        title = finalTitle,
+        body = finalBody
     )
 }
 
