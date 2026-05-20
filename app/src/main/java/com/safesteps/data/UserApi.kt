@@ -17,7 +17,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40381/"
+private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40382/"
 private const val USERS_PATH = "api/v1/users"
 
 enum class UserSyncResult {

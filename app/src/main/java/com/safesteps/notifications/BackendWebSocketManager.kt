@@ -21,7 +21,7 @@ import okhttp3.WebSocketListener
 import org.json.JSONObject
 
 private const val BackendWebSocketTag = "BACKEND_WS"
-private const val BackendWebSocketEndpoint = "ws://nattech.fib.upc.edu:40383/ws-safesteps"
+private const val BackendWebSocketEndpoint = "ws://nattech.fib.upc.edu:40382/ws-safesteps"
 private const val BackendReconnectDelayMillis = 5_000L
 private const val BackendStompNull = '\u0000'
 
@@ -489,7 +489,7 @@ object BackendWebSocketManager {
         return buildString {
             append("CONNECT\n")
             append("accept-version:1.2\n")
-            append("host:nattech.fib.upc.edu:40383\n")
+            append("host:nattech.fib.upc.edu:40382\n")
             append("heart-beat:0,0\n")
             append("googleId:$googleId\n")
             append("\n")

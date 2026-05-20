@@ -433,4 +433,26 @@
         <item quantity="other">%d filters</item>
     </plurals>
     <string name="route_completed_points">Congratulations! You earned %1$d points.</string>
+    <!-- ════════ SHARE ROUTE ════════ -->
+    <string name="share_route_title">Share route</string>
+    <string name="share_route_tab_share">Share route</string>
+    <string name="share_route_tab_plan">Plan route</string>
+    <string name="share_route_search_placeholder">Search a chat or person…</string>
+    <string name="share_route_date_label">Start date and time</string>
+    <string name="share_route_date_placeholder">Select date and time</string>
+    <string name="share_route_button_share">Share route</string>
+    <string name="share_route_button_plan">Plan route</string>
+    <string name="share_route_button_share_count">Share to %1$d chats</string>
+    <string name="share_route_button_plan_count">Plan to %1$d chats</string>
+    <string name="share_route_button_share_one">Share to 1 chat</string>
+    <string name="share_route_button_plan_one">Plan to 1 chat</string>
+    <string name="share_route_error">Failed to send the route. Please try again.</string>
+    <string name="share_route_load_failed">Could not load chats.</string>
+    <string name="share_route_retry">Retry</string>
+    <string name="share_route_empty_chats">You have no active chats</string>
+    <string name="share_route_empty_search">No results</string>
+    <string name="share_route_participants">%1$d participants</string>
+    <string name="share_route_view_button">View route</string>
+    <string name="share_route_message_shared">🗺 Shared a route</string>
+    <string name="share_route_message_planned">📅 Planned a route</string>
 </resources>

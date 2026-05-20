@@ -438,4 +438,26 @@
         <item quantity="other">%d filtros</item>
     </plurals>
     <string name="route_completed_points">¡Enhorabuena! Has conseguido %1$d puntos.</string>
+    <!-- ════════ SHARE ROUTE ════════ -->
+    <string name="share_route_title">Compartir ruta</string>
+    <string name="share_route_tab_share">Compartir ruta</string>
+    <string name="share_route_tab_plan">Planificar ruta</string>
+    <string name="share_route_search_placeholder">Busca un chat o persona…</string>
+    <string name="share_route_date_label">Fecha y hora de inicio</string>
+    <string name="share_route_date_placeholder">Seleccionar fecha y hora</string>
+    <string name="share_route_button_share">Compartir ruta</string>
+    <string name="share_route_button_plan">Planificar ruta</string>
+    <string name="share_route_button_share_count">Compartir en %1$d chats</string>
+    <string name="share_route_button_plan_count">Planificar en %1$d chats</string>
+    <string name="share_route_button_share_one">Compartir en 1 chat</string>
+    <string name="share_route_button_plan_one">Planificar en 1 chat</string>
+    <string name="share_route_error">Error al enviar la ruta. Inténtalo de nuevo.</string>
+    <string name="share_route_load_failed">No se pudieron cargar los chats.</string>
+    <string name="share_route_retry">Reintentar</string>
+    <string name="share_route_empty_chats">No tienes ningún chat activo</string>
+    <string name="share_route_empty_search">Sin resultados</string>
+    <string name="share_route_participants">%1$d participantes</string>
+    <string name="share_route_view_button">Ver ruta</string>
+    <string name="share_route_message_shared">🗺 Ha compartido una ruta</string>
+    <string name="share_route_message_planned">📅 Ha planificado una ruta</string>
 </resources>

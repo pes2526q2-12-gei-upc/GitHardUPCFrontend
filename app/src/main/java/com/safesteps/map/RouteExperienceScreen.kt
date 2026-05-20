@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Escalator
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -112,6 +113,24 @@ private data class PoiSummaryCardItem(
 private enum class PoiSummaryCustomIcon {
     STREET_BENCH
 }
+
+private data class PoiTypeConfig(
+    val typeKey: String,
+    val pluralResId: Int,
+    val accentColor: Color,
+    val emoji: String? = null,
+    val icon: ImageVector? = null,
+    val customIcon: PoiSummaryCustomIcon? = null
+)
+
+private val poiTypeConfigs = listOf(
+    PoiTypeConfig("FONT", R.plurals.poi_fountains, Color(0xFF5F6B67), emoji = "\uD83D\uDCA7"),
+    PoiTypeConfig("BANC", R.plurals.poi_benches, Color(0xFF8D6E63), customIcon = PoiSummaryCustomIcon.STREET_BENCH),
+    PoiTypeConfig("COMISSARIA", R.plurals.poi_police_stations, Color(0xFF5F6B67), emoji = "\uD83D\uDC6E"),
+    PoiTypeConfig("CAMERA", R.plurals.poi_security_cameras, Color(0xFF5F6B67), emoji = "\uD83D\uDCF9"),
+    PoiTypeConfig("ESCALA_MECANICA", R.plurals.poi_escalators, Color(0xFF2E8B57), icon = Icons.Default.Escalator),
+    PoiTypeConfig("REFUGI_CLIMATIC", R.plurals.poi_climate_shelters, Color(0xFFE67E22), icon = Icons.Default.DeviceThermostat)
+)
 
 @Composable
 private fun RoutePriorityCompactOption(
@@ -199,7 +218,10 @@ private fun routePrioritySpec(
 }
 
 @Composable
-private fun RoutePlannerHeader(onClose: () -> Unit) {
+private fun RoutePlannerHeader(
+    onClose: () -> Unit,
+    onShareRoute: () -> Unit
+) {
     val closeLabel = appString(R.string.close)
 
     Row(
@@ -231,12 +253,20 @@ private fun RoutePlannerHeader(onClose: () -> Unit) {
 
         Spacer(modifier = Modifier.width(6.dp))
 
+        IconButton(onClick = onShareRoute) {
+            Icon(
+                imageVector = Icons.Default.Share,
+                contentDescription = "Compartir ruta",
+                tint = Color(0xFF6C7772)
+            )
+        }
+
         IconButton(
             onClick = onClose,
             modifier = Modifier
                 .semantics { testTag = "btn_close" }
                 .testTag("btn_close")
-            ) {
+        ) {
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = closeLabel,
@@ -357,68 +387,9 @@ private fun SelectedRoutePrioritySummary(spec: RoutePrioritySpec) {
 private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
     if (puntsInteres.isEmpty()) return
 
-    val fonts = puntsInteres.count { it.tipus.uppercase() == "FONT" }
-    val bancs = puntsInteres.count { it.tipus.uppercase() == "BANC" }
-    val comisaries = puntsInteres.count { it.tipus.uppercase() == "COMISSARIA" }
-    val cameras = puntsInteres.count { it.tipus.uppercase() == "CAMERA" }
-    val escalesMecaniques = puntsInteres.count { it.tipus.uppercase() == "ESCALA_MECANICA" }
-    val refugisClimatics = puntsInteres.count { it.tipus.uppercase() == "REFUGI_CLIMATIC" }
-    val summaryItems = buildList {
-        if (fonts > 0) {
-            add(
-                PoiSummaryCardItem(
-                    emoji = "\uD83D\uDCA7",
-                    text = appPlural(R.plurals.poi_fountains, fonts, fonts),
-                    accentColor = Color(0xFF5F6B67)
-                )
-            )
-        }
-        if (bancs > 0) {
-            add(
-                PoiSummaryCardItem(
-                    customIcon = PoiSummaryCustomIcon.STREET_BENCH,
-                    text = appPlural(R.plurals.poi_benches, bancs, bancs),
-                    accentColor = Color(0xFF8D6E63)
-                )
-            )
-        }
-        if (comisaries > 0) {
-            add(
-                PoiSummaryCardItem(
-                    emoji = "\uD83D\uDC6E",
-                    text = appPlural(R.plurals.poi_police_stations, comisaries, comisaries),
-                    accentColor = Color(0xFF5F6B67)
-                )
-            )
-        }
-        if (cameras > 0) {
-            add(
-                PoiSummaryCardItem(
-                    emoji = "\uD83D\uDCF9",
-                    text = appPlural(R.plurals.poi_security_cameras, cameras, cameras),
-                    accentColor = Color(0xFF5F6B67)
-                )
-            )
-        }
-        if (escalesMecaniques > 0) {
-            add(
-                PoiSummaryCardItem(
-                    icon = Icons.Default.Escalator,
-                    text = appPlural(R.plurals.poi_escalators, escalesMecaniques, escalesMecaniques),
-                    accentColor = Color(0xFF2E8B57)
-                )
-            )
-        }
-        if (refugisClimatics > 0) {
-            add(
-                PoiSummaryCardItem(
-                    icon = Icons.Default.DeviceThermostat,
-                    text = appPlural(R.plurals.poi_climate_shelters, refugisClimatics, refugisClimatics),
-                    accentColor = Color(0xFFE67E22)
-                )
-            )
-        }
-    }
+    val summaryItems = buildPoiSummaryItems(puntsInteres)
+    if (summaryItems.isEmpty()) return
+
     val scrollState = rememberScrollState()
 
     Box(
@@ -458,6 +429,26 @@ private fun PoiSummary(puntsInteres: List<com.safesteps.data.PuntInteres>) {
 }
 
 @Composable
+private fun buildPoiSummaryItems(puntsInteres: List<com.safesteps.data.PuntInteres>): List<PoiSummaryCardItem> {
+    val typeCounts = remember(puntsInteres) {
+        puntsInteres.groupingBy { it.tipus.uppercase() }.eachCount()
+    }
+    
+    return poiTypeConfigs.mapNotNull { config ->
+        val count = typeCounts[config.typeKey] ?: 0
+        if (count > 0) {
+            PoiSummaryCardItem(
+                icon = config.icon,
+                emoji = config.emoji,
+                customIcon = config.customIcon,
+                text = appPlural(config.pluralResId, count, count),
+                accentColor = config.accentColor
+            )
+        } else null
+    }
+}
+
+@Composable
 private fun PoiSummaryInlineItem(
     item: PoiSummaryCardItem
 ) {
@@ -477,12 +468,12 @@ private fun PoiSummaryInlineItem(
                     )
                 }
                 item.icon != null -> {
-                Icon(
-                    imageVector = item.icon,
-                    contentDescription = null,
-                    tint = item.accentColor,
-                    modifier = Modifier.size(16.dp)
-                )
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = null,
+                        tint = item.accentColor,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
                 else -> {
                     Text(
@@ -607,7 +598,8 @@ private fun RoutePlannerSheet(
     sheetState: RoutePlannerSheetState,
     onPrioritySelected: (RoutePriority) -> Unit,
     onClose: () -> Unit,
-    onStartRoute: () -> Unit
+    onStartRoute: () -> Unit,
+    onShareRoute: () -> Unit
 ) {
     Card(
         modifier = modifier
@@ -631,7 +623,10 @@ private fun RoutePlannerSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            RoutePlannerHeader(onClose = onClose)
+            RoutePlannerHeader(
+                onClose = onClose,
+                onShareRoute = onShareRoute
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -988,6 +983,7 @@ private fun BoxScope.RoutePlannerSheetOverlay(
     onPrioritySelected: (RoutePriority) -> Unit,
     onClose: () -> Unit,
     onStartRoute: () -> Unit,
+    onShareRoute: () -> Unit,
     showProfilePreferences: Boolean
 ) {
     AnimatedVisibility(
@@ -1022,7 +1018,8 @@ private fun BoxScope.RoutePlannerSheetOverlay(
                 onSheetOffsetChange(0f)
                 onClose()
             },
-            onStartRoute = onStartRoute
+            onStartRoute = onStartRoute,
+            onShareRoute = onShareRoute
         )
     }
 }
@@ -1271,42 +1268,42 @@ private fun RouteActiveBottomBar(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-                Column(modifier = Modifier
-                    .weight(1f)
-                    .semantics(mergeDescendants = true) {}
-                    .testTag("active_route_duration")
-                ) {
-                    Text(
-                        text = durationText,
-                        color = Color(0xFF202124),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Spacer(modifier = Modifier.height(1.dp))
-                    Text(
-                        text = remainingLabel,
-                        color = Color(0xFF5F6368),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                NavigationCompactMetric(
-                    icon = Icons.Default.LocationOn,
-                    value = distanceText,
-                    accentColor = Color(0xFF1A73E8),
-                    valueTestTag = "active_route_distance"
+            Column(modifier = Modifier
+                .weight(1f)
+                .semantics(mergeDescendants = true) {}
+                .testTag("active_route_duration")
+            ) {
+                Text(
+                    text = durationText,
+                    color = Color(0xFF202124),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
                 )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                NavigationCompactMetric(
-                    icon = Icons.Default.AccessTime,
-                    value = etaText,
-                    accentColor = Color(0xFF34A853),
-                    valueTestTag = "active_route_eta"
+                Spacer(modifier = Modifier.height(1.dp))
+                Text(
+                    text = remainingLabel,
+                    color = Color(0xFF5F6368),
+                    style = MaterialTheme.typography.labelMedium
                 )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            NavigationCompactMetric(
+                icon = Icons.Default.LocationOn,
+                value = distanceText,
+                accentColor = Color(0xFF1A73E8),
+                valueTestTag = "active_route_distance"
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            NavigationCompactMetric(
+                icon = Icons.Default.AccessTime,
+                value = etaText,
+                accentColor = Color(0xFF34A853),
+                valueTestTag = "active_route_eta"
+            )
 
             Spacer(modifier = Modifier.width(8.dp))
 
@@ -1447,6 +1444,7 @@ internal fun BoxScope.RouteExperienceOverlay(
     showProfilePreferences: Boolean,
     onPrioritySelected: (RoutePriority) -> Unit,
     onStartRoute: () -> Unit,
+    onShareRoute: () -> Unit,
     onClose: () -> Unit,
     onBottomPaddingChange: (Dp) -> Unit,
     onTopBannerHeightChange: (Float) -> Unit
@@ -1524,6 +1522,7 @@ internal fun BoxScope.RouteExperienceOverlay(
         onPrioritySelected = onPrioritySelected,
         onClose = onClose,
         onStartRoute = onStartRoute,
+        onShareRoute = onShareRoute,
         showProfilePreferences = showProfilePreferences
     )
     RouteActiveBottomBarOverlay(

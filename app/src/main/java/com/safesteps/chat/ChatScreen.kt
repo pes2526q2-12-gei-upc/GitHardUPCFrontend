@@ -56,6 +56,8 @@ import com.safesteps.i18n.appString
 import com.safesteps.chat.ChatConversationViewModel
 
 
+private const val SAFESTEPS_ROUTE_PREFIX = "safesteps_route:"
+
 @Composable
 fun UserAvatarSmall(username: String, photoUrl: String?, size: Int = 36) {
     val sizeDp = size.dp
@@ -744,6 +746,7 @@ fun ConversationScreen(
     otherParticipantName: String,
     user: UserInfo,
     onBack: () -> Unit,
+    onViewRoute: (Double, Double, Double, Double) -> Unit = { _, _, _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: ChatConversationViewModel = viewModel()
 ) {
@@ -801,14 +804,15 @@ fun ConversationScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) { data -> Snackbar(snackbarData = data, containerColor = Color(0xFF33413B), contentColor = Color.White) } },
             containerColor = Color(0xFFF4F7F5),
             contentWindowInsets = WindowInsets(0)
-        ) { _ ->
-            Box(modifier = Modifier.fillMaxSize()) {
+        ) { paddingValues ->
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
                 ConversationContent(
                     uiState = uiState, avatars = avatars, listState = listState,
                     otherParticipantName = otherParticipantName,
                     onBack = onBack, onOptions = { showDetails = true },
                     onInputChanged = viewModel::onInputChanged, onSendMessage = viewModel::sendMessage,
-                    onRetryLoad = viewModel::onScreenVisible, onLoadAvatar = viewModel::carregarAvatarSiCal
+                    onRetryLoad = viewModel::onScreenVisible, onLoadAvatar = viewModel::carregarAvatarSiCal,
+                    onViewRoute = onViewRoute
                 )
 
                 if (showFullLoader) {
@@ -855,7 +859,8 @@ private fun ConversationContent(
     uiState: ConversationUiState, avatars: Map<String, String>, listState: LazyListState,
     otherParticipantName: String, onBack: () -> Unit, onOptions: () -> Unit,
     onInputChanged: (String) -> Unit, onSendMessage: () -> Unit,
-    onRetryLoad: () -> Unit, onLoadAvatar: (String) -> Unit
+    onRetryLoad: () -> Unit, onLoadAvatar: (String) -> Unit,
+    onViewRoute: (Double, Double, Double, Double) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F7F5)).statusBarsPadding().imePadding()) {
         ConversationTopBar(
@@ -866,7 +871,7 @@ private fun ConversationContent(
         if (uiState.loadFailed) {
             ChatErrorState(modifier = Modifier.weight(1f), message = appString(R.string.chat_messages_load_failed), onRetry = onRetryLoad)
         } else {
-            ConversationMessagesList(uiState.messages, avatars, listState, onLoadAvatar, Modifier.weight(1f))
+            ConversationMessagesList(uiState.messages, avatars, listState, onLoadAvatar, onViewRoute, Modifier.weight(1f))
         }
         MessageInputBar(
             text = uiState.inputText, isSending = uiState.isSending, sendFailed = uiState.sendFailed,
@@ -878,7 +883,8 @@ private fun ConversationContent(
 @Composable
 private fun ConversationMessagesList(
     messages: List<MessageUiState>, avatars: Map<String, String>, listState: LazyListState,
-    onLoadAvatar: (String) -> Unit, modifier: Modifier
+    onLoadAvatar: (String) -> Unit, onViewRoute: (Double, Double, Double, Double) -> Unit,
+    modifier: Modifier
 ) {
     LazyColumn(
         modifier = modifier, state = listState, reverseLayout = true,
@@ -893,7 +899,12 @@ private fun ConversationMessagesList(
             }
         } else {
             items(messages.reversed(), key = { it.localId ?: it.id.toString() }) { msg ->
-                MessageBubble(message = msg, avatarUrl = avatars[msg.senderGoogleId], onLoadAvatar = { onLoadAvatar(msg.senderGoogleId) })
+                MessageBubble(
+                    message = msg,
+                    avatarUrl = avatars[msg.senderGoogleId],
+                    onLoadAvatar = { onLoadAvatar(msg.senderGoogleId) },
+                    onViewRoute = onViewRoute
+                )
             }
         }
     }
@@ -971,7 +982,8 @@ private fun ConversationTopBar(
 private fun MessageBubble(
     message: MessageUiState,
     avatarUrl: String?,
-    onLoadAvatar: () -> Unit
+    onLoadAvatar: () -> Unit,
+    onViewRoute: (Double, Double, Double, Double) -> Unit
 ) {
     val isMe = message.isFromMe
     var showSenderInfo by remember { mutableStateOf(false) }
@@ -999,7 +1011,8 @@ private fun MessageBubble(
         MessageBubbleContent(
             message = message,
             isMe = isMe,
-            onClick = { if (!isMe) showSenderInfo = true }
+            onClick = { if (!isMe) showSenderInfo = true },
+            onViewRoute = onViewRoute
         )
 
         if (isMe) {
@@ -1010,9 +1023,18 @@ private fun MessageBubble(
 }
 
 @Composable
-private fun MessageBubbleContent(message: MessageUiState, isMe: Boolean, onClick: () -> Unit) {
+private fun MessageBubbleContent(
+    message: MessageUiState,
+    isMe: Boolean,
+    onClick: () -> Unit,
+    onViewRoute: (Double, Double, Double, Double) -> Unit
+) {
     val bubbleColor = if (isMe) Color(0xFF5E9F7A) else Color(0xFFE9EDF0)
     val textColor = if (isMe) Color.White else Color(0xFF23333A)
+    val routeData = remember(message.content) { parseRouteTag(message.content) }
+    val displayContent = remember(message.content) {
+        message.content.substringBefore(SAFESTEPS_ROUTE_PREFIX).trimEnd()
+    }
 
     Surface(
         modifier = Modifier.widthIn(max = 260.dp).clickable(onClick = onClick),
@@ -1026,12 +1048,17 @@ private fun MessageBubbleContent(message: MessageUiState, isMe: Boolean, onClick
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             Text(
-                text = message.content,
+                text = displayContent,
                 color = textColor.copy(alpha = if (message.isOptimistic) 0.6f else 1f),
                 style = MaterialTheme.typography.bodyMedium
             )
-            Spacer(Modifier.height(3.dp))
 
+            if (routeData != null) {
+                Spacer(Modifier.height(8.dp))
+                RouteViewButton(isMe = isMe, routeData = routeData, onViewRoute = onViewRoute)
+            }
+
+            Spacer(Modifier.height(3.dp))
             MessageStatusRow(
                 message = message,
                 isMe = isMe,
@@ -1039,6 +1066,36 @@ private fun MessageBubbleContent(message: MessageUiState, isMe: Boolean, onClick
                 modifier = Modifier.align(if (isMe) Alignment.End else Alignment.Start)
             )
         }
+    }
+}
+
+@Composable
+private fun RouteViewButton(
+    isMe: Boolean,
+    routeData: RouteTagData,
+    onViewRoute: (Double, Double, Double, Double) -> Unit
+) {
+    Button(
+        onClick = {
+            onViewRoute(
+                routeData.originLat,
+                routeData.originLng,
+                routeData.destLat,
+                routeData.destLng
+            )
+        },
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isMe) Color.White.copy(alpha = 0.25f) else Color(0xFF5E9F7A),
+            contentColor = if (isMe) Color.White else Color.White
+        )
+    ) {
+        Text(
+            text = appString(R.string.share_route_view_button),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -1411,5 +1468,28 @@ private fun ChatErrorState(message: String, onRetry: () -> Unit, modifier: Modif
                 Text(appString(R.string.retry_action))
             }
         }
+    }
+}
+
+private data class RouteTagData(
+    val originLat: Double,
+    val originLng: Double,
+    val destLat: Double,
+    val destLng: Double
+)
+
+private fun parseRouteTag(content: String): RouteTagData? {
+    val tag = content.lines().firstOrNull { it.startsWith(SAFESTEPS_ROUTE_PREFIX) } ?: return null
+    return try {
+        val params = tag.removePrefix(SAFESTEPS_ROUTE_PREFIX).split("|")
+            .associate { it.substringBefore("=") to it.substringAfter("=") }
+        RouteTagData(
+            originLat = params["oLat"]?.toDouble() ?: return null,
+            originLng = params["oLng"]?.toDouble() ?: return null,
+            destLat = params["dLat"]?.toDouble() ?: return null,
+            destLng = params["dLng"]?.toDouble() ?: return null
+        )
+    } catch (_: Exception) {
+        null
     }
 }

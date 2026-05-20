@@ -35,6 +35,7 @@ import com.safesteps.i18n.ProvideLocalizedStrings
 import com.safesteps.i18n.appString
 import com.safesteps.map.CommunityMenuScreen
 import com.safesteps.map.MapLibreScreen
+import com.safesteps.map.PendingRoute
 import com.safesteps.notifications.BackendWebSocketManager
 import com.safesteps.notifications.persistEmergencyNotificationLanguage
 import com.safesteps.notifications.persistEmergencyNotificationUser
@@ -104,11 +105,24 @@ fun SafeStepsApp(
     var issuesRefreshTrigger by rememberSaveable {
         mutableStateOf(0)
     }
+    var pendingRouteOriginLat by rememberSaveable { mutableStateOf(0.0) }
+    var pendingRouteOriginLng by rememberSaveable { mutableStateOf(0.0) }
+    var pendingRouteDestLat by rememberSaveable { mutableStateOf(0.0) }
+    var pendingRouteDestLng by rememberSaveable { mutableStateOf(0.0) }
+    var hasPendingRoute by rememberSaveable { mutableStateOf(false) }
 
     val onLoginClick = rememberGoogleSignInAction(
         onUserLoggedIn = authViewModel::onUserLoggedIn,
         onSessionRestored = authViewModel::restoreLoggedUser
     )
+    val onViewRouteFromChat: (Double, Double, Double, Double) -> Unit = { oLat, oLng, dLat, dLng ->
+        pendingRouteOriginLat = oLat
+        pendingRouteOriginLng = oLng
+        pendingRouteDestLat = dLat
+        pendingRouteDestLng = dLng
+        hasPendingRoute = true
+        currentDestination = SafeStepsDestination.MAP
+    }
     val onNavigateToMap = {
         profileBackDestination = SafeStepsDestination.MAP
         issuesRefreshTrigger += 1
@@ -333,7 +347,14 @@ fun SafeStepsApp(
         onRouteCompleted = { response -> profileViewModel.onRouteCompleted(response) },
         onOpenPrize = profileViewModel::openPrize,
         onDismissLevelUp = profileViewModel::dismissLevelUpAnimation,
-        onDismissPrize = profileViewModel::dismissPrizeAnimation
+        onDismissPrize = profileViewModel::dismissPrizeAnimation,
+                onViewRouteFromChat = onViewRouteFromChat,
+        pendingRoute = if (hasPendingRoute) PendingRoute(
+            originLat = pendingRouteOriginLat,
+            originLng = pendingRouteOriginLng,
+            destLat = pendingRouteDestLat,
+            destLng = pendingRouteDestLng
+        ) else null
     )
 }
 
@@ -480,7 +501,9 @@ private fun SafeStepsLocalizedContent(
     onRouteCompleted: (RouteCompletionResponse) -> Unit,
     onOpenPrize: () -> Unit,
     onDismissLevelUp: () -> Unit,
-    onDismissPrize: () -> Unit
+    onDismissPrize: () -> Unit,
+    onViewRouteFromChat: (Double, Double, Double, Double) -> Unit,
+    pendingRoute: PendingRoute?
 ) {
     ProvideLocalizedStrings(currentLanguage) {
         HandleAuthNoticeEffect(
@@ -543,7 +566,9 @@ private fun SafeStepsLocalizedContent(
             onRouteCompleted = onRouteCompleted,
             onOpenPrize = onOpenPrize,
             onDismissLevelUp = onDismissLevelUp,
-            onDismissPrize = onDismissPrize
+            onDismissPrize = onDismissPrize,
+            onViewRouteFromChat = onViewRouteFromChat,
+            pendingRoute = pendingRoute
         )
     }
 }
@@ -614,7 +639,9 @@ private fun SafeStepsBody(
     onRouteCompleted: (RouteCompletionResponse) -> Unit,
     onOpenPrize: () -> Unit,
     onDismissLevelUp: () -> Unit,
-    onDismissPrize: () -> Unit
+    onDismissPrize: () -> Unit,
+    onViewRouteFromChat: (Double, Double, Double, Double) -> Unit,
+    pendingRoute: PendingRoute?
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         val currentUser = authUiState.currentUser
@@ -711,7 +738,8 @@ private fun SafeStepsBody(
                         onLoginClick = onLoginClick,
                         onMenuClick = onNavigateToMenu,
                         onProfileClick = onNavigateToProfileFromMap,
-                        onRouteCompleted = onRouteCompleted
+                        onRouteCompleted = onRouteCompleted,
+                        pendingRoute = pendingRoute
                     )
                 }
 
@@ -731,6 +759,7 @@ private fun SafeStepsBody(
                         otherParticipantName = currentChatOtherName,
                         user = currentUser,
                         onBack = onNavigateBackFromConversation,
+                        onViewRoute = onViewRouteFromChat,
                         modifier = Modifier.fillMaxSize()
                     )
                 }

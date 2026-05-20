@@ -9,6 +9,11 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.WindowInsets
@@ -94,6 +99,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import kotlinx.coroutines.launch
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 
 private const val EmergencyStatusNotificationDurationMillis = 6_000L
 
@@ -317,6 +327,188 @@ private fun MapScreenDialogs(
 }
 
 @Composable
+private fun BoxScope.ShareRouteOverlay(
+    currentUser: UserInfo?,
+    showShareRoute: Boolean,
+    uiState: MapUiState,
+    onBack: () -> Unit,
+    onShared: () -> Unit
+) {
+    if (currentUser != null) {
+        AnimatedVisibility(
+            visible = showShareRoute,
+            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+        ) {
+            ShareRouteScreen(
+                user = currentUser,
+                originLat = uiState.origenSeleccionado?.latitude ?: 0.0,
+                originLng = uiState.origenSeleccionado?.longitude ?: 0.0,
+                destLat = uiState.destinoSeleccionado?.latitude ?: 0.0,
+                destLng = uiState.destinoSeleccionado?.longitude ?: 0.0,
+                originAddress = uiState.textoOrigen.takeIf { it.isNotBlank() },
+                destAddress = uiState.textoDestino.takeIf { it.isNotBlank() },
+                distanceText = uiState.distanceText,
+                durationText = uiState.durationText,
+                routePriority = uiState.prioridadSeleccionada,
+                onBack = onBack,
+                onShared = onShared
+            )
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.MapActionButtons(
+    uiState: MapUiState,
+    isPlanningRoute: Boolean,
+    isActiveRoute: Boolean,
+    floatingActionsLayout: FloatingActionsLayout,
+    effectiveFloatingActionsBottomPadding: Dp,
+    showEmergencyAction: Boolean,
+    isEmergencyActive: Boolean,
+    strings: MapScreenStrings,
+    viewModel: MapViewModel,
+    actions: MapScreenActions,
+    onEmergencyClick: () -> Unit
+) {
+    if (!isPlanningRoute && !isActiveRoute) {
+        MapFloatingActions(
+            uiState = uiState,
+            state = FloatingActionsState(
+                bottomPadding = effectiveFloatingActionsBottomPadding,
+                compactMode = floatingActionsLayout.compactMode,
+                showPoiAction = floatingActionsLayout.showPoiAction,
+                showMapStyleAction = floatingActionsLayout.showMapStyleAction,
+                showMyLocationAction = floatingActionsLayout.showMyLocationAction,
+                showReportIssueAction = floatingActionsLayout.showReportIssueAction,
+                showEmergencyAction = floatingActionsLayout.showEmergencyAction && showEmergencyAction
+            ),
+            labels = FloatingActionLabels(
+                hideExtraInfoLabel = strings.hideExtraInfoLabel,
+                showExtraInfoLabel = strings.showExtraInfoLabel,
+                myLocationLabel = strings.myLocationLabel
+            ),
+            callbacks = FloatingActionCallbacks(
+                onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
+                onMyLocationClick = actions.onCenterCurrentLocation
+            ),
+            reportIssueLabel = strings.reportIssueLabel,
+            emergencyActionLabel = strings.emergencyActionLabel,
+            isEmergencyActive = isEmergencyActive,
+            onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
+            onEmergencyClick = onEmergencyClick
+        )
+    }
+
+    if (isPlanningRoute || isActiveRoute) {
+        RouteModeFloatingActions(
+            uiState = uiState,
+            bottomPadding = effectiveFloatingActionsBottomPadding,
+            onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
+            onMyLocationClick = actions.onCenterCurrentLocation,
+            onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
+            hideExtraInfoLabel = strings.hideExtraInfoLabel,
+            showExtraInfoLabel = strings.showExtraInfoLabel,
+            myLocationLabel = strings.myLocationLabel,
+            reportIssueLabel = strings.reportIssueLabel,
+            emergencyActionLabel = strings.emergencyActionLabel,
+            isEmergencyActive = isEmergencyActive,
+            showEmergencyAction = showEmergencyAction,
+            onEmergencyClick = onEmergencyClick
+        )
+    }
+}
+
+@Composable
+private fun BoxScope.MainMapSearchOverlay(
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    currentUser: UserInfo?,
+    actions: MapScreenActions,
+    onLoginClick: () -> Unit,
+    onMenuClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    onHeightChanged: (Float) -> Unit
+) {
+    MainMapOverlay(
+        uiState = uiState,
+        accountActions = TopPanelAccountActions(
+            currentUser = currentUser,
+            onLoginClick = onLoginClick,
+            onMenuClick = onMenuClick,
+            onProfileClick = onProfileClick
+        ),
+        callbacks = TopSearchPanelCallbacks(
+            onOrigenChange = { text ->
+                viewModel.onTextoBuscadorModificado(text, textField.ORIGIN)
+                if (text.isEmpty()) {
+                    viewModel.limpiarOrigen()
+                    viewModel.cancelarRutaVisual()
+                }
+            },
+            onDestinoChange = { text ->
+                viewModel.onTextoBuscadorModificado(text, textField.DESTINY)
+                if (text.isEmpty()) {
+                    viewModel.limpiarDestino()
+                    viewModel.cancelarRutaVisual()
+                }
+            },
+            onOrigenFocus = {
+                viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN)
+            },
+            onDestinoFocus = {
+                viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY)
+            },
+            onAdrecaSeleccionada = actions.onAddressSelected,
+            onHeightChanged = onHeightChanged
+        )
+    )
+}
+
+@Composable
+private fun BoxScope.ActiveRouteExperienceOverlay(
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    mapView: MapView,
+    currentUser: UserInfo?,
+    navigationHeadingDegrees: Float?,
+    actions: MapScreenActions,
+    onShareRoute: () -> Unit,
+    onBottomPaddingChange: (Dp) -> Unit,
+    onTopBannerHeightChange: (Float) -> Unit
+) {
+    RouteExperienceOverlay(
+        uiState = uiState,
+        showProfilePreferences = !currentUser?.googleId.isNullOrBlank(),
+        onPrioritySelected = actions.onPrioritySelected,
+        onStartRoute = {
+            when (viewModel.iniciarRuta()) {
+                ActiveRouteMode.USER_LOCATION_NAVIGATION -> {
+                    uiState.ultimaUbicacion?.let { location ->
+                        enableNavigationCameraTracking(
+                            mapView = mapView,
+                            currentLocation = location,
+                            headingDegrees = navigationHeadingDegrees?.toDouble(),
+                            applyZoom = true
+                        )
+                    }
+                }
+
+                ActiveRouteMode.FIXED_OVERVIEW,
+                ActiveRouteMode.NONE -> {
+                    disableNavigationCameraTracking(mapView)
+                }
+            }
+        },
+        onClose = actions.resetToMainMenu,
+        onShareRoute = onShareRoute,
+        onBottomPaddingChange = onBottomPaddingChange,
+        onTopBannerHeightChange = onTopBannerHeightChange
+    )
+}
+
+@Composable
 private fun MapScreenContent(
     modifier: Modifier,
     uiState: MapUiState,
@@ -336,6 +528,7 @@ private fun MapScreenContent(
     var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
     var topOverlayHeightPx by remember { mutableFloatStateOf(0f) }
     var routeTopBannerHeightPx by remember { mutableFloatStateOf(0f) }
+    var showShareRoute by remember { mutableStateOf(false) }
     val density = LocalDensity.current
 
     LaunchedEffect(uiState.modoRuta) {
@@ -372,6 +565,9 @@ private fun MapScreenContent(
             hasEmergencyAction = showEmergencyAction
         )
 
+        val isPlanningRoute = uiState.destinoSeleccionado != null && !uiState.modoRuta
+        val isActiveRoute = uiState.modoRuta
+
         MapViewSurface(
             mapView = mapView,
             uiState = uiState,
@@ -379,103 +575,50 @@ private fun MapScreenContent(
             restrictedLocationMessage = strings.mapLocationSelectionRestrictedMessage
         )
 
-        MainMapOverlay(
+        MainMapSearchOverlay(
             uiState = uiState,
-            accountActions = TopPanelAccountActions(
-                currentUser = currentUser,
-                onLoginClick = onLoginClick,
-                onMenuClick = onMenuClick,
-                onProfileClick = onProfileClick
-            ),
-            callbacks = TopSearchPanelCallbacks(
-                onOrigenChange = { text ->
-                    viewModel.onTextoBuscadorModificado(text, textField.ORIGIN)
-                    if (text.isEmpty()) {
-                        viewModel.limpiarOrigen()
-                        viewModel.cancelarRutaVisual()
-                    }
-                },
-                onDestinoChange = { text ->
-                    viewModel.onTextoBuscadorModificado(text, textField.DESTINY)
-                    if (text.isEmpty()) {
-                        viewModel.limpiarDestino()
-                        viewModel.cancelarRutaVisual()
-                    }
-                },
-                onOrigenFocus = {
-                    viewModel.onTextoBuscadorModificado(uiState.textoOrigen, textField.ORIGIN)
-                },
-                onDestinoFocus = {
-                    viewModel.onTextoBuscadorModificado(uiState.textoDestino, textField.DESTINY)
-                },
-                onAdrecaSeleccionada = actions.onAddressSelected,
-                onHeightChanged = { topOverlayHeightPx = it }
-            )
+            viewModel = viewModel,
+            currentUser = currentUser,
+            actions = actions,
+            onLoginClick = onLoginClick,
+            onMenuClick = onMenuClick,
+            onProfileClick = onProfileClick,
+            onHeightChanged = { topOverlayHeightPx = it }
         )
 
-        RouteExperienceOverlay(
+        ActiveRouteExperienceOverlay(
             uiState = uiState,
-            showProfilePreferences = !currentUser?.googleId.isNullOrBlank(),
-            onPrioritySelected = actions.onPrioritySelected,
-            onStartRoute = {
-                when (viewModel.iniciarRuta()) {
-                    ActiveRouteMode.USER_LOCATION_NAVIGATION -> {
-                        uiState.ultimaUbicacion?.let { location ->
-                            enableNavigationCameraTracking(
-                                mapView = mapView,
-                                currentLocation = location,
-                                headingDegrees = navigationHeadingDegrees?.toDouble(),
-                                applyZoom = true
-                            )
-                        }
-                    }
-
-                    ActiveRouteMode.FIXED_OVERVIEW,
-                    ActiveRouteMode.NONE -> {
-                        disableNavigationCameraTracking(mapView)
-                    }
-                }
-            },
-            onClose = actions.resetToMainMenu,
-            onBottomPaddingChange = { padding ->
-                floatingActionsBottomPadding = padding
-            },
-            onTopBannerHeightChange = { heightPx ->
-                routeTopBannerHeightPx = heightPx
-            }
+            viewModel = viewModel,
+            mapView = mapView,
+            currentUser = currentUser,
+            navigationHeadingDegrees = navigationHeadingDegrees,
+            actions = actions,
+            onShareRoute = { showShareRoute = true },
+            onBottomPaddingChange = { padding -> floatingActionsBottomPadding = padding },
+            onTopBannerHeightChange = { heightPx -> routeTopBannerHeightPx = heightPx }
         )
 
-        val isPlanningRoute = uiState.destinoSeleccionado != null && !uiState.modoRuta
-        val isActiveRoute = uiState.modoRuta
+        ShareRouteOverlay(
+            currentUser = currentUser,
+            showShareRoute = showShareRoute,
+            uiState = uiState,
+            onBack = { showShareRoute = false },
+            onShared = { showShareRoute = false }
+        )
 
-        if (!isPlanningRoute && !isActiveRoute) {
-            MapFloatingActions(
-                uiState = uiState,
-                state = FloatingActionsState(
-                    bottomPadding = effectiveFloatingActionsBottomPadding,
-                    compactMode = floatingActionsLayout.compactMode,
-                    showPoiAction = floatingActionsLayout.showPoiAction,
-                    showMapStyleAction = floatingActionsLayout.showMapStyleAction,
-                    showMyLocationAction = floatingActionsLayout.showMyLocationAction,
-                    showReportIssueAction = floatingActionsLayout.showReportIssueAction,
-                    showEmergencyAction = floatingActionsLayout.showEmergencyAction && showEmergencyAction
-                ),
-                labels = FloatingActionLabels(
-                    hideExtraInfoLabel = strings.hideExtraInfoLabel,
-                    showExtraInfoLabel = strings.showExtraInfoLabel,
-                    myLocationLabel = strings.myLocationLabel
-                ),
-                callbacks = FloatingActionCallbacks(
-                    onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
-                    onMyLocationClick = actions.onCenterCurrentLocation
-                ),
-                reportIssueLabel = strings.reportIssueLabel,
-                emergencyActionLabel = strings.emergencyActionLabel,
-                isEmergencyActive = isEmergencyActive,
-                onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
-                onEmergencyClick = onEmergencyClick
-            )
-        }
+        MapActionButtons(
+            uiState = uiState,
+            isPlanningRoute = isPlanningRoute,
+            isActiveRoute = isActiveRoute,
+            floatingActionsLayout = floatingActionsLayout,
+            effectiveFloatingActionsBottomPadding = effectiveFloatingActionsBottomPadding,
+            showEmergencyAction = showEmergencyAction,
+            isEmergencyActive = isEmergencyActive,
+            strings = strings,
+            viewModel = viewModel,
+            actions = actions,
+            onEmergencyClick = onEmergencyClick
+        )
 
         MapStyleTopRightOverlay(
             visible = floatingActionsLayout.showMapStyleAction,
@@ -485,24 +628,6 @@ private fun MapScreenContent(
             satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
             onClick = { viewModel.toggleEstiloSatelite() }
         )
-
-        if (isPlanningRoute || isActiveRoute) {
-            RouteModeFloatingActions(
-                uiState = uiState,
-                bottomPadding = effectiveFloatingActionsBottomPadding,
-                onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
-                onMyLocationClick = actions.onCenterCurrentLocation,
-                onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
-                hideExtraInfoLabel = strings.hideExtraInfoLabel,
-                showExtraInfoLabel = strings.showExtraInfoLabel,
-                myLocationLabel = strings.myLocationLabel,
-                reportIssueLabel = strings.reportIssueLabel,
-                emergencyActionLabel = strings.emergencyActionLabel,
-                isEmergencyActive = isEmergencyActive,
-                showEmergencyAction = showEmergencyAction,
-                onEmergencyClick = onEmergencyClick
-            )
-        }
 
         CalculatingRouteOverlay(
             visible = uiState.calculantRuta,
@@ -529,7 +654,8 @@ fun MapLibreScreen(
     onLoginClick: () -> Unit = {},
     onMenuClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    onRouteCompleted: (RouteCompletionResponse) -> Unit = {}
+    onRouteCompleted: (RouteCompletionResponse) -> Unit = {},
+    pendingRoute: PendingRoute? = null
 ) {
 
     val context = LocalContext.current
@@ -538,6 +664,16 @@ fun MapLibreScreen(
     )
     val mapView = rememberMapViewWithLifecycle()
     val uiState by viewModel.uiState.collectAsState()
+    LaunchedEffect(pendingRoute) {
+        if (pendingRoute != null) {
+            viewModel.calcularRuta(
+                origenLong = pendingRoute.originLng,
+                origenLat = pendingRoute.originLat,
+                destiLong = pendingRoute.destLng,
+                destiLat = pendingRoute.destLat
+            )
+        }
+    }
     val routeCompletionResult = viewModel.routeResult
     var showLevelUpOverlay by remember { mutableStateOf(false) }
     var levelUpLevel by remember { mutableStateOf(1L) }
@@ -1775,10 +1911,10 @@ private fun addPoiMarkersIfVisible(
 private fun isVisiblePoi(punt: PuntInteres): Boolean {
     val tipus = punt.tipus.trim().uppercase()
     return tipus == "FONT" ||
-        tipus == "COMISSARIA" ||
-        tipus == "CAMERA" ||
-        tipus == "ESCALA_MECANICA" ||
-        tipus == "REFUGI_CLIMATIC"
+            tipus == "COMISSARIA" ||
+            tipus == "CAMERA" ||
+            tipus == "ESCALA_MECANICA" ||
+            tipus == "REFUGI_CLIMATIC"
 }
 
 private fun poiTitle(punt: PuntInteres): String {
@@ -1957,3 +2093,10 @@ private suspend fun resolveIssueAddressOrFallback(
 private fun issueTypeFromApi(apiType: IssueApiType): IssueType {
     return runCatching { IssueType.valueOf(apiType.name) }.getOrDefault(IssueType.OBRES)
 }
+
+data class PendingRoute(
+    val originLat: Double,
+    val originLng: Double,
+    val destLat: Double,
+    val destLng: Double
+)
