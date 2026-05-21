@@ -9,7 +9,7 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 
-private const val USER_EMERGENCY_BASE_URL = "http://nattech.fib.upc.edu:40381/"
+private const val USER_EMERGENCY_BASE_URL = "http://nattech.fib.upc.edu:40382/"
 private const val USER_EMERGENCY_USERS_PATH = "api/v1/users"
 private const val UserEmergencyApiTag = "USER_EMERGENCY_API"
 

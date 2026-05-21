@@ -53,6 +53,7 @@ fun CommunityMenuScreen(
     onBack: () -> Unit,
     onProfileClick: () -> Unit,
     onFriendsClick: () -> Unit,
+    onChatClick: () -> Unit,
     onRouteFiltersClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -93,7 +94,7 @@ fun CommunityMenuScreen(
                 iconTint = Color(0xFF507DBC),
                 title = appString(R.string.community_menu_chat_title),
                 description = appString(R.string.community_menu_chat_description),
-                onClick = {}
+                onClick = onChatClick
             )
         }
 

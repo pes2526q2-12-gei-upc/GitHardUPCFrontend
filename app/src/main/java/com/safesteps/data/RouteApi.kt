@@ -48,7 +48,7 @@ private fun interface RouteCoordinatesApi {
 }
 
 private object RouteCoordinatesBackend {
-    private const val BASE_URL = "http://nattech.fib.upc.edu:40381/"
+    private const val BASE_URL = "http://nattech.fib.upc.edu:40382/"
 
     private val retrofit by lazy {
         Retrofit.Builder()

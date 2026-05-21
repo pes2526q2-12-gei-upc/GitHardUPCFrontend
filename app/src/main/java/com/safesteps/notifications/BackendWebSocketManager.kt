@@ -3,6 +3,9 @@ package com.safesteps.notifications
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.safesteps.R
+import com.safesteps.chat.ChatEventBus
+import com.safesteps.ui.notifications.ScreenNotificationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,7 +24,7 @@ import okhttp3.WebSocketListener
 import org.json.JSONObject
 
 private const val BackendWebSocketTag = "BACKEND_WS"
-private const val BackendWebSocketEndpoint = "ws://nattech.fib.upc.edu:40381/ws-safesteps"
+private const val BackendWebSocketEndpoint = "ws://nattech.fib.upc.edu:40382/ws-safesteps"
 private const val BackendReconnectDelayMillis = 5_000L
 private const val BackendStompNull = '\u0000'
 private const val BackendLocationUpdateDestination = "/app/location.update"
@@ -49,6 +52,7 @@ data class BackendEmergencySocketEvent(
 )
 
 object BackendWebSocketManager {
+    private val alwaysSubscribedChannels = setOf(SocketChannelPreference.MESSAGES)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val client = OkHttpClient.Builder()
         .retryOnConnectionFailure(true)
@@ -89,8 +93,8 @@ object BackendWebSocketManager {
         synchronized(stateLock) {
             val shouldReuseConnection =
                 desiredGoogleId == normalizedGoogleId &&
-                    activeGoogleId == normalizedGoogleId &&
-                    webSocket != null
+                        activeGoogleId == normalizedGoogleId &&
+                        webSocket != null
             if (shouldReuseConnection) {
                 return
             }
@@ -217,8 +221,8 @@ object BackendWebSocketManager {
 
                 val shouldReconnect = synchronized(stateLock) {
                     !intentionalDisconnect &&
-                        desiredGoogleId == googleId &&
-                        webSocket == null
+                            desiredGoogleId == googleId &&
+                            webSocket == null
                 }
 
                 if (!shouldReconnect) {
@@ -282,15 +286,21 @@ object BackendWebSocketManager {
         frame: StompFrame
     ) {
         val destination = frame.headers["destination"]
+        val subscriptionId = frame.headers["subscription"]
         val channel = SocketChannelPreference.fromDestination(destination)
-        val isCurrentSocket = synchronized(stateLock) {
-            webSocket == socket &&
-                stompConnected &&
-                channel != null &&
-                desiredChannelSettings.isEnabled(channel)
-        }
-        if (!isCurrentSocket) {
+            ?: SocketChannelPreference.fromSubscriptionId(subscriptionId)
+        if (channel == null) {
+            Log.w(
+                BackendWebSocketTag,
+                "Frame websocket sin canal resoluble. destination=${destination ?: "none"} subscription=${subscriptionId ?: "none"}"
+            )
             return
+        }
+        val settings = synchronized(stateLock) {
+            if (webSocket != socket || !stompConnected) {
+                return
+            }
+            desiredChannelSettings
         }
 
         val context = appContext ?: return
@@ -298,11 +308,36 @@ object BackendWebSocketManager {
 
         when (channel) {
             SocketChannelPreference.MESSAGES -> {
-                showIncomingMessageNotification(
-                    context = context,
-                    title = payload.resolveTitle(MessageTitleKey),
-                    body = payload.resolveBody(MessageBodyKey)
-                )
+                val eventType = payload.extractEventType()
+                val chatId = payload.extractChatId()
+                val username = payload.extractUsername()
+                when (eventType?.uppercase()) {
+                    "PARTICIPANT_LEFT" -> ChatEventBus.onParticipantLeft(chatId, username)
+                    "PARTICIPANT_JOINED" -> ChatEventBus.onParticipantJoined(chatId, username)
+                    "PARTICIPANT_KICKED" -> ChatEventBus.onParticipantKicked(chatId, username)
+                    "ADMIN_PROMOTED" -> ChatEventBus.onAdminPromoted(chatId, username)
+                    "ADMIN_REVOKED" -> ChatEventBus.onAdminRevoked(chatId, username)
+                    "GROUP_CREATED" -> ChatEventBus.onGroupCreated(chatId, payload.extractGroupName())
+                    else -> ChatEventBus.onNewMessage(chatId)
+                }
+                if (settings.messagesEnabled) {
+                    val title = payload.resolveTitle(MessageTitleKey)
+                    val body = payload.resolveBody(MessageBodyKey)
+                    val normalizedTitle = normalizeNotificationText(
+                        rawValue = title,
+                        knownKey = MessageTitleKey
+                    )
+                    val normalizedBody = normalizeNotificationText(
+                        rawValue = body,
+                        knownKey = MessageBodyKey
+                    )
+                    showIncomingMessageNotification(
+                        context = context,
+                        title = normalizedTitle,
+                        body = normalizedBody
+                    )
+                    showMessageBanner(context, normalizedTitle, normalizedBody)
+                }
             }
 
             SocketChannelPreference.EMERGENCY -> {
@@ -328,6 +363,7 @@ object BackendWebSocketManager {
                         body = resolvedBody
                     )
                 )
+                showEmergencyBanner(context, resolvedTitle, resolvedBody)
             }
 
             SocketChannelPreference.FRIEND_REQUESTS -> {
@@ -340,9 +376,11 @@ object BackendWebSocketManager {
                     senderName = payload.resolveFriendRequestActorName(),
                     status = payload.resolveFriendRequestStatus()
                 )
+                showFriendRequestBanner(context, resolvedTitle, resolvedBody)
             }
 
             SocketChannelPreference.LOCATION -> {
+                if (!settings.locationEnabled) return
                 val coordinates = payload.extractCoordinates()
                 val resolvedUsername = payload.resolveUsername()
                 val resolvedTitle = payload.resolveTitle(null)
@@ -361,18 +399,90 @@ object BackendWebSocketManager {
                 }
             }
 
-            else -> {
-                Log.w(
-                    BackendWebSocketTag,
-                    "Destino websocket no gestionado: ${destination ?: "sin destino"}"
-                )
-                return
-            }
         }
 
         Log.d(
             BackendWebSocketTag,
             "Evento websocket recibido en ${destination ?: "unknown"}"
+        )
+    }
+
+    private fun normalizeNotificationText(
+        rawValue: String?,
+        knownKey: String?
+    ): String? {
+        val normalized = rawValue?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        if (!knownKey.isNullOrBlank() && normalized.equals(knownKey, ignoreCase = true)) {
+            return null
+        }
+        val looksLikeKey = normalized
+            .all { it.isUpperCase() || it == '_' || it.isDigit() }
+        return normalized.takeUnless { looksLikeKey }
+    }
+
+    private fun showMessageBanner(
+        context: Context,
+        title: String?,
+        body: String?
+    ) {
+        val localizedContext = notificationLocalizedContext(context)
+        ScreenNotificationManager.showNotification(
+            notificationName = title?.takeIf { it.isNotBlank() }
+                ?: localizedContext.getString(R.string.message_notification_received_title),
+            text = body?.takeIf { it.isNotBlank() }
+                ?: localizedContext.getString(R.string.message_notification_received_body)
+        )
+    }
+
+    private fun showEmergencyBanner(
+        context: Context,
+        title: String?,
+        body: String?
+    ) {
+        val localizedContext = notificationLocalizedContext(context)
+        ScreenNotificationManager.showNotification(
+            notificationName = title?.takeIf { it.isNotBlank() }
+                ?: localizedContext.getString(R.string.emergency_notification_received_title),
+            text = body?.takeIf { it.isNotBlank() }
+                ?: localizedContext.getString(R.string.emergency_notification_received_body)
+        )
+    }
+
+    private fun showFriendRequestBanner(
+        context: Context,
+        title: String?,
+        body: String?
+    ) {
+        val localizedContext = notificationLocalizedContext(context)
+        ScreenNotificationManager.showNotification(
+            notificationName = title?.takeIf { it.isNotBlank() }
+                ?: localizedContext.getString(R.string.friend_request_notification_received_title),
+            text = body?.takeIf { it.isNotBlank() }
+                ?: localizedContext.getString(R.string.friend_request_notification_received_body)
+        )
+    }
+
+    private fun showLocationBanner(
+        context: Context,
+        title: String?,
+        body: String?,
+        coordinates: Coordinates?
+    ) {
+        val localizedContext = notificationLocalizedContext(context)
+        val resolvedBody = body?.takeIf { it.isNotBlank() } ?: if (coordinates != null) {
+            localizedContext.getString(
+                R.string.location_notification_received_body_with_coords,
+                coordinates.latitude,
+                coordinates.longitude
+            )
+        } else {
+            localizedContext.getString(R.string.location_notification_received_body)
+        }
+
+        ScreenNotificationManager.showNotification(
+            notificationName = title?.takeIf { it.isNotBlank() }
+                ?: localizedContext.getString(R.string.location_notification_received_title),
+            text = resolvedBody
         )
     }
 
@@ -403,7 +513,7 @@ object BackendWebSocketManager {
                 return
             }
 
-            val desiredChannels = desiredChannelSettings.enabledChannels()
+            val desiredChannels = desiredChannelSettings.enabledChannels() + alwaysSubscribedChannels
             val channelsToSubscribe = desiredChannels - subscribedChannels
             val channelsToUnsubscribe = subscribedChannels - desiredChannels
 
@@ -433,7 +543,7 @@ object BackendWebSocketManager {
         return buildString {
             append("CONNECT\n")
             append("accept-version:1.2\n")
-            append("host:nattech.fib.upc.edu:40381\n")
+            append("host:nattech.fib.upc.edu:40382\n")
             append("heart-beat:0,0\n")
             append("googleId:$googleId\n")
             append("\n")
@@ -727,6 +837,45 @@ object BackendWebSocketManager {
                     }
                 }
             }
+        }
+
+        fun extractChatId(): Long? {
+            val candidates = listOfNotNull(dataObject, root)
+            for (candidate in candidates) {
+                if (!candidate.has("chatId")) continue
+                val chatId = candidate.optLong("chatId", -1L)
+                if (chatId > 0L) return chatId
+            }
+            return null
+        }
+
+        fun extractEventType(): String? {
+            val candidates = listOfNotNull(dataObject, root)
+            val keys = listOf("eventType", "type", "event", "action", "titleKey")
+            for (c in candidates) for (k in keys) {
+                val v = c.optString(k, "").trim()
+                if (v.isNotBlank()) return v
+            }
+            return null
+        }
+
+        fun extractUsername(): String? {
+            val candidates = listOfNotNull(dataObject, root)
+            val keys = listOf("username", "targetUsername", "userName", "user")
+            for (c in candidates) for (k in keys) {
+                val v = c.optString(k, "").trim()
+                if (v.isNotBlank()) return v
+            }
+            return null
+        }
+
+        fun extractGroupName(): String? {
+            val candidates = listOfNotNull(dataObject, root)
+            for (c in candidates) {
+                val v = c.optString("groupName", "").trim().ifBlank { c.optString("name", "").trim() }
+                if (v.isNotBlank()) return v
+            }
+            return null
         }
 
         private fun parseCoordinates(objectNode: JSONObject): Coordinates? {

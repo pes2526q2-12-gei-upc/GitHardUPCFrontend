@@ -5,6 +5,7 @@ import java.util.Locale
 
 private const val LANGUAGE_PREFERENCES_NAME = "language_preferences"
 private const val USER_LANGUAGE_KEY_PREFIX = "user_language_"
+private const val GLOBAL_LANGUAGE_KEY = "global_app_language"
 
 class LanguagePreferencesRepository(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(
@@ -13,18 +14,32 @@ class LanguagePreferencesRepository(context: Context) {
     )
 
     fun getLanguageForUser(email: String?): AppLanguage {
-        if (email.isNullOrBlank()) {
-            return AppLanguage.default
+        val storedLanguage = if (!email.isNullOrBlank()) {
+            preferences.getString(keyFor(email), null)
+        } else {
+            null
         }
 
-        val storedLanguage = preferences.getString(keyFor(email), null)
-        return AppLanguage.fromLanguageTag(storedLanguage)
+        // Si no hay idioma para el usuario, o el usuario es null, usamos el global
+        return if (storedLanguage != null) {
+            AppLanguage.fromLanguageTag(storedLanguage)
+        } else {
+            val globalLanguage = preferences.getString(GLOBAL_LANGUAGE_KEY, null)
+            AppLanguage.fromLanguageTag(globalLanguage)
+        }
     }
 
-    fun saveLanguageForUser(email: String, language: AppLanguage) {
-        preferences.edit()
-            .putString(keyFor(email), language.languageTag)
-            .apply()
+    fun saveLanguageForUser(email: String?, language: AppLanguage) {
+        val editor = preferences.edit()
+        
+        // Siempre guardamos como global para persistencia entre sesiones/logouts
+        editor.putString(GLOBAL_LANGUAGE_KEY, language.languageTag)
+        
+        if (!email.isNullOrBlank()) {
+            editor.putString(keyFor(email), language.languageTag)
+        }
+        
+        editor.apply()
     }
 
     private fun keyFor(email: String): String {

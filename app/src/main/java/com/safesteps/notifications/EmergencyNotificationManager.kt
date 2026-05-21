@@ -70,10 +70,10 @@ fun initializeEmergencyMessaging(context: Context) {
 
 fun hasNotificationPermission(context: Context): Boolean {
     return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
 }
 
 fun persistEmergencyNotificationUser(
@@ -85,6 +85,13 @@ fun persistEmergencyNotificationUser(
         .edit()
         .putString(CurrentGoogleIdKey, googleId?.takeIf { it.isNotBlank() })
         .apply()
+}
+
+fun persistEmergencyNotificationLanguage(
+    context: Context,
+    languageTag: String?
+) {
+    persistNotificationLanguageTag(context, languageTag)
 }
 
 suspend fun syncCurrentFcmTokenForUser(
@@ -126,10 +133,11 @@ fun showTriggeredEmergencyNotification(
     context: Context,
     currentUser: UserInfo?
 ) {
+    val localizedContext = notificationLocalizedContext(context)
     val senderName = currentUser?.username?.takeIf(String::isNotBlank)
-        ?: context.getString(R.string.app_name)
-    val title = context.getString(R.string.emergency_notification_triggered_title)
-    val body = context.getString(R.string.emergency_notification_triggered_body, senderName)
+        ?: localizedContext.getString(R.string.app_name)
+    val title = localizedContext.getString(R.string.emergency_notification_triggered_title)
+    val body = localizedContext.getString(R.string.emergency_notification_triggered_body, senderName)
 
     showEmergencyNotification(
         context = context,
@@ -233,13 +241,14 @@ fun showIncomingMessageNotification(
     title: String?,
     body: String?
 ) {
+    val localizedContext = notificationLocalizedContext(context)
     showActivityNotification(
         context = context,
         notificationId = MessageNotificationId,
         title = title?.takeIf(String::isNotBlank)
-            ?: context.getString(R.string.message_notification_received_title),
+            ?: localizedContext.getString(R.string.message_notification_received_title),
         body = body?.takeIf(String::isNotBlank)
-            ?: context.getString(R.string.message_notification_received_body),
+            ?: localizedContext.getString(R.string.message_notification_received_body),
         category = NotificationCompat.CATEGORY_MESSAGE,
         color = 0xFF1F6F78.toInt()
     )
@@ -367,22 +376,23 @@ fun showIncomingLocationNotification(
     latitude: Double? = null,
     longitude: Double? = null
 ) {
+    val localizedContext = notificationLocalizedContext(context)
     val resolvedBody = body?.takeIf(String::isNotBlank)
         ?: if (latitude != null && longitude != null) {
-            context.getString(
+            localizedContext.getString(
                 R.string.location_notification_received_body_with_coords,
                 latitude,
                 longitude
             )
         } else {
-            context.getString(R.string.location_notification_received_body)
+            localizedContext.getString(R.string.location_notification_received_body)
         }
 
     showActivityNotification(
         context = context,
         notificationId = LocationNotificationId,
         title = title?.takeIf(String::isNotBlank)
-            ?: context.getString(R.string.location_notification_received_title),
+            ?: localizedContext.getString(R.string.location_notification_received_title),
         body = resolvedBody,
         category = NotificationCompat.CATEGORY_STATUS,
         color = 0xFF2B6CB0.toInt()
@@ -399,12 +409,13 @@ private fun ensureEmergencyNotificationChannel(context: Context) {
         return
     }
 
+    val localizedContext = notificationLocalizedContext(context)
     val channel = NotificationChannel(
         EmergencyChannelId,
-        context.getString(R.string.emergency_notification_channel_name),
+        localizedContext.getString(R.string.emergency_notification_channel_name),
         NotificationManager.IMPORTANCE_HIGH
     ).apply {
-        description = context.getString(R.string.emergency_notification_channel_description)
+        description = localizedContext.getString(R.string.emergency_notification_channel_description)
         enableVibration(true)
     }
 
@@ -421,12 +432,13 @@ private fun ensureActivityNotificationChannel(context: Context) {
         return
     }
 
+    val localizedContext = notificationLocalizedContext(context)
     val channel = NotificationChannel(
         ActivityChannelId,
-        context.getString(R.string.notification_channel_activity_name),
+        localizedContext.getString(R.string.notification_channel_activity_name),
         NotificationManager.IMPORTANCE_DEFAULT
     ).apply {
-        description = context.getString(R.string.notification_channel_activity_description)
+        description = localizedContext.getString(R.string.notification_channel_activity_description)
         enableVibration(true)
     }
 
