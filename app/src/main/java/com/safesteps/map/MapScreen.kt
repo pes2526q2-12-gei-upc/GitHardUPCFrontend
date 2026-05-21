@@ -110,6 +110,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -120,6 +121,7 @@ import java.util.Date
 import java.util.Locale
 
 private const val EmergencyStatusNotificationDurationMillis = 6_000L
+private const val EmergencyLocationBroadcastIntervalMillis = 60_000L
 
 private data class MapScreenStrings(
     val mapNotificationTitle: String,
@@ -853,20 +855,24 @@ fun MapLibreScreen(
         }
     }
 
-    LaunchedEffect(
-        isEmergencyActive,
-        uiState.ultimaUbicacion?.latitude,
-        uiState.ultimaUbicacion?.longitude
-    ) {
-        val location = uiState.ultimaUbicacion ?: return@LaunchedEffect
+    val latestEmergencyLocation = rememberUpdatedState(uiState.ultimaUbicacion)
+
+    LaunchedEffect(isEmergencyActive) {
         if (!isEmergencyActive) {
             return@LaunchedEffect
         }
 
-        BackendWebSocketManager.sendLocationUpdate(
-            latitude = location.latitude,
-            longitude = location.longitude
-        )
+        // Keep a fixed 60-second cadence while emergency mode is active,
+        // instead of restarting the timer on each GPS update.
+        while (true) {
+            latestEmergencyLocation.value?.let { location ->
+                BackendWebSocketManager.sendLocationUpdate(
+                    latitude = location.latitude,
+                    longitude = location.longitude
+                )
+            }
+            delay(EmergencyLocationBroadcastIntervalMillis)
+        }
     }
 
     MapScreenEffects(
