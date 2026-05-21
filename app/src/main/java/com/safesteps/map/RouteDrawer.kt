@@ -135,7 +135,7 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
         "FONT" -> "\uD83D\uDCA7" to "#3DA5F4".toColorInt()
         "COMISSARIA" -> "\uD83D\uDC6E" to "#355C7D".toColorInt()
         "BANC" -> "\uD83E\uDE91" to "#8D6E63".toColorInt()
-        "CAMERA" -> "\uD83D\uDCF9" to "#7B1FA2".toColorInt()
+        "CAMERA" -> "" to "#66746D".toColorInt()
         "ESCALA_MECANICA" -> "" to "#5C6F7B".toColorInt()
         "REFUGI_CLIMATIC" -> "" to "#F28C28".toColorInt()
         else -> "\uD83D\uDCCD" to "#C86A37".toColorInt()
@@ -168,6 +168,7 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     when (normalizedType) {
         "ESCALA_MECANICA" -> drawEscalatorSymbol(canvas, size)
         "REFUGI_CLIMATIC" -> drawThermometerSymbol(canvas, size)
+        "CAMERA" -> drawSecurityCameraSymbol(canvas, size)
         else -> {
             val y = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
             canvas.drawText(emoji, size / 2f, y, textPaint)
@@ -175,6 +176,33 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     }
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
+}
+
+private fun drawSecurityCameraSymbol(canvas: Canvas, size: Int) {
+    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        style = Paint.Style.FILL
+    }
+
+    val cameraBounds = RectF(
+        size * 0.22f,
+        size * 0.29f,
+        size * 0.59f,
+        size * 0.51f
+    )
+    canvas.drawRoundRect(cameraBounds, size * 0.07f, size * 0.07f, strokePaint)
+    canvas.drawCircle(size * 0.44f, size * 0.40f, size * 0.035f, fillPaint)
+    canvas.drawLine(size * 0.59f, size * 0.34f, size * 0.79f, size * 0.27f, strokePaint)
+    canvas.drawLine(size * 0.59f, size * 0.46f, size * 0.79f, size * 0.53f, strokePaint)
+    canvas.drawLine(size * 0.29f, size * 0.56f, size * 0.20f, size * 0.74f, strokePaint)
+    canvas.drawLine(size * 0.20f, size * 0.74f, size * 0.48f, size * 0.74f, strokePaint)
 }
 
 private fun drawEscalatorSymbol(canvas: Canvas, size: Int) {

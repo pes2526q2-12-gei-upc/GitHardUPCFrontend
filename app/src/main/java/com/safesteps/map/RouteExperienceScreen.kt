@@ -62,10 +62,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -111,7 +113,8 @@ private data class PoiSummaryCardItem(
 )
 
 private enum class PoiSummaryCustomIcon {
-    STREET_BENCH
+    STREET_BENCH,
+    SECURITY_CAMERA
 }
 
 private data class PoiTypeConfig(
@@ -127,7 +130,7 @@ private val poiTypeConfigs = listOf(
     PoiTypeConfig("FONT", R.plurals.poi_fountains, Color(0xFF5F6B67), emoji = "\uD83D\uDCA7"),
     PoiTypeConfig("BANC", R.plurals.poi_benches, Color(0xFF8D6E63), customIcon = PoiSummaryCustomIcon.STREET_BENCH),
     PoiTypeConfig("COMISSARIA", R.plurals.poi_police_stations, Color(0xFF5F6B67), emoji = "\uD83D\uDC6E"),
-    PoiTypeConfig("CAMERA", R.plurals.poi_security_cameras, Color(0xFF5F6B67), emoji = "\uD83D\uDCF9"),
+    PoiTypeConfig("CAMERA", R.plurals.poi_security_cameras, Color(0xFF5F6B67), customIcon = PoiSummaryCustomIcon.SECURITY_CAMERA),
     PoiTypeConfig("ESCALA_MECANICA", R.plurals.poi_escalators, Color(0xFF2E8B57), icon = Icons.Default.Escalator),
     PoiTypeConfig("REFUGI_CLIMATIC", R.plurals.poi_climate_shelters, Color(0xFFE67E22), icon = Icons.Default.DeviceThermostat)
 )
@@ -467,6 +470,12 @@ private fun PoiSummaryInlineItem(
                         modifier = Modifier.size(16.dp)
                     )
                 }
+                item.customIcon == PoiSummaryCustomIcon.SECURITY_CAMERA -> {
+                    PoiSummarySecurityCameraIcon(
+                        color = item.accentColor.copy(alpha = 0.9f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
                 item.icon != null -> {
                     Icon(
                         imageVector = item.icon,
@@ -490,6 +499,65 @@ private fun PoiSummaryInlineItem(
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun PoiSummarySecurityCameraIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val stroke = size.minDimension * 0.11f
+        val housingLeft = size.width * 0.18f
+        val housingTop = size.height * 0.28f
+        val housingRight = size.width * 0.64f
+        val housingBottom = size.height * 0.56f
+        val corner = size.minDimension * 0.12f
+
+        drawRoundRect(
+            color = color,
+            topLeft = Offset(housingLeft, housingTop),
+            size = androidx.compose.ui.geometry.Size(
+                width = housingRight - housingLeft,
+                height = housingBottom - housingTop
+            ),
+            cornerRadius = CornerRadius(corner, corner),
+            style = Stroke(width = stroke)
+        )
+        drawCircle(
+            color = color,
+            radius = size.minDimension * 0.045f,
+            center = Offset(size.width * 0.46f, size.height * 0.42f)
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.64f, size.height * 0.35f),
+            end = Offset(size.width * 0.82f, size.height * 0.28f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.64f, size.height * 0.49f),
+            end = Offset(size.width * 0.82f, size.height * 0.56f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.28f, size.height * 0.58f),
+            end = Offset(size.width * 0.19f, size.height * 0.78f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = color,
+            start = Offset(size.width * 0.19f, size.height * 0.78f),
+            end = Offset(size.width * 0.49f, size.height * 0.78f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
         )
     }
 }
