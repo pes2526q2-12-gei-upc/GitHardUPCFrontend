@@ -44,19 +44,19 @@ class SafeStepsFirebaseMessagingService : FirebaseMessagingService() {
         }
 
         Log.d(FcmTag, "==== FCM recibido (background/cerrada) ====")
-        Log.d(FcmTag, "title='$remoteTitle' body='$remoteBody'")
+        Log.d(FcmTag, "title='$title' body='$body'")
         message.data.forEach { (k, v) -> Log.d(FcmTag, "  data['$k'] = '$v'") }
 
         val normalizedType = resolveNotificationType(message)
         Log.d(FcmTag, "-> Routing as $normalizedType")
 
         val localizedContext = notificationLocalizedContext(applicationContext)
-        val title = resolveLocalizedTitle(
+        val resolvedTitle = resolveLocalizedTitle(
             context = localizedContext,
             type = normalizedType,
             data = message.data
         )
-        val body = resolveLocalizedBody(
+        val resolvedBody = resolveLocalizedBody(
             context = localizedContext,
             type = normalizedType,
             data = message.data
@@ -65,30 +65,27 @@ class SafeStepsFirebaseMessagingService : FirebaseMessagingService() {
         when {
             normalizedType.contains("MESSAGE") -> showIncomingMessageNotification(
                 context = applicationContext,
-                title = title,
-                body = body
+                title = resolvedTitle,
+                body = resolvedBody
             )
-
             normalizedType.contains("FRIEND") -> showIncomingFriendRequestNotification(
                 context = applicationContext,
-                title = title,
-                body = body
+                title = resolvedTitle,
+                body = resolvedBody
             )
-
             normalizedType.contains("LOCATION") -> showIncomingLocationNotification(
                 context = applicationContext,
-                title = title,
-                body = body,
+                title = resolvedTitle,
+                body = resolvedBody,
                 latitude = message.data["lat"]?.toDoubleOrNull() ?: message.data["latitude"]?.toDoubleOrNull(),
                 longitude = message.data["lon"]?.toDoubleOrNull()
                     ?: message.data["lng"]?.toDoubleOrNull()
                     ?: message.data["longitude"]?.toDoubleOrNull()
             )
-
             else -> showIncomingEmergencyNotification(
                 context = applicationContext,
-                title = title,
-                body = body
+                title = resolvedTitle,
+                body = resolvedBody
             )
         }
     }

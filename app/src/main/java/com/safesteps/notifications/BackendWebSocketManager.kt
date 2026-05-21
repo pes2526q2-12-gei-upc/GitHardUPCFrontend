@@ -363,7 +363,7 @@ object BackendWebSocketManager {
                         body = resolvedBody
                     )
                 )
-                showEmergencyBanner(context, normalizedTitle, normalizedBody)
+                showEmergencyBanner(context, resolvedTitle, resolvedBody)
             }
 
             SocketChannelPreference.FRIEND_REQUESTS -> {
@@ -376,7 +376,7 @@ object BackendWebSocketManager {
                     senderName = payload.resolveFriendRequestActorName(),
                     status = payload.resolveFriendRequestStatus()
                 )
-                showFriendRequestBanner(context, normalizedTitle, normalizedBody)
+                showFriendRequestBanner(context, resolvedTitle, resolvedBody)
             }
 
             SocketChannelPreference.LOCATION -> {
@@ -837,6 +837,45 @@ object BackendWebSocketManager {
                     }
                 }
             }
+        }
+
+        fun extractChatId(): Long? {
+            val candidates = listOfNotNull(dataObject, root)
+            for (candidate in candidates) {
+                if (!candidate.has("chatId")) continue
+                val chatId = candidate.optLong("chatId", -1L)
+                if (chatId > 0L) return chatId
+            }
+            return null
+        }
+
+        fun extractEventType(): String? {
+            val candidates = listOfNotNull(dataObject, root)
+            val keys = listOf("eventType", "type", "event", "action", "titleKey")
+            for (c in candidates) for (k in keys) {
+                val v = c.optString(k, "").trim()
+                if (v.isNotBlank()) return v
+            }
+            return null
+        }
+
+        fun extractUsername(): String? {
+            val candidates = listOfNotNull(dataObject, root)
+            val keys = listOf("username", "targetUsername", "userName", "user")
+            for (c in candidates) for (k in keys) {
+                val v = c.optString(k, "").trim()
+                if (v.isNotBlank()) return v
+            }
+            return null
+        }
+
+        fun extractGroupName(): String? {
+            val candidates = listOfNotNull(dataObject, root)
+            for (c in candidates) {
+                val v = c.optString("groupName", "").trim().ifBlank { c.optString("name", "").trim() }
+                if (v.isNotBlank()) return v
+            }
+            return null
         }
 
         private fun parseCoordinates(objectNode: JSONObject): Coordinates? {

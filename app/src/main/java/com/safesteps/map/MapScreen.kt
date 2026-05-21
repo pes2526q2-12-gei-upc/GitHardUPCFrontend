@@ -628,28 +628,11 @@ private fun MapScreenContent(
 
         ActiveRouteExperienceOverlay(
             uiState = uiState,
-            showProfilePreferences = !currentUser?.googleId.isNullOrBlank(),
-            onPrioritySelected = actions.onPrioritySelected,
-            onStartRoute = {
-                actions.clearRouteExitCameraSnapshot()
-                when (viewModel.iniciarRuta()) {
-                    ActiveRouteMode.USER_LOCATION_NAVIGATION -> {
-                        uiState.ultimaUbicacion?.let { location ->
-                            enableNavigationCameraTracking(
-                                mapView = mapView,
-                                currentLocation = location,
-                                headingDegrees = navigationHeadingDegrees?.toDouble(),
-                                applyZoom = true
-                            )
-                        }
-                    }
-                    ActiveRouteMode.FIXED_OVERVIEW,
-                    ActiveRouteMode.NONE -> {
-                        disableNavigationCameraTracking(mapView)
-                    }
-                }
-            },
-            onClose = actions.resetToMainMenu,
+            viewModel = viewModel,
+            mapView = mapView,
+            currentUser = currentUser,
+            navigationHeadingDegrees = navigationHeadingDegrees,
+            actions = actions,
             onShareRoute = { showShareRoute = true },
             onBottomPaddingChange = { padding ->
                 floatingActionsBottomPadding = padding
