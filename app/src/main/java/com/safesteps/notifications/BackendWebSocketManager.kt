@@ -3,9 +3,7 @@ package com.safesteps.notifications
 import android.content.Context
 import android.net.Uri
 import android.util.Log
-import com.safesteps.R
 import com.safesteps.chat.ChatEventBus
-import com.safesteps.ui.notifications.ScreenNotificationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -336,7 +334,6 @@ object BackendWebSocketManager {
                         title = normalizedTitle,
                         body = normalizedBody
                     )
-                    showMessageBanner(context, normalizedTitle, normalizedBody)
                 }
             }
 
@@ -363,7 +360,6 @@ object BackendWebSocketManager {
                         body = resolvedBody
                     )
                 )
-                showEmergencyBanner(context, resolvedTitle, resolvedBody)
             }
 
             SocketChannelPreference.FRIEND_REQUESTS -> {
@@ -376,7 +372,6 @@ object BackendWebSocketManager {
                     senderName = payload.resolveFriendRequestActorName(),
                     status = payload.resolveFriendRequestStatus()
                 )
-                showFriendRequestBanner(context, resolvedTitle, resolvedBody)
             }
 
             SocketChannelPreference.LOCATION -> {
@@ -418,72 +413,6 @@ object BackendWebSocketManager {
         val looksLikeKey = normalized
             .all { it.isUpperCase() || it == '_' || it.isDigit() }
         return normalized.takeUnless { looksLikeKey }
-    }
-
-    private fun showMessageBanner(
-        context: Context,
-        title: String?,
-        body: String?
-    ) {
-        val localizedContext = notificationLocalizedContext(context)
-        ScreenNotificationManager.showNotification(
-            notificationName = title?.takeIf { it.isNotBlank() }
-                ?: localizedContext.getString(R.string.message_notification_received_title),
-            text = body?.takeIf { it.isNotBlank() }
-                ?: localizedContext.getString(R.string.message_notification_received_body)
-        )
-    }
-
-    private fun showEmergencyBanner(
-        context: Context,
-        title: String?,
-        body: String?
-    ) {
-        val localizedContext = notificationLocalizedContext(context)
-        ScreenNotificationManager.showNotification(
-            notificationName = title?.takeIf { it.isNotBlank() }
-                ?: localizedContext.getString(R.string.emergency_notification_received_title),
-            text = body?.takeIf { it.isNotBlank() }
-                ?: localizedContext.getString(R.string.emergency_notification_received_body)
-        )
-    }
-
-    private fun showFriendRequestBanner(
-        context: Context,
-        title: String?,
-        body: String?
-    ) {
-        val localizedContext = notificationLocalizedContext(context)
-        ScreenNotificationManager.showNotification(
-            notificationName = title?.takeIf { it.isNotBlank() }
-                ?: localizedContext.getString(R.string.friend_request_notification_received_title),
-            text = body?.takeIf { it.isNotBlank() }
-                ?: localizedContext.getString(R.string.friend_request_notification_received_body)
-        )
-    }
-
-    private fun showLocationBanner(
-        context: Context,
-        title: String?,
-        body: String?,
-        coordinates: Coordinates?
-    ) {
-        val localizedContext = notificationLocalizedContext(context)
-        val resolvedBody = body?.takeIf { it.isNotBlank() } ?: if (coordinates != null) {
-            localizedContext.getString(
-                R.string.location_notification_received_body_with_coords,
-                coordinates.latitude,
-                coordinates.longitude
-            )
-        } else {
-            localizedContext.getString(R.string.location_notification_received_body)
-        }
-
-        ScreenNotificationManager.showNotification(
-            notificationName = title?.takeIf { it.isNotBlank() }
-                ?: localizedContext.getString(R.string.location_notification_received_title),
-            text = resolvedBody
-        )
     }
 
     private fun handleSocketEnded(
