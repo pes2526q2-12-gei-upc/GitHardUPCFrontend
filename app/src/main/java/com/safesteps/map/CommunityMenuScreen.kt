@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -57,65 +55,82 @@ fun CommunityMenuScreen(
     onRouteFiltersClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyColumn(
+    Column(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFFF4F7F5))
             .statusBarsPadding()
-            .navigationBarsPadding(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp)
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
     ) {
-        item {
-            CommunityMenuTopBar(
-                onBack = onBack
-            )
-        }
+        CommunityMenuTopBar(
+            onBack = onBack
+        )
 
-        item {
-            CommunityProfileCard(
-                user = user,
-                onProfileClick = onProfileClick
-            )
-        }
+        Spacer(modifier = Modifier.height(20.dp))
 
-        item {
+        CommunityProfileCard(
+            user = user,
+            onProfileClick = onProfileClick
+        )
+
+        Spacer(modifier = Modifier.height(22.dp))
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.Top
+        ) {
             Text(
                 text = appString(R.string.community_menu_section_title),
                 color = Color(0xFF23333A),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-        }
 
-        item {
-            CommunityMenuCard(
-                icon = Icons.Default.ChatBubbleOutline,
-                iconTint = Color(0xFF507DBC),
-                title = appString(R.string.community_menu_chat_title),
-                description = appString(R.string.community_menu_chat_description),
-                onClick = onChatClick
-            )
-        }
+            Spacer(modifier = Modifier.height(14.dp))
 
-        item {
-            CommunityMenuCard(
-                icon = Icons.Default.PersonAddAlt1,
-                iconTint = Color(0xFF5E9F7A),
-                title = appString(R.string.community_menu_friends_title),
-                description = appString(R.string.community_menu_friends_description),
-                onClick = onFriendsClick
-            )
-        }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                CommunityFeaturedMenuCard(
+                    modifier = Modifier.weight(0.92f),
+                    icon = Icons.Default.ChatBubbleOutline,
+                    iconTint = Color(0xFF507DBC),
+                    title = appString(R.string.community_menu_chat_title),
+                    description = appString(R.string.community_menu_chat_description),
+                    onClick = onChatClick
+                )
 
-        item {
-            CommunityMenuCard(
-                icon = Icons.Default.Tune,
-                iconTint = Color(0xFF5B8C6F),
-                title = appString(R.string.community_menu_route_title),
-                description = appString(R.string.community_menu_route_description),
-                onClick = onRouteFiltersClick
-            )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    CommunityCompactMenuCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.PersonAddAlt1,
+                        iconTint = Color(0xFF5E9F7A),
+                        title = appString(R.string.community_menu_friends_title),
+                        description = appString(R.string.community_menu_friends_description),
+                        onClick = onFriendsClick
+                    )
+
+                    CommunityCompactMenuCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Default.Tune,
+                        iconTint = Color(0xFF5B8C6F),
+                        title = appString(R.string.community_menu_route_title),
+                        description = appString(R.string.community_menu_route_description),
+                        onClick = onRouteFiltersClick
+                    )
+                }
+            }
         }
     }
 }
@@ -229,7 +244,8 @@ private fun CommunityProfileCard(
 }
 
 @Composable
-private fun CommunityMenuCard(
+private fun CommunityFeaturedMenuCard(
+    modifier: Modifier = Modifier,
     icon: ImageVector,
     iconTint: Color,
     title: String,
@@ -237,60 +253,153 @@ private fun CommunityMenuCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .padding(horizontal = 22.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Surface(
-                modifier = Modifier.size(52.dp),
-                shape = CircleShape,
-                color = iconTint.copy(alpha = 0.14f)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconTint,
-                        modifier = Modifier.size(24.dp)
-                    )
+                Surface(
+                    modifier = Modifier.size(66.dp),
+                    shape = CircleShape,
+                    color = iconTint.copy(alpha = 0.14f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = iconTint,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.size(38.dp),
+                    shape = CircleShape,
+                    color = Color(0xFFF2F6F3)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = Color(0xFF7A8782),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
+            Column {
                 Text(
                     text = title,
                     color = Color(0xFF23333A),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
                     text = description,
                     color = Color(0xFF67756F),
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 3
                 )
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.width(8.dp))
+@Composable
+private fun CommunityCompactMenuCard(
+    modifier: Modifier = Modifier,
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    description: String,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 18.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(56.dp),
+                    shape = CircleShape,
+                    color = iconTint.copy(alpha = 0.14f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = iconTint,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
 
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                tint = Color(0xFF7A8782)
-            )
+                Surface(
+                    modifier = Modifier.size(34.dp),
+                    shape = CircleShape,
+                    color = Color(0xFFF2F6F3)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = Color(0xFF7A8782),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            Column {
+                Text(
+                    text = title,
+                    color = Color(0xFF23333A),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = description,
+                    color = Color(0xFF67756F),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 5
+                )
+            }
         }
     }
 }
