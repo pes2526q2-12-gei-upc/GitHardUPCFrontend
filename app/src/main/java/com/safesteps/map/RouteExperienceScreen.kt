@@ -64,9 +64,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -128,9 +130,9 @@ private data class PoiTypeConfig(
 
 private val poiTypeConfigs = listOf(
     PoiTypeConfig("FONT", R.plurals.poi_fountains, Color(0xFF5F6B67), emoji = "\uD83D\uDCA7"),
-    PoiTypeConfig("BANC", R.plurals.poi_benches, Color(0xFF8D6E63), customIcon = PoiSummaryCustomIcon.STREET_BENCH),
+    PoiTypeConfig("BANC", R.plurals.poi_benches, Color(0xFF8A9096), customIcon = PoiSummaryCustomIcon.STREET_BENCH),
     PoiTypeConfig("COMISSARIA", R.plurals.poi_police_stations, Color(0xFF5F6B67), emoji = "\uD83D\uDC6E"),
-    PoiTypeConfig("CAMERA", R.plurals.poi_security_cameras, Color(0xFF5F6B67), customIcon = PoiSummaryCustomIcon.SECURITY_CAMERA),
+    PoiTypeConfig("CAMERA", R.plurals.poi_security_cameras, Color(0xFF101010), customIcon = PoiSummaryCustomIcon.SECURITY_CAMERA),
     PoiTypeConfig("ESCALA_MECANICA", R.plurals.poi_escalators, Color(0xFF2E8B57), icon = Icons.Default.Escalator),
     PoiTypeConfig("REFUGI_CLIMATIC", R.plurals.poi_climate_shelters, Color(0xFFE67E22), icon = Icons.Default.DeviceThermostat)
 )
@@ -472,7 +474,7 @@ private fun PoiSummaryInlineItem(
                 }
                 item.customIcon == PoiSummaryCustomIcon.SECURITY_CAMERA -> {
                     PoiSummarySecurityCameraIcon(
-                        color = item.accentColor.copy(alpha = 0.9f),
+                        color = item.accentColor,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -509,54 +511,86 @@ private fun PoiSummarySecurityCameraIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
-        val stroke = size.minDimension * 0.11f
-        val housingLeft = size.width * 0.18f
-        val housingTop = size.height * 0.28f
-        val housingRight = size.width * 0.64f
-        val housingBottom = size.height * 0.56f
-        val corner = size.minDimension * 0.12f
+        val stroke = size.minDimension * 0.085f
+        val outline = color
+        val bodyFill = color
+        val softDetail = Color.White.copy(alpha = 0.75f)
+        val lensCenter = Offset(size.width * 0.31f, size.height * 0.52f)
+        val circleRadius = size.minDimension * 0.48f
 
-        drawRoundRect(
-            color = color,
-            topLeft = Offset(housingLeft, housingTop),
-            size = androidx.compose.ui.geometry.Size(
-                width = housingRight - housingLeft,
-                height = housingBottom - housingTop
-            ),
-            cornerRadius = CornerRadius(corner, corner),
-            style = Stroke(width = stroke)
+        drawCircle(color = Color.White, radius = circleRadius)
+        drawCircle(
+            color = color.copy(alpha = 0.22f),
+            radius = circleRadius,
+            style = Stroke(width = stroke * 0.30f)
+        )
+
+        val bodyPath = Path().apply {
+            moveTo(size.width * 0.27f, size.height * 0.37f)
+            lineTo(size.width * 0.66f, size.height * 0.31f)
+            quadraticTo(size.width * 0.78f, size.height * 0.29f, size.width * 0.82f, size.height * 0.39f)
+            lineTo(size.width * 0.84f, size.height * 0.50f)
+            quadraticTo(size.width * 0.85f, size.height * 0.58f, size.width * 0.74f, size.height * 0.61f)
+            lineTo(size.width * 0.37f, size.height * 0.66f)
+            quadraticTo(size.width * 0.24f, size.height * 0.68f, size.width * 0.21f, size.height * 0.56f)
+            lineTo(size.width * 0.18f, size.height * 0.46f)
+            quadraticTo(size.width * 0.16f, size.height * 0.39f, size.width * 0.27f, size.height * 0.37f)
+            close()
+        }
+
+        drawPath(path = bodyPath, color = bodyFill)
+        drawLine(
+            color = softDetail,
+            start = Offset(size.width * 0.34f, size.height * 0.42f),
+            end = Offset(size.width * 0.56f, size.height * 0.39f),
+            strokeWidth = stroke * 0.26f,
+            cap = StrokeCap.Round
         )
         drawCircle(
-            color = color,
-            radius = size.minDimension * 0.045f,
-            center = Offset(size.width * 0.46f, size.height * 0.42f)
+            color = Color.White,
+            radius = size.minDimension * 0.11f,
+            center = lensCenter,
+            style = Stroke(width = stroke * 0.42f)
+        )
+        drawCircle(
+            color = Color.White,
+            radius = size.minDimension * 0.07f,
+            center = lensCenter
+        )
+        drawCircle(
+            color = outline,
+            radius = size.minDimension * 0.026f,
+            center = lensCenter
+        )
+        drawCircle(
+            color = Color.White.copy(alpha = 0.95f),
+            radius = size.minDimension * 0.018f,
+            center = Offset(size.width * 0.27f, size.height * 0.48f)
+        )
+        drawCircle(
+            color = outline,
+            radius = size.minDimension * 0.022f,
+            center = Offset(size.width * 0.61f, size.height * 0.63f)
         )
         drawLine(
-            color = color,
-            start = Offset(size.width * 0.64f, size.height * 0.35f),
-            end = Offset(size.width * 0.82f, size.height * 0.28f),
-            strokeWidth = stroke,
+            color = outline,
+            start = Offset(size.width * 0.61f, size.height * 0.65f),
+            end = Offset(size.width * 0.69f, size.height * 0.74f),
+            strokeWidth = stroke * 0.52f,
             cap = StrokeCap.Round
         )
         drawLine(
-            color = color,
-            start = Offset(size.width * 0.64f, size.height * 0.49f),
-            end = Offset(size.width * 0.82f, size.height * 0.56f),
-            strokeWidth = stroke,
+            color = outline,
+            start = Offset(size.width * 0.69f, size.height * 0.74f),
+            end = Offset(size.width * 0.69f, size.height * 0.82f),
+            strokeWidth = stroke * 0.52f,
             cap = StrokeCap.Round
         )
         drawLine(
-            color = color,
-            start = Offset(size.width * 0.28f, size.height * 0.58f),
-            end = Offset(size.width * 0.19f, size.height * 0.78f),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = color,
-            start = Offset(size.width * 0.19f, size.height * 0.78f),
-            end = Offset(size.width * 0.49f, size.height * 0.78f),
-            strokeWidth = stroke,
+            color = outline,
+            start = Offset(size.width * 0.61f, size.height * 0.83f),
+            end = Offset(size.width * 0.75f, size.height * 0.83f),
+            strokeWidth = stroke * 0.52f,
             cap = StrokeCap.Round
         )
     }
@@ -568,52 +602,63 @@ private fun PoiSummaryStreetBenchIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
-        val stroke = size.minDimension * 0.12f
-        val seatY = size.height * 0.62f
-        val backY = size.height * 0.38f
-        val leftX = size.width * 0.18f
-        val rightX = size.width * 0.82f
+        val stroke = size.minDimension * 0.08f
 
+        drawCircle(color = Color.White, radius = size.minDimension * 0.48f)
+        drawCircle(
+            color = color.copy(alpha = 0.22f),
+            radius = size.minDimension * 0.48f,
+            style = Stroke(width = stroke * 0.30f)
+        )
+
+        val backTopLeft = Offset(size.width * 0.24f, size.height * 0.30f)
+        val seatTopLeft = Offset(size.width * 0.20f, size.height * 0.49f)
+        val backSize = androidx.compose.ui.geometry.Size(size.width * 0.52f, size.height * 0.12f)
+        val seatSize = androidx.compose.ui.geometry.Size(size.width * 0.60f, size.height * 0.11f)
+        val corner = CornerRadius(size.minDimension * 0.04f, size.minDimension * 0.04f)
+
+        drawRoundRect(color = color.copy(alpha = 0.15f), topLeft = backTopLeft, size = backSize, cornerRadius = corner)
+        drawRoundRect(color = color.copy(alpha = 0.15f), topLeft = seatTopLeft, size = seatSize, cornerRadius = corner)
+        drawRoundRect(
+            color = color,
+            topLeft = backTopLeft,
+            size = backSize,
+            cornerRadius = corner,
+            style = Stroke(width = stroke * 0.55f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+        drawRoundRect(
+            color = color,
+            topLeft = seatTopLeft,
+            size = seatSize,
+            cornerRadius = corner,
+            style = Stroke(width = stroke * 0.55f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
         drawLine(
             color = color,
-            start = Offset(leftX, backY),
-            end = Offset(rightX, backY),
-            strokeWidth = stroke,
+            start = Offset(size.width * 0.32f, size.height * 0.42f),
+            end = Offset(size.width * 0.32f, size.height * 0.60f),
+            strokeWidth = stroke * 0.55f,
             cap = StrokeCap.Round
         )
         drawLine(
             color = color,
-            start = Offset(leftX, seatY),
-            end = Offset(rightX, seatY),
-            strokeWidth = stroke,
+            start = Offset(size.width * 0.68f, size.height * 0.42f),
+            end = Offset(size.width * 0.68f, size.height * 0.60f),
+            strokeWidth = stroke * 0.55f,
             cap = StrokeCap.Round
         )
         drawLine(
             color = color,
-            start = Offset(size.width * 0.24f, backY),
-            end = Offset(size.width * 0.24f, seatY),
-            strokeWidth = stroke,
+            start = Offset(size.width * 0.34f, size.height * 0.60f),
+            end = Offset(size.width * 0.28f, size.height * 0.80f),
+            strokeWidth = stroke * 0.55f,
             cap = StrokeCap.Round
         )
         drawLine(
             color = color,
-            start = Offset(size.width * 0.76f, backY),
-            end = Offset(size.width * 0.76f, seatY),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = color,
-            start = Offset(size.width * 0.30f, seatY),
-            end = Offset(size.width * 0.24f, size.height * 0.90f),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
-        drawLine(
-            color = color,
-            start = Offset(size.width * 0.70f, seatY),
-            end = Offset(size.width * 0.76f, size.height * 0.90f),
-            strokeWidth = stroke,
+            start = Offset(size.width * 0.66f, size.height * 0.60f),
+            end = Offset(size.width * 0.72f, size.height * 0.80f),
+            strokeWidth = stroke * 0.55f,
             cap = StrokeCap.Round
         )
     }
