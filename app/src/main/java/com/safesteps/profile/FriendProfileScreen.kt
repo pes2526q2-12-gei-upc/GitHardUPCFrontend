@@ -131,7 +131,8 @@ fun FriendProfileScreen(
             FriendProfileDetailsCard(
                 email = friend.email,
                 isEmergencyContact = friend.isEmergencyContact,
-                level = level
+                level = level,
+                points = points
             )
 
             when {
@@ -143,10 +144,6 @@ fun FriendProfileScreen(
                     FriendProfileErrorCard(
                         onRetry = { refreshVersion += 1 }
                     )
-                }
-
-                points != null -> {
-                    FriendProfilePointsCard(points = points)
                 }
             }
         }
@@ -389,7 +386,8 @@ private fun FriendProfileHeroCard(
 private fun FriendProfileDetailsCard(
     email: String,
     isEmergencyContact: Boolean,
-    level: Long?
+    level: Long?,
+    points: Long?
 ) {
     Surface(
         shape = RoundedCornerShape(24.dp),
@@ -422,6 +420,14 @@ private fun FriendProfileDetailsCard(
                 value = level?.toString() ?: appString(R.string.friends_profile_level_unavailable)
             )
 
+            if (points != null) {
+                FriendProfileDetailRow(
+                    icon = Icons.Default.CheckCircle,
+                    label = appString(R.string.friends_profile_points_label),
+                    value = points.toString()
+                )
+            }
+
             if (isEmergencyContact) {
                 Surface(
                     shape = RoundedCornerShape(18.dp),
@@ -447,56 +453,6 @@ private fun FriendProfileDetailsCard(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FriendProfilePointsCard(
-    points: Long
-) {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = Color(0xFFF9FBFA),
-        border = BorderStroke(1.dp, Color(0xFFE3ECE6))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Surface(
-                modifier = Modifier.size(40.dp),
-                shape = CircleShape,
-                color = Color(0xFFE9F4ED)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = Color(0xFF5E9F7A),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = appString(R.string.friends_profile_points_label),
-                    color = Color(0xFF66756F),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = points.toString(),
-                    color = Color(0xFF23333A),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
             }
         }
     }
