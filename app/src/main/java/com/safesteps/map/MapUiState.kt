@@ -34,6 +34,16 @@ data class RouteCompletionSummary(
     val durationText: String
 )
 
+data class EmergencyContactLocation(
+    val id: String,
+    val latitude: Double,
+    val longitude: Double,
+    val username: String? = null,
+    val title: String? = null,
+    val body: String? = null,
+    val receivedAtMillis: Long = System.currentTimeMillis()
+)
+
 data class MapUiState(
     val destinoSeleccionado: LatLng? = null,
     val textoOrigen: String = "",
@@ -70,6 +80,8 @@ data class MapUiState(
     val incidenciaSeleccionada: IssueResponseDTO? = null,
     val incidenciaEnEdicio: IssueResponseDTO? = null,
     val userVotes: Map<Long, Int> = emptyMap(),
+    val emergencyContactLocations: List<EmergencyContactLocation> = emptyList(),
+    val pendingEmergencyContactLocation: EmergencyContactLocation? = null,
 )
 
 val MapUiState.usesLiveNavigation: Boolean

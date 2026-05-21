@@ -12,6 +12,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -24,6 +27,7 @@ private const val BackendWebSocketTag = "BACKEND_WS"
 private const val BackendWebSocketEndpoint = "ws://nattech.fib.upc.edu:40382/ws-safesteps"
 private const val BackendReconnectDelayMillis = 5_000L
 private const val BackendStompNull = '\u0000'
+private const val BackendLocationUpdateDestination = "/app/location.update"
 
 private const val MessageTitleKey = "NEW_MESSAGE_TITLE"
 private const val MessageBodyKey = "NEW_MESSAGE_BODY"
@@ -31,6 +35,21 @@ private const val EmergencyTitleKey = "EMERGENCY_TITLE"
 private const val EmergencyBodyKey = "EMERGENCY_BODY"
 private const val FriendRequestTitleKey = "FRIEND_REQ_TITLE"
 private const val FriendRequestBodyKey = "FRIEND_REQ_BODY"
+
+data class BackendLocationSocketEvent(
+    val latitude: Double,
+    val longitude: Double,
+    val sourceKey: String? = null,
+    val username: String? = null,
+    val title: String? = null,
+    val body: String? = null
+)
+
+data class BackendEmergencySocketEvent(
+    val sourceKey: String? = null,
+    val title: String? = null,
+    val body: String? = null
+)
 
 object BackendWebSocketManager {
     private val alwaysSubscribedChannels = setOf(SocketChannelPreference.MESSAGES)
@@ -51,6 +70,15 @@ object BackendWebSocketManager {
     private var intentionalDisconnect = false
     private var desiredChannelSettings = SocketChannelSettings()
     private var subscribedChannels = mutableSetOf<SocketChannelPreference>()
+    private val _locationEvents = MutableSharedFlow<BackendLocationSocketEvent>(
+        extraBufferCapacity = 16
+    )
+    private val _emergencyEvents = MutableSharedFlow<BackendEmergencySocketEvent>(
+        extraBufferCapacity = 16
+    )
+
+    val locationEvents: SharedFlow<BackendLocationSocketEvent> = _locationEvents.asSharedFlow()
+    val emergencyEvents: SharedFlow<BackendEmergencySocketEvent> = _emergencyEvents.asSharedFlow()
 
     fun connect(
         context: Context,
@@ -98,6 +126,36 @@ object BackendWebSocketManager {
             send(buildDisconnectFrame())
             close(1000, "Backend websocket disconnected")
         }
+    }
+
+    fun sendLocationUpdate(
+        latitude: Double,
+        longitude: Double
+    ): Boolean {
+        if (!latitude.isFinite() || !longitude.isFinite()) {
+            return false
+        }
+
+        val socket = synchronized(stateLock) {
+            if (!stompConnected) {
+                null
+            } else {
+                webSocket
+            }
+        } ?: return false
+
+        val body = JSONObject()
+            .put("lat", latitude)
+            .put("lon", longitude)
+            .toString()
+
+        return socket.send(
+            buildSendFrame(
+                destination = BackendLocationUpdateDestination,
+                body = body,
+                contentType = "application/json"
+            )
+        )
     }
 
     private fun openSocket(googleId: String) {
@@ -283,41 +341,40 @@ object BackendWebSocketManager {
             }
 
             SocketChannelPreference.EMERGENCY -> {
-                if (!settings.emergencyEnabled) return
-                val title = payload.resolveTitle(EmergencyTitleKey)
-                val body = payload.resolveBody(EmergencyBodyKey)
-                val normalizedTitle = normalizeNotificationText(
-                    rawValue = title,
-                    knownKey = EmergencyTitleKey
-                )
-                val normalizedBody = normalizeNotificationText(
-                    rawValue = body,
-                    knownKey = EmergencyBodyKey
-                )
+                Log.d(BackendWebSocketTag, "Notificación de EMERGENCIA recibida (raw): ${frame.body}")
+
+                val resolvedTitle = payload.resolveTitle(EmergencyTitleKey)
+                val resolvedBody = payload.resolveBody(EmergencyBodyKey)
+                val resolvedUsername = payload.root?.optString("data")?.takeIf { it.isNotBlank() && it != "null" }
+                    ?: payload.resolveUsername()
+
                 showIncomingEmergencyNotification(
                     context = context,
-                    title = normalizedTitle,
-                    body = normalizedBody
+                    title = resolvedTitle,
+                    body = resolvedBody,
+                    senderName = resolvedUsername,
+                    titleKey = payload.resolveTitleKey(),
+                    bodyKey = payload.resolveBodyKey()
+                )
+                _emergencyEvents.tryEmit(
+                    BackendEmergencySocketEvent(
+                        sourceKey = payload.resolveSourceKey(),
+                        title = resolvedTitle,
+                        body = resolvedBody
+                    )
                 )
                 showEmergencyBanner(context, normalizedTitle, normalizedBody)
             }
 
             SocketChannelPreference.FRIEND_REQUESTS -> {
-                if (!settings.friendRequestsEnabled) return
-                val title = payload.resolveTitle(FriendRequestTitleKey)
-                val body = payload.resolveBody(FriendRequestBodyKey)
-                val normalizedTitle = normalizeNotificationText(
-                    rawValue = title,
-                    knownKey = FriendRequestTitleKey
-                )
-                val normalizedBody = normalizeNotificationText(
-                    rawValue = body,
-                    knownKey = FriendRequestBodyKey
-                )
+                val resolvedTitle = payload.resolveTitle(FriendRequestTitleKey)
+                val resolvedBody = payload.resolveBody(FriendRequestBodyKey)
                 showIncomingFriendRequestNotification(
                     context = context,
-                    title = normalizedTitle,
-                    body = normalizedBody
+                    title = resolvedTitle,
+                    body = resolvedBody,
+                    senderName = payload.resolveFriendRequestActorName(),
+                    status = payload.resolveFriendRequestStatus()
                 )
                 showFriendRequestBanner(context, normalizedTitle, normalizedBody)
             }
@@ -325,24 +382,21 @@ object BackendWebSocketManager {
             SocketChannelPreference.LOCATION -> {
                 if (!settings.locationEnabled) return
                 val coordinates = payload.extractCoordinates()
-                val title = payload.resolveTitle(null)
-                val body = payload.resolveBody(null)
-                val normalizedTitle = normalizeNotificationText(
-                    rawValue = title,
-                    knownKey = null
-                )
-                val normalizedBody = normalizeNotificationText(
-                    rawValue = body,
-                    knownKey = null
-                )
-                showIncomingLocationNotification(
-                    context = context,
-                    title = normalizedTitle,
-                    body = normalizedBody,
-                    latitude = coordinates?.latitude,
-                    longitude = coordinates?.longitude
-                )
-                showLocationBanner(context, normalizedTitle, normalizedBody, coordinates)
+                val resolvedUsername = payload.resolveUsername()
+                val resolvedTitle = payload.resolveTitle(null)
+                val resolvedBody = payload.resolveBody(null)
+                coordinates?.let {
+                    _locationEvents.tryEmit(
+                        BackendLocationSocketEvent(
+                            latitude = it.latitude,
+                            longitude = it.longitude,
+                            sourceKey = payload.resolveSourceKey(),
+                            username = resolvedUsername,
+                            title = resolvedTitle,
+                            body = resolvedBody
+                        )
+                    )
+                }
             }
 
         }
@@ -519,6 +573,22 @@ object BackendWebSocketManager {
         }
     }
 
+    private fun buildSendFrame(
+        destination: String,
+        body: String,
+        contentType: String? = null
+    ): String {
+        return buildString {
+            append("SEND\n")
+            append("destination:$destination\n")
+            contentType?.let { append("content-type:$it\n") }
+            append("content-length:${body.toByteArray(Charsets.UTF_8).size}\n")
+            append("\n")
+            append(body)
+            append(BackendStompNull)
+        }
+    }
+
     private fun buildUnsubscribeFrame(subscriptionId: String): String {
         return buildString {
             append("UNSUBSCRIBE\n")
@@ -603,23 +673,28 @@ object BackendWebSocketManager {
         private val dataObject: JSONObject?
             get() = root?.optJSONObject("data")
 
+        fun resolveTitleKey(): String? {
+            return root?.optString("titleKey")
+                ?.takeIf { it.isMeaningfulPayloadText() }
+        }
+
+        fun resolveBodyKey(): String? {
+            return root?.optString("bodyKey")
+                ?.takeIf { it.isMeaningfulPayloadText() }
+        }
+
         fun resolveTitle(defaultKey: String?): String? {
             val directTitle = sequenceOf(root, dataObject)
                 .mapNotNull { objectNode ->
                     objectNode?.optString("title")
-                        ?.takeIf { it.isNotBlank() }
+                        ?.takeIf { it.isMeaningfulPayloadText() }
                 }
                 .firstOrNull()
             if (directTitle != null) {
                 return directTitle
             }
 
-            val titleKey = sequenceOf(root, dataObject)
-                .mapNotNull { objectNode ->
-                    objectNode?.optString("titleKey")
-                        ?.takeIf { it.isNotBlank() }
-                }
-                .firstOrNull()
+            val titleKey = resolveTitleKey()
                 ?: return null
 
             return titleKey.takeUnless { it == defaultKey }
@@ -629,32 +704,113 @@ object BackendWebSocketManager {
             val directBody = sequenceOf(root, dataObject)
                 .mapNotNull { objectNode ->
                     objectNode?.optString("body")
-                        ?.takeIf { it.isNotBlank() }
+                        ?.takeIf { it.isMeaningfulPayloadText() }
                 }
                 .firstOrNull()
             if (directBody != null) {
                 return directBody
             }
 
-            val bodyKey = sequenceOf(root, dataObject)
-                .mapNotNull { objectNode ->
-                    objectNode?.optString("bodyKey")
-                        ?.takeIf { it.isNotBlank() }
-                }
-                .firstOrNull()
+            val bodyKey = resolveBodyKey()
                 ?: return null
 
             return bodyKey.takeUnless { it == defaultKey }
         }
 
-        fun extractCoordinates(): Coordinates? {
-            val candidates = listOfNotNull(
-                dataObject,
-                root?.optJSONObject("coords"),
-                root?.optJSONObject("location"),
-                root
+        fun resolveSourceKey(): String? {
+            val candidateKeys = listOf(
+                "googleId",
+                "userId",
+                "senderGoogleId",
+                "contactGoogleId",
+                "username"
             )
 
+            return sequenceOf(dataObject, root)
+                .flatMap { objectNode ->
+                    candidateKeys.asSequence().mapNotNull { key ->
+                        objectNode?.optString(key)
+                            ?.takeIf { it.isMeaningfulPayloadText() }
+                    }
+                }
+                .firstOrNull()
+        }
+
+        fun resolveUsername(): String? {
+            val candidateKeys = listOf(
+                "username",
+                "userName",
+                "displayName",
+                "name"
+            )
+
+            return sequenceOf(
+                dataObject,
+                dataObject?.optJSONObject("payload"),
+                root,
+                root?.optJSONObject("payload")
+            )
+                .flatMap { objectNode ->
+                    candidateKeys.asSequence().mapNotNull { key ->
+                        objectNode?.optString(key)
+                            ?.takeIf { it.isMeaningfulPayloadText() }
+                    }
+                }
+                .firstOrNull()
+        }
+
+        fun resolveFriendRequestActorName(): String? {
+            val candidateKeys = listOf(
+                "fromUser",
+                "fromUsername",
+                "fromDisplayName",
+                "senderName",
+                "senderUsername",
+                "username",
+                "userName",
+                "displayName",
+                "name"
+            )
+
+            return sequenceOf(
+                dataObject,
+                dataObject?.optJSONObject("payload"),
+                root,
+                root?.optJSONObject("payload")
+            )
+                .flatMap { objectNode ->
+                    candidateKeys.asSequence().mapNotNull { key ->
+                        objectNode?.optString(key)
+                            ?.takeIf { it.isMeaningfulPayloadText() }
+                    }
+                }
+                .firstOrNull()
+        }
+
+        fun resolveFriendRequestStatus(): String? {
+            val candidateKeys = listOf(
+                "status",
+                "friendshipStatus",
+                "requestStatus"
+            )
+
+            return sequenceOf(
+                dataObject,
+                dataObject?.optJSONObject("payload"),
+                root,
+                root?.optJSONObject("payload")
+            )
+                .flatMap { objectNode ->
+                    candidateKeys.asSequence().mapNotNull { key ->
+                        objectNode?.optString(key)
+                            ?.takeIf { it.isMeaningfulPayloadText() }
+                    }
+                }
+                .firstOrNull()
+        }
+
+        fun extractCoordinates(): Coordinates? {
+            val candidates = candidateObjects(dataObject) + candidateObjects(root)
             for (candidate in candidates) {
                 parseCoordinates(candidate)?.let { return it }
             }
@@ -662,49 +818,25 @@ object BackendWebSocketManager {
             return null
         }
 
-        fun extractChatId(): Long? {
-            val candidates = listOfNotNull(dataObject, root)
+        private fun candidateObjects(objectNode: JSONObject?): List<JSONObject> {
+            if (objectNode == null) {
+                return emptyList()
+            }
 
-            for (candidate in candidates) {
-                if (!candidate.has("chatId")) {
-                    continue
+            val nestedKeys = listOf("coord", "coords", "coordinates", "location", "payload")
+            val locationKeys = listOf("coord", "coords", "coordinates", "location")
+
+            return buildList {
+                add(objectNode)
+                nestedKeys.forEach { key ->
+                    objectNode.optJSONObject(key)?.let { nested ->
+                        add(nested)
+                        locationKeys.forEach { nestedLocationKey ->
+                            nested.optJSONObject(nestedLocationKey)?.let(::add)
+                        }
+                    }
                 }
-                val chatId = candidate.optLong("chatId", -1L)
-                if (chatId > 0L) {
-                    return chatId
-                }
             }
-
-            return null
-        }
-
-        fun extractEventType(): String? {
-            val candidates = listOfNotNull(dataObject, root)
-            val keys = listOf("eventType", "type", "event", "action", "titleKey")
-            for (c in candidates) for (k in keys) {
-                val v = c.optString(k, "").trim()
-                if (v.isNotBlank()) return v
-            }
-            return null
-        }
-
-        fun extractUsername(): String? {
-            val candidates = listOfNotNull(dataObject, root)
-            val keys = listOf("username", "targetUsername", "userName", "user")
-            for (c in candidates) for (k in keys) {
-                val v = c.optString(k, "").trim()
-                if (v.isNotBlank()) return v
-            }
-            return null
-        }
-
-        fun extractGroupName(): String? {
-            val candidates = listOfNotNull(dataObject, root)
-            for (c in candidates) {
-                val v = c.optString("groupName", "").trim().ifBlank { c.optString("name", "").trim() }
-                if (v.isNotBlank()) return v
-            }
-            return null
         }
 
         private fun parseCoordinates(objectNode: JSONObject): Coordinates? {
@@ -739,6 +871,10 @@ object BackendWebSocketManager {
                 return BackendPayload(root = jsonObject)
             }
         }
+    }
+
+    private fun String.isMeaningfulPayloadText(): Boolean {
+        return isNotBlank() && !equals("null", ignoreCase = true)
     }
 
     private class BackendSocketListener(
