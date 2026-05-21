@@ -285,6 +285,15 @@
     <string name="friends_emergency_contact_title">Emergency contact</string>
     <string name="friends_emergency_mark_action">Add to emergency</string>
     <string name="friends_emergency_unmark_action">Remove from emergency</string>
+    <string name="friends_profile_title">Friend profile</string>
+    <string name="friends_profile_loading">Loading profile...</string>
+    <string name="friends_profile_error_title">Could not load this profile</string>
+    <string name="friends_profile_error_description">Try again in a moment to see your friend\'s updated information.</string>
+    <string name="friends_profile_level_unavailable">Level unavailable</string>
+    <string name="friends_profile_details_title">Profile information</string>
+    <string name="friends_profile_email_label">Email</string>
+    <string name="friends_profile_level_label">Level</string>
+    <string name="friends_profile_points_label">Total points</string>
 
     <string name="chat_notif_channel_name">Chat messages</string>
     <string name="chat_notif_channel_description">Notifications for incoming messages in your chats</string>

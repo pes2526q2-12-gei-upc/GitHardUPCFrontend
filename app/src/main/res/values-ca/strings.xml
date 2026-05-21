@@ -284,6 +284,15 @@
     <string name="friends_emergency_contact_title">Contacto d\'emergència</string>
     <string name="friends_emergency_mark_action">Afegir a emergència</string>
     <string name="friends_emergency_unmark_action">Treure d\'emergència</string>
+    <string name="friends_profile_title">Perfil de l\'amic</string>
+    <string name="friends_profile_loading">Carregant perfil...</string>
+    <string name="friends_profile_error_title">No s\'ha pogut carregar aquest perfil</string>
+    <string name="friends_profile_error_description">Torna-ho a provar d\'aquí a un moment per veure la informació actualitzada del teu amic.</string>
+    <string name="friends_profile_level_unavailable">Nivell no disponible</string>
+    <string name="friends_profile_details_title">Informació del perfil</string>
+    <string name="friends_profile_email_label">Correu</string>
+    <string name="friends_profile_level_label">Nivell</string>
+    <string name="friends_profile_points_label">Punts totals</string>
 
     <string name="chat_notif_channel_name">Missatges de xat</string>
     <string name="chat_notif_channel_description">Notificacions de missatges entrants als teus xats</string>

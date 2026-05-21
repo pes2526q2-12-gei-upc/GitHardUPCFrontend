@@ -1,7 +1,9 @@
 package com.safesteps.profile
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -76,10 +78,25 @@ fun FriendsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var friendPendingRemoval by remember { mutableStateOf<FriendListItemUiState?>(null) }
+    var selectedFriendProfile by remember { mutableStateOf<FriendListItemUiState?>(null) }
 
     LaunchedEffect(user.googleId) {
         viewModel.onCurrentUserChanged(user)
         viewModel.onScreenOpened()
+    }
+
+    BackHandler(enabled = selectedFriendProfile != null) {
+        selectedFriendProfile = null
+    }
+
+    val activeFriendProfile = selectedFriendProfile
+    if (activeFriendProfile != null) {
+        FriendProfileScreen(
+            friend = activeFriendProfile,
+            onBack = { selectedFriendProfile = null },
+            modifier = modifier
+        )
+        return
     }
 
     Box(
@@ -163,6 +180,7 @@ fun FriendsScreen(
                         ) { friend ->
                             FriendItemCard(
                                 friend = friend,
+                                onOpenProfileClick = { selectedFriendProfile = friend },
                                 onEmergencyContactToggleClick = {
                                     viewModel.onEmergencyContactToggleClicked(friend.googleId)
                                 },
@@ -597,6 +615,7 @@ private fun PendingFriendRequestCard(
 @Composable
 private fun FriendItemCard(
     friend: FriendListItemUiState,
+    onOpenProfileClick: () -> Unit,
     onEmergencyContactToggleClick: () -> Unit,
     onChatClick: () -> Unit,
     onRemoveClick: () -> Unit
@@ -604,6 +623,10 @@ private fun FriendItemCard(
     val isBusy = friend.isRemoving || friend.isUpdatingEmergencyContact
 
     Card(
+        modifier = Modifier.clickable(
+            enabled = !isBusy,
+            onClick = onOpenProfileClick
+        ),
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.97f)),
         border = BorderStroke(1.dp, Color(0xFFDDE8E0)),

@@ -286,6 +286,15 @@
     <string name="friends_emergency_contact_title">Contacto de emergencia</string>
     <string name="friends_emergency_mark_action">Añadir a emergencia</string>
     <string name="friends_emergency_unmark_action">Quitar de emergencia</string>
+    <string name="friends_profile_title">Perfil del amigo</string>
+    <string name="friends_profile_loading">Cargando perfil...</string>
+    <string name="friends_profile_error_title">No se ha podido cargar este perfil</string>
+    <string name="friends_profile_error_description">Vuelve a intentarlo dentro de un momento para ver la información actualizada de tu amigo.</string>
+    <string name="friends_profile_level_unavailable">Nivel no disponible</string>
+    <string name="friends_profile_details_title">Información del perfil</string>
+    <string name="friends_profile_email_label">Correo</string>
+    <string name="friends_profile_level_label">Nivel</string>
+    <string name="friends_profile_points_label">Puntos totales</string>
 
 
 
