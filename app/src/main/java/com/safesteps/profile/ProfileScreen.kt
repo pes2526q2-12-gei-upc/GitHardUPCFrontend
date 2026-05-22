@@ -78,6 +78,7 @@ import com.safesteps.i18n.LanguageSelector
 import com.safesteps.i18n.appPlural
 import com.safesteps.i18n.appString
 import com.safesteps.map.IssueType
+import com.safesteps.map.MapEventPreferences
 import com.safesteps.map.ReportIssueDialog
 import com.safesteps.notifications.SocketChannelPreference
 import com.safesteps.notifications.SocketChannelPreferences
@@ -297,12 +298,16 @@ fun ProfileScreen(
 ) {
     var isIssuesSectionExpanded by rememberSaveable { mutableStateOf(false) }
     var isNotificationSettingsExpanded by rememberSaveable { mutableStateOf(false) }
+    var isMapSettingsExpanded by rememberSaveable { mutableStateOf(false) }
     var showDeleteBanner by rememberSaveable { mutableStateOf(false) }
 
     val appContext = LocalContext.current.applicationContext
     val issuesState = rememberProfileIssuesState(userGoogleId = user.googleId)
     val socketChannelSettings by remember(appContext) {
         SocketChannelPreferences.settings(appContext)
+    }.collectAsState()
+    val mapEventSettings by remember(appContext) {
+        MapEventPreferences.settings(appContext)
     }.collectAsState()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -333,6 +338,10 @@ fun ProfileScreen(
                 onNotificationSettingsExpandedChange = {
                     isNotificationSettingsExpanded = !isNotificationSettingsExpanded
                 },
+                isMapSettingsExpanded = isMapSettingsExpanded,
+                onMapSettingsExpandedChange = {
+                    isMapSettingsExpanded = !isMapSettingsExpanded
+                },
                 onCustomizeClick = onCustomizeClick,
                 onLogout = onLogout,
                 onDeleteAccount = onDeleteAccount,
@@ -350,6 +359,20 @@ fun ProfileScreen(
                     SocketChannelPreferences.setChannelEnabled(
                         context = appContext,
                         channel = channel,
+                        enabled = enabled
+                    )
+                },
+                hideEventsDuringActiveRoute = mapEventSettings.hideEventsDuringActiveRoute,
+                onHideEventsDuringActiveRouteChange = { enabled ->
+                    MapEventPreferences.setHideEventsDuringActiveRoute(
+                        context = appContext,
+                        enabled = enabled
+                    )
+                },
+                hideEventsDuringRoutePreview = mapEventSettings.hideEventsDuringRoutePreview,
+                onHideEventsDuringRoutePreviewChange = { enabled ->
+                    MapEventPreferences.setHideEventsDuringRoutePreview(
+                        context = appContext,
                         enabled = enabled
                     )
                 }
@@ -428,6 +451,8 @@ private fun ProfileContentCard(
     onIssuesSectionExpandedChange: () -> Unit,
     isNotificationSettingsExpanded: Boolean,
     onNotificationSettingsExpandedChange: () -> Unit,
+    isMapSettingsExpanded: Boolean,
+    onMapSettingsExpandedChange: () -> Unit,
     onCustomizeClick: () -> Unit,
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit,
@@ -441,7 +466,11 @@ private fun ProfileContentCard(
     onEditIssue: (IssueResponseDTO) -> Unit,
     onDeleteIssue: (IssueResponseDTO) -> Unit,
     socketChannelSettings: SocketChannelSettings,
-    onSocketChannelEnabledChange: (SocketChannelPreference, Boolean) -> Unit
+    onSocketChannelEnabledChange: (SocketChannelPreference, Boolean) -> Unit,
+    hideEventsDuringActiveRoute: Boolean,
+    onHideEventsDuringActiveRouteChange: (Boolean) -> Unit,
+    hideEventsDuringRoutePreview: Boolean,
+    onHideEventsDuringRoutePreviewChange: (Boolean) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -500,6 +529,17 @@ private fun ProfileContentCard(
                 expanded = isNotificationSettingsExpanded,
                 onExpandedChange = onNotificationSettingsExpandedChange,
                 onChannelEnabledChange = onSocketChannelEnabledChange
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            ProfileMapSettingsSection(
+                expanded = isMapSettingsExpanded,
+                onExpandedChange = onMapSettingsExpandedChange,
+                hideEventsDuringActiveRoute = hideEventsDuringActiveRoute,
+                onHideEventsDuringActiveRouteChange = onHideEventsDuringActiveRouteChange,
+                hideEventsDuringRoutePreview = hideEventsDuringRoutePreview,
+                onHideEventsDuringRoutePreviewChange = onHideEventsDuringRoutePreviewChange
             )
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -601,6 +641,85 @@ private fun ProfileSocketSettingsSection(
                     onEnabledChange = { enabled ->
                         onChannelEnabledChange(SocketChannelPreference.FRIEND_REQUESTS, enabled)
                     }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileMapSettingsSection(
+    expanded: Boolean,
+    onExpandedChange: () -> Unit,
+    hideEventsDuringActiveRoute: Boolean,
+    onHideEventsDuringActiveRouteChange: (Boolean) -> Unit,
+    hideEventsDuringRoutePreview: Boolean,
+    onHideEventsDuringRoutePreviewChange: (Boolean) -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .border(1.dp, Color(0xFFE5ECE7), RoundedCornerShape(22.dp)),
+        shape = RoundedCornerShape(22.dp),
+        color = Color(0xFFF9FBFA)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onExpandedChange)
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = appString(R.string.profile_map_settings_title),
+                        color = Color(0xFF23333A),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = appString(R.string.profile_map_settings_subtitle),
+                        color = Color(0xFF77837D),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = Color(0xFF5C6A64)
+                )
+            }
+
+            if (expanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SocketChannelSettingRow(
+                    title = appString(R.string.profile_events_hide_started_title),
+                    description = appString(R.string.profile_events_hide_started_description),
+                    enabled = hideEventsDuringActiveRoute,
+                    onEnabledChange = onHideEventsDuringActiveRouteChange
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SocketChannelSettingRow(
+                    title = appString(R.string.profile_events_hide_preview_title),
+                    description = appString(R.string.profile_events_hide_preview_description),
+                    enabled = hideEventsDuringRoutePreview,
+                    onEnabledChange = onHideEventsDuringRoutePreviewChange
                 )
             }
         }

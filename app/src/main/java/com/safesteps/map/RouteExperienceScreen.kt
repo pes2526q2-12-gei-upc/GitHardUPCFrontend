@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.Escalator
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Security
@@ -134,7 +135,8 @@ private val poiTypeConfigs = listOf(
     PoiTypeConfig("COMISSARIA", R.plurals.poi_police_stations, Color(0xFF5F6B67), emoji = "\uD83D\uDC6E"),
     PoiTypeConfig("CAMERA", R.plurals.poi_security_cameras, Color(0xFF101010), customIcon = PoiSummaryCustomIcon.SECURITY_CAMERA),
     PoiTypeConfig("ESCALA_MECANICA", R.plurals.poi_escalators, Color(0xFF2E8B57), icon = Icons.Default.Escalator),
-    PoiTypeConfig("REFUGI_CLIMATIC", R.plurals.poi_climate_shelters, Color(0xFFE67E22), icon = Icons.Default.DeviceThermostat)
+    PoiTypeConfig("REFUGI_CLIMATIC", R.plurals.poi_climate_shelters, Color(0xFFE67E22), icon = Icons.Default.DeviceThermostat),
+    PoiTypeConfig("ESDEVENIMENT", R.plurals.poi_events, Color(0xFFB8522A), icon = Icons.Default.Event)
 )
 
 @Composable

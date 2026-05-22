@@ -139,13 +139,19 @@ fun normalizarResposta(
         poisJson.forEach { element ->
             val obj = element.asJsonObject
             val name = obj["name"]
+            val description = obj["description"]
             puntsInteresList.add(
                 PuntInteres(
                     id = UUID.randomUUID().toString(),
                     tipus = obj["type"].asString,
                     latitud = obj["lat"].asDouble,
                     longitud = obj["lon"].asDouble,
-                    nom = if (obj.has("name") && !name.isJsonNull) name.asString else null
+                    nom = if (obj.has("name") && !name.isJsonNull) name.asString else null,
+                    descripcio = if (obj.has("description") && !description.isJsonNull) {
+                        description.asString
+                    } else {
+                        null
+                    }
                 )
             )
         }

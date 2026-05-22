@@ -195,6 +195,11 @@
     <string name="issue_location_fallback">Ubicaci&#243;n de la incidencia</string>
     <string name="issue_location_locked_message">La ubicaci&#243;n no se puede modificar al editar una incidencia.</string>
     <string name="issue_report_outside_barcelona">No puedes reportar incidencias fuera de Barcelona usando tu ubicaci&#243;n actual.</string>
+    <string name="event_description_title">Descripci&#243;n</string>
+    <string name="event_description_empty">Este evento no tiene descripci&#243;n.</string>
+    <string name="event_route_action">Ir al evento</string>
+    <string name="event_highlight_title">Evento cercano en la ruta</string>
+    <string name="event_highlight_subtitle">Consulta sus detalles e inicia la navegación hasta este evento cuando quieras.</string>
     <string name="map_location_selection_restricted">Solo se permite seleccionar ubicaciones dentro del &#225;rea de Barcelona.</string>
     <string name="profile_my_issues_title">Mis incidencias</string>
     <string name="profile_my_issues_subtitle">Edita o elimina las incidencias que has reportado.</string>
@@ -220,6 +225,14 @@
     <string name="profile_socket_friend_requests_description">Recibe notificaciones de solicitudes de amistad y otras actualizaciones relacionadas con tus amistades.</string>
     <string name="profile_socket_location_title">Ubicaci&#243;n en tiempo real</string>
     <string name="profile_socket_location_description">Recibe la ubicaci&#243;n en tiempo real de un contacto que te tiene guardado como contacto de emergencia cuando pide ayuda.</string>
+    <string name="profile_map_settings_title">Preferencias del mapa</string>
+    <string name="profile_map_settings_subtitle">Ajusta c&#243;mo se muestran los eventos de las rutas en este dispositivo.</string>
+    <string name="profile_events_toggle_title">Mostrar eventos de ruta</string>
+    <string name="profile_events_toggle_description">Muestra en el mapa los eventos cercanos que devuelve el cálculo de ruta y permite abrir sus detalles.</string>
+    <string name="profile_events_hide_started_title">Ocultar eventos al iniciar la ruta</string>
+    <string name="profile_events_hide_started_description">Muestra los eventos en la previsualización y ocúltalos al iniciar la ruta.</string>
+    <string name="profile_events_hide_preview_title">Ocultar eventos al calcular la ruta</string>
+    <string name="profile_events_hide_preview_description">Oculta los eventos solo durante la previsualización de la ruta calculada, antes de iniciar la navegación.</string>
     <string name="retry_action">Reintentar</string>
     <string name="edit_action">Editar</string>
     <string name="delete_action">Eliminar</string>
@@ -458,6 +471,11 @@
         <item quantity="one">%d refugio clim&#225;tico</item>
         <item quantity="many">%d refugios clim&#225;ticos</item>
         <item quantity="other">%d refugios clim&#225;ticos</item>
+    </plurals>
+    <plurals name="poi_events">
+        <item quantity="one">%d evento</item>
+        <item quantity="many">%d eventos</item>
+        <item quantity="other">%d eventos</item>
     </plurals>
     <plurals name="profile_filter_count">
         <item quantity="one">%d filtro</item>

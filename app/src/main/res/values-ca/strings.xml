@@ -193,6 +193,11 @@
     <string name="issue_location_fallback">Ubicació de la incidència</string>
     <string name="issue_location_locked_message">La ubicaci&#243; no es pot modificar en editar una incidència.</string>
     <string name="issue_report_outside_barcelona">No pots reportar incidències fora de Barcelona usant la teva ubicació actual.</string>
+    <string name="event_description_title">Descripció</string>
+    <string name="event_description_empty">Aquest esdeveniment no té descripció.</string>
+    <string name="event_route_action">Anar a l\'esdeveniment</string>
+    <string name="event_highlight_title">Esdeveniment proper a la ruta</string>
+    <string name="event_highlight_subtitle">Consulta\'n els detalls i inicia la navegació cap a aquest esdeveniment quan vulguis.</string>
     <string name="map_location_selection_restricted">Només es permet seleccionar ubicacions dins de l\'&#225;rea de Barcelona.</string>
     <string name="profile_my_issues_title">Les meves incidències</string>
     <string name="profile_my_issues_subtitle">Edita o elimina les incidències que has reportat.</string>
@@ -218,6 +223,14 @@
     <string name="profile_socket_friend_requests_description">Rep notificacions de sol·licituds d\'amistat i altres actualitzacions relacionades amb les teves amistats.</string>
     <string name="profile_socket_location_title">Ubicació en temps real</string>
     <string name="profile_socket_location_description">Rep la ubicació en temps real d\'un contacte que et té guardat com a contacte d\'emergència quan demana ajuda.</string>
+    <string name="profile_map_settings_title">Preferències del mapa</string>
+    <string name="profile_map_settings_subtitle">Ajusta com es mostren els esdeveniments de les rutes en aquest dispositiu.</string>
+    <string name="profile_events_toggle_title">Mostrar esdeveniments de ruta</string>
+    <string name="profile_events_toggle_description">Mostra al mapa els esdeveniments propers que retorna el càlcul de ruta i permet obrir-ne els detalls.</string>
+    <string name="profile_events_hide_started_title">Amagar esdeveniments en iniciar la ruta</string>
+    <string name="profile_events_hide_started_description">Mostra els esdeveniments a la previsualització i amaga\'ls en iniciar la ruta.</string>
+    <string name="profile_events_hide_preview_title">Amagar esdeveniments en calcular la ruta</string>
+    <string name="profile_events_hide_preview_description">Amaga els esdeveniments només durant la previsualització de la ruta calculada, abans d\'iniciar la navegació.</string>
     <string name="retry_action">Reintentar</string>
     <string name="edit_action">Editar</string>
     <string name="delete_action">Eliminar</string>
@@ -452,6 +465,10 @@
     <plurals name="poi_climate_shelters">
         <item quantity="one">%d refugi climàtic</item>
         <item quantity="other">%d refugis climàtics</item>
+    </plurals>
+    <plurals name="poi_events">
+        <item quantity="one">%d esdeveniment</item>
+        <item quantity="other">%d esdeveniments</item>
     </plurals>
     <plurals name="profile_filter_count">
         <item quantity="one">%d filtre</item>

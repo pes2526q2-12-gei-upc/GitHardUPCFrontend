@@ -141,6 +141,7 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
         "CAMERA" -> Triple("", white, cameraBlack)
         "ESCALA_MECANICA" -> Triple("", "#5C6F7B".toColorInt(), white)
         "REFUGI_CLIMATIC" -> Triple("", "#F28C28".toColorInt(), white)
+        "ESDEVENIMENT" -> Triple("", "#B8522A".toColorInt(), white)
         else -> Triple("\uD83D\uDCCD", "#C86A37".toColorInt(), white)
     }
 
@@ -182,6 +183,7 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
         "ESCALA_MECANICA" -> drawEscalatorSymbol(canvas, size)
         "REFUGI_CLIMATIC" -> drawThermometerSymbol(canvas, size)
         "CAMERA" -> drawSecurityCameraSymbol(canvas, size, bgColor, foregroundColor)
+        "ESDEVENIMENT" -> drawEventCalendarSymbol(canvas, size, foregroundColor)
         else -> {
             val y = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
             canvas.drawText(emoji, size / 2f, y, textPaint)
@@ -189,6 +191,80 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     }
 
     return IconFactory.getInstance(context).fromBitmap(bitmap)
+}
+
+private fun drawEventCalendarSymbol(
+    canvas: Canvas,
+    size: Int,
+    symbolColor: Int
+) {
+    val cardRect = RectF(
+        size * 0.25f,
+        size * 0.27f,
+        size * 0.75f,
+        size * 0.72f
+    )
+    val corner = size * 0.07f
+
+    val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = symbolColor
+        style = Paint.Style.STROKE
+        strokeWidth = size * 0.055f
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
+    }
+    val barPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = symbolColor
+        style = Paint.Style.FILL
+    }
+    val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = symbolColor
+        style = Paint.Style.FILL
+    }
+
+    canvas.drawRoundRect(cardRect, corner, corner, framePaint)
+
+    val topBarHeight = size * 0.11f
+    canvas.drawRoundRect(
+        RectF(
+            cardRect.left,
+            cardRect.top,
+            cardRect.right,
+            cardRect.top + topBarHeight
+        ),
+        corner,
+        corner,
+        barPaint
+    )
+
+    val ringStroke = size * 0.045f
+    val leftRingX = cardRect.left + size * 0.11f
+    val rightRingX = cardRect.right - size * 0.11f
+    val ringTop = cardRect.top - size * 0.06f
+    val ringBottom = cardRect.top + size * 0.02f
+    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = symbolColor
+        style = Paint.Style.STROKE
+        strokeWidth = ringStroke
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(leftRingX, ringTop, leftRingX, ringBottom, ringPaint)
+    canvas.drawLine(rightRingX, ringTop, rightRingX, ringBottom, ringPaint)
+
+    val dotRadius = size * 0.038f
+    val startX = cardRect.left + size * 0.12f
+    val startY = cardRect.top + size * 0.22f
+    val step = size * 0.12f
+    repeat(2) { row ->
+        repeat(2) { column ->
+            canvas.drawCircle(
+                startX + column * step,
+                startY + row * step,
+                dotRadius,
+                dotPaint
+            )
+        }
+    }
 }
 
 private fun drawSecurityCameraSymbol(

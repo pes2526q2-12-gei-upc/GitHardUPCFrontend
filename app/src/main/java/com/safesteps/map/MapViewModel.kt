@@ -25,7 +25,9 @@ import com.safesteps.data.completarRutaEnBackend
 import com.safesteps.data.crearIncidencia
 import com.safesteps.data.eliminarIncidencia
 import com.safesteps.data.eliminarVotPerId
+import com.safesteps.data.esEsdeveniment
 import com.safesteps.data.getAllIssues
+import com.safesteps.data.nomMostrat
 import com.safesteps.data.obtenirCoordenadesRuta
 import com.safesteps.data.obtenirVotsUsuari
 import com.safesteps.data.votarIncidencia
@@ -365,50 +367,63 @@ class MapViewModel(
     ) {
         if (_uiState.value.calculantRuta) return
 
-        if (!isInsideBarcelonaArea(origenLat, origenLong)) {
-            _uiState.update { it.copy(navigationNotice = "L'inici de la ruta ha de ser dins de Barcelona") }
+        if (!validateRouteEndpoints(origenLat = origenLat, origenLong = origenLong, destiLat = destiLat, destiLong = destiLong)) {
             return
         }
 
-        if (!isInsideBarcelonaArea(destiLat, destiLong)) {
-            _uiState.update { it.copy(navigationNotice = "El destí de la ruta ha de ser dins de Barcelona") }
-            return
-        }
-
-        val prioridad = _uiState.value.prioridadSeleccionada
-        val routeType = routeTypeFor(prioridad)
-        Log.d("PRUEBA_RUTA", "Llamando a calcularRuta. Prioridad actual: $prioridad")
-
-        _uiState.update { it.copy(calculantRuta = true) }
         viewModelScope.launch {
-            try {
-                val infoRuta = obtenirCoordenadesRuta(
-                    RouteCoordinatesRequest(
-                        googleId = currentGoogleId,
-                        origenLong = origenLong,
-                        origenLat = origenLat,
-                        destiLong = destiLong,
-                        destiLat = destiLat,
-                        nRoutes = 1,
-                        routeType = routeType
-                    )
-                )
+            calculateRouteInternal(
+                origenLong = origenLong,
+                origenLat = origenLat,
+                destiLong = destiLong,
+                destiLat = destiLat
+            )
+        }
+    }
 
-                val coordenadas = infoRuta.first
-                val tiempoDistancia = infoRuta.second
-                val puntosInteres = infoRuta.third
+    fun calcularIIniciarRutaCapAPunt(punt: PuntInteres) {
+        if (_uiState.value.calculantRuta || !punt.esEsdeveniment()) {
+            return
+        }
 
-                val routeDurationMinutes = resolveRouteDurationMinutes(tiempoDistancia)
-                applyCalculatedRoute(
-                    coordenadas = coordenadas,
-                    tiempoDistancia = tiempoDistancia,
-                    routeDurationMinutes = routeDurationMinutes,
-                    puntosInteres = puntosInteres
-                )
-            } catch (e: Exception) {
-                Log.e("ROUTE_VM", "Error calculant la ruta: ${e.message}")
-            } finally {
-                _uiState.update { it.copy(calculantRuta = false) }
+        val currentState = _uiState.value
+        val origen = routeOriginForState(currentState)
+            ?.let { coordenada -> LatLng(coordenada.lat, coordenada.lon) }
+            ?: return
+        val desti = LatLng(punt.latitud, punt.longitud)
+
+        if (!validateRouteEndpoints(
+                origenLat = origen.latitude,
+                origenLong = origen.longitude,
+                destiLat = desti.latitude,
+                destiLong = desti.longitude
+            )
+        ) {
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                destinoSeleccionado = desti,
+                textoDestino = punt.nomMostrat(),
+                mostrarOrigen = true,
+                adrecesSuggerides = emptyList(),
+                campActiu = textField.NONE,
+                isTyping = false,
+                puntInteresSeleccionat = null
+            )
+        }
+
+        viewModelScope.launch {
+            val routeWasCalculated = calculateRouteInternal(
+                origenLong = origen.longitude,
+                origenLat = origen.latitude,
+                destiLong = desti.longitude,
+                destiLat = desti.latitude
+            )
+
+            if (routeWasCalculated) {
+                iniciarRuta()
             }
         }
     }
@@ -629,6 +644,70 @@ class MapViewModel(
             RoutePriority.ACCESSIBILITY -> RouteType.CONFORT
             RoutePriority.HEAT -> RouteType.CLIMA
             RoutePriority.PERSONALIZED -> RouteType.PERSONALITZAT
+        }
+    }
+
+    private fun validateRouteEndpoints(
+        origenLat: Double,
+        origenLong: Double,
+        destiLat: Double,
+        destiLong: Double
+    ): Boolean {
+        if (!isInsideBarcelonaArea(origenLat, origenLong)) {
+            _uiState.update { it.copy(navigationNotice = "L'inici de la ruta ha de ser dins de Barcelona") }
+            return false
+        }
+
+        if (!isInsideBarcelonaArea(destiLat, destiLong)) {
+            _uiState.update { it.copy(navigationNotice = "El destí de la ruta ha de ser dins de Barcelona") }
+            return false
+        }
+
+        return true
+    }
+
+    private suspend fun calculateRouteInternal(
+        origenLong: Double,
+        origenLat: Double,
+        destiLong: Double,
+        destiLat: Double
+    ): Boolean {
+        val prioridad = _uiState.value.prioridadSeleccionada
+        val routeType = routeTypeFor(prioridad)
+        Log.d("PRUEBA_RUTA", "Llamando a calcularRuta. Prioridad actual: $prioridad")
+
+        _uiState.update { it.copy(calculantRuta = true) }
+
+        return try {
+            val infoRuta = obtenirCoordenadesRuta(
+                RouteCoordinatesRequest(
+                    googleId = currentGoogleId,
+                    origenLong = origenLong,
+                    origenLat = origenLat,
+                    destiLong = destiLong,
+                    destiLat = destiLat,
+                    nRoutes = 1,
+                    routeType = routeType
+                )
+            )
+
+            val coordenadas = infoRuta.first
+            val tiempoDistancia = infoRuta.second
+            val puntosInteres = infoRuta.third
+
+            val routeDurationMinutes = resolveRouteDurationMinutes(tiempoDistancia)
+            applyCalculatedRoute(
+                coordenadas = coordenadas,
+                tiempoDistancia = tiempoDistancia,
+                routeDurationMinutes = routeDurationMinutes,
+                puntosInteres = puntosInteres
+            )
+            true
+        } catch (e: Exception) {
+            Log.e("ROUTE_VM", "Error calculant la ruta: ${e.message}")
+            false
+        } finally {
+            _uiState.update { it.copy(calculantRuta = false) }
         }
     }
 
@@ -1007,7 +1086,12 @@ class MapViewModel(
     }
 
     fun selectIssue(incidencia: IssueResponseDTO?) {
-        _uiState.update { it.copy(incidenciaSeleccionada = incidencia) }
+        _uiState.update {
+            it.copy(
+                incidenciaSeleccionada = incidencia,
+                puntInteresSeleccionat = if (incidencia != null) null else it.puntInteresSeleccionat
+            )
+        }
     }
 
     fun voteIssue(incidenciaId: Long, esReal: Boolean, googleId: String) {

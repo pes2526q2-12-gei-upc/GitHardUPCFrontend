@@ -194,6 +194,11 @@
     <string name="issue_location_fallback">Incident location</string>
     <string name="issue_location_locked_message">The location cannot be changed when editing an incident.</string>
     <string name="issue_report_outside_barcelona">You cannot report incidents outside Barcelona using your current location.</string>
+    <string name="event_description_title">Description</string>
+    <string name="event_description_empty">This event has no description.</string>
+    <string name="event_route_action">Go to event</string>
+    <string name="event_highlight_title">Nearby route event</string>
+    <string name="event_highlight_subtitle">Check the details and start navigation to this event whenever you want.</string>
     <string name="map_location_selection_restricted">You can only select locations within the Barcelona area.</string>
     <string name="profile_my_issues_title">My incidents</string>
     <string name="profile_my_issues_subtitle">Edit or delete the incidents you have reported.</string>
@@ -219,6 +224,14 @@
     <string name="profile_socket_friend_requests_description">Receive notifications for friend requests and other updates related to your friendships.</string>
     <string name="profile_socket_location_title">Real-time location</string>
     <string name="profile_socket_location_description">Receive the real-time location of a contact who has saved you as an emergency contact when they ask for help.</string>
+    <string name="profile_map_settings_title">Map preferences</string>
+    <string name="profile_map_settings_subtitle">Adjust how route events are shown on this device.</string>
+    <string name="profile_events_toggle_title">Show route events</string>
+    <string name="profile_events_toggle_description">Display nearby events returned by the route calculator and let you open their details on the map.</string>
+    <string name="profile_events_hide_started_title">Hide events after starting the route</string>
+    <string name="profile_events_hide_started_description">Show events in route preview and hide them when navigation starts.</string>
+    <string name="profile_events_hide_preview_title">Hide events during route preview</string>
+    <string name="profile_events_hide_preview_description">Hide events only while previewing the calculated route before navigation starts.</string>
     <string name="retry_action">Retry</string>
     <string name="edit_action">Edit</string>
     <string name="delete_action">Delete</string>
@@ -453,6 +466,10 @@
     <plurals name="poi_climate_shelters">
         <item quantity="one">%d climate shelter</item>
         <item quantity="other">%d climate shelters</item>
+    </plurals>
+    <plurals name="poi_events">
+        <item quantity="one">%d event</item>
+        <item quantity="other">%d events</item>
     </plurals>
     <plurals name="profile_filter_count">
         <item quantity="one">%d filter</item>

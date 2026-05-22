@@ -3,9 +3,16 @@
 package com.safesteps.map
 
 import org.maplibre.android.annotations.Icon
+import org.maplibre.android.annotations.Marker
 import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
+
+internal data class LegacyMarkerSelection(
+    val position: LatLng,
+    val title: String?,
+    val snippet: String?
+)
 
 internal fun clearLegacyAnnotations(map: MapLibreMap) {
     map.clear()
@@ -15,7 +22,8 @@ internal fun addLegacyMarker(
     map: MapLibreMap,
     position: LatLng,
     title: String? = null,
-    icon: Icon? = null
+    icon: Icon? = null,
+    snippet: String? = null
 ) {
     val markerOptions = MarkerOptions().position(position)
 
@@ -27,14 +35,26 @@ internal fun addLegacyMarker(
         markerOptions.icon(icon)
     }
 
+    if (snippet != null) {
+        markerOptions.snippet(snippet)
+    }
+
     map.addMarker(markerOptions)
 }
 
 internal fun setLegacyMarkerClickListener(
     map: MapLibreMap,
-    onMarkerClick: (LatLng) -> Boolean
+    onMarkerClick: (LegacyMarkerSelection) -> Boolean
 ) {
     map.setOnMarkerClickListener { marker ->
-        onMarkerClick(marker.position)
+        onMarkerClick(marker.toLegacyMarkerSelection())
     }
+}
+
+private fun Marker.toLegacyMarkerSelection(): LegacyMarkerSelection {
+    return LegacyMarkerSelection(
+        position = position,
+        title = title,
+        snippet = snippet
+    )
 }

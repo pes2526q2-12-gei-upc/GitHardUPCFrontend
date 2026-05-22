@@ -54,6 +54,8 @@ import com.safesteps.data.PuntInteres
 import com.safesteps.data.RouteCompletionResponse
 import com.safesteps.data.alternarEstadoEmergenciaUsuario
 import com.safesteps.data.cargarContactosEmergenciaUsuario
+import com.safesteps.data.esEsdeveniment
+import com.safesteps.data.nomMostrat
 import com.safesteps.data.obtenerEstadoEmergenciaUsuario
 import com.safesteps.domain.RoutePriority
 import com.safesteps.i18n.AppLanguage
@@ -363,6 +365,17 @@ private fun MapScreenDialogs(
             onNavigateToLogin = onLoginClick
         )
     }
+
+    uiState.puntInteresSeleccionat
+        ?.takeIf(PuntInteres::esEsdeveniment)
+        ?.let { event ->
+            EventInfoDialog(
+                event = event,
+                canStartRoute = uiState.origenSeleccionado != null || uiState.ultimaUbicacion != null,
+                onDismiss = { viewModel.onPuntInteresSeleccionat(null) },
+                onRouteToEvent = { viewModel.calcularIIniciarRutaCapAPunt(event) }
+            )
+        }
 }
 
 @Composable
@@ -761,6 +774,32 @@ fun MapLibreScreen(
     )
     val mapView = rememberMapViewWithLifecycle()
     val uiState by viewModel.uiState.collectAsState()
+    val eventSettings by remember(context.applicationContext) {
+        MapEventPreferences.settings(context.applicationContext)
+    }.collectAsState()
+    val shouldHideRouteEvents = remember(uiState, eventSettings) {
+        resolveShouldHideRouteEvents(
+            uiState = uiState,
+            settings = eventSettings
+        )
+    }
+    val displayedPuntsInteres = remember(uiState.puntsInteres, shouldHideRouteEvents) {
+        filterDisplayedPuntsInteres(
+            puntsInteres = uiState.puntsInteres,
+            hideRouteEvents = shouldHideRouteEvents
+        )
+    }
+    val displayedSelectedPoi = remember(uiState.puntInteresSeleccionat, displayedPuntsInteres) {
+        uiState.puntInteresSeleccionat?.takeIf { selectedPoi ->
+            displayedPuntsInteres.any { it.id == selectedPoi.id }
+        }
+    }
+    val displayedUiState = remember(uiState, displayedPuntsInteres, displayedSelectedPoi) {
+        uiState.copy(
+            puntsInteres = displayedPuntsInteres,
+            puntInteresSeleccionat = displayedSelectedPoi
+        )
+    }
     LaunchedEffect(pendingRoute) {
         if (pendingRoute != null) {
             viewModel.calcularRuta(
@@ -769,6 +808,11 @@ fun MapLibreScreen(
                 destiLong = pendingRoute.destLng,
                 destiLat = pendingRoute.destLat
             )
+        }
+    }
+    LaunchedEffect(shouldHideRouteEvents, uiState.puntInteresSeleccionat?.id) {
+        if (shouldHideRouteEvents && uiState.puntInteresSeleccionat?.esEsdeveniment() == true) {
+            viewModel.onPuntInteresSeleccionat(null)
         }
     }
     val routeCompletionResult = viewModel.routeResult
@@ -877,7 +921,7 @@ fun MapLibreScreen(
 
     MapScreenEffects(
         currentLanguage = currentLanguage,
-        uiState = uiState,
+        uiState = displayedUiState,
         renderContext = renderContext,
         mapNotificationTitle = strings.mapNotificationTitle,
         callbacks = MapScreenEffectCallbacks(
@@ -888,7 +932,7 @@ fun MapLibreScreen(
 
     MapScreenContent(
         modifier = modifier,
-        uiState = uiState,
+        uiState = displayedUiState,
         viewModel = viewModel,
         mapView = mapView,
         currentUser = currentUser,
@@ -1803,13 +1847,16 @@ private fun configurePoiSelection(
     viewModel: MapViewModel,
     uiStateProvider: () -> MapUiState
 ) {
-    setLegacyMarkerClickListener(map) { markerPosition ->
+    setLegacyMarkerClickListener(map) { markerSelection ->
         val uiState = uiStateProvider()
 
-        val clickedIssue = uiState.issues.find {
-            it.coordinates.lat == markerPosition.latitude &&
-                    it.coordinates.lon == markerPosition.longitude
-        }
+        val clickedIssue = markerSelection.snippet
+            ?.toLongOrNull()
+            ?.let { issueId -> uiState.issues.find { it.id == issueId } }
+            ?: uiState.issues.find {
+                it.coordinates.lat == markerSelection.position.latitude &&
+                    it.coordinates.lon == markerSelection.position.longitude
+            }
 
         if (clickedIssue != null) {
             viewModel.selectIssue(clickedIssue)
@@ -1818,11 +1865,11 @@ private fun configurePoiSelection(
 
         val selectedPoi = findSelectedPoi(
             puntsInteres = uiState.puntsInteres,
-            markerPosition = markerPosition
+            markerSelection = markerSelection
         )
-        viewModel.onPuntInteresSeleccionat(selectedPoi)
+        viewModel.onPuntInteresSeleccionat(selectedPoi?.takeIf(PuntInteres::esEsdeveniment))
 
-        false
+        selectedPoi != null
     }
 }
 
@@ -1834,6 +1881,7 @@ private fun configureMapClickHandling(
     restrictedLocationMessage: String
 ) {
     map.addOnMapClickListener { point ->
+        viewModel.onPuntInteresSeleccionat(null)
         if (viewModel.isInsideBarcelonaArea(point.latitude, point.longitude)){
 
             handleMapClick(
@@ -2213,7 +2261,8 @@ private fun addIssueMarkers(
             map = map,
             position = LatLng(issue.coordinates.lat, issue.coordinates.lon),
             title = issue.type.name,
-            icon = createIssueIcon(context, issue.type)
+            icon = createIssueIcon(context, issue.type),
+            snippet = issue.id.toString()
         )
     }
 }
@@ -2237,7 +2286,8 @@ private fun addEmergencyContactMarkers(
             icon = createEmergencyContactIcon(
                 context = context,
                 highlighted = location.id == highlightedLocationId
-            )
+            ),
+            snippet = location.id
         )
     }
 }
@@ -2312,16 +2362,98 @@ private fun addPoiMarkersIfVisible(
         return
     }
 
-    puntsInteres
-        .filter(::isVisiblePoi)
-        .forEach { punt ->
+    visiblePoiMarkers(puntsInteres)
+        .forEach { marker ->
             addLegacyMarker(
                 map = map,
-                position = LatLng(punt.latitud, punt.longitud),
-                title = poiTitle(punt),
-                icon = crearIconaPoi(context, punt.tipus)
+                position = marker.position,
+                title = poiTitle(marker.punt),
+                icon = crearIconaPoi(context, marker.punt.tipus),
+                snippet = marker.punt.id
             )
         }
+}
+
+private data class VisiblePoiMarker(
+    val punt: PuntInteres,
+    val position: LatLng
+)
+
+private fun visiblePoiMarkers(puntsInteres: List<PuntInteres>): List<VisiblePoiMarker> {
+    val groupedPois = puntsInteres
+        .filter(::isVisiblePoi)
+        .groupBy { punt ->
+        "${punt.latitud};${punt.longitud}"
+    }
+
+    return groupedPois.values.flatMap { groupedPoints ->
+        if (groupedPoints.size == 1) {
+            val punt = groupedPoints.first()
+            return@flatMap listOf(
+                VisiblePoiMarker(
+                    punt = punt,
+                    position = LatLng(punt.latitud, punt.longitud)
+                )
+            )
+        }
+
+        groupedPoints.mapIndexed { index, punt ->
+            VisiblePoiMarker(
+                punt = punt,
+                position = offsetPoiPosition(
+                    punt = punt,
+                    index = index,
+                    total = groupedPoints.size
+                )
+            )
+        }
+    }
+}
+
+private fun offsetPoiPosition(
+    punt: PuntInteres,
+    index: Int,
+    total: Int
+): LatLng {
+    val radius = 0.00014
+    val angle = (2.0 * Math.PI * index) / total
+    val latOffset = kotlin.math.sin(angle) * radius
+    val lonOffset = kotlin.math.cos(angle) * radius
+
+    return LatLng(
+        punt.latitud + latOffset,
+        punt.longitud + lonOffset
+    )
+}
+
+private fun filterDisplayedPuntsInteres(
+    puntsInteres: List<PuntInteres>,
+    hideRouteEvents: Boolean
+): List<PuntInteres> {
+    if (!hideRouteEvents) {
+        return puntsInteres
+    }
+
+    return puntsInteres.filterNot(PuntInteres::esEsdeveniment)
+}
+
+private fun resolveShouldHideRouteEvents(
+    uiState: MapUiState,
+    settings: MapEventSettings
+): Boolean {
+    if (
+        settings.hideEventsDuringRoutePreview &&
+        uiState.rutaCoordenades.isNotEmpty() &&
+        !uiState.modoRuta
+    ) {
+        return true
+    }
+
+    if (settings.hideEventsDuringActiveRoute && uiState.modoRuta) {
+        return true
+    }
+
+    return false
 }
 
 private fun isVisiblePoi(punt: PuntInteres): Boolean {
@@ -2330,14 +2462,12 @@ private fun isVisiblePoi(punt: PuntInteres): Boolean {
             tipus == "COMISSARIA" ||
             tipus == "CAMERA" ||
             tipus == "ESCALA_MECANICA" ||
-            tipus == "REFUGI_CLIMATIC"
+            tipus == "REFUGI_CLIMATIC" ||
+            tipus == "ESDEVENIMENT"
 }
 
 private fun poiTitle(punt: PuntInteres): String {
-    return punt.nom ?: punt.tipus
-        .lowercase()
-        .replace('_', ' ')
-        .replaceFirstChar { char -> char.uppercase() }
+    return punt.nomMostrat()
 }
 
 private fun addSelectionMarkers(
@@ -2383,11 +2513,19 @@ private fun startLocationListenerIfNeeded(
 
 private fun findSelectedPoi(
     puntsInteres: List<PuntInteres>,
-    markerPosition: LatLng
+    markerSelection: LegacyMarkerSelection
 ): PuntInteres? {
+    markerSelection.snippet?.let { markerId ->
+        puntsInteres.firstOrNull { punt -> punt.id == markerId }?.let { return it }
+    }
+
     return puntsInteres.find { punt ->
-        punt.latitud == markerPosition.latitude &&
-                punt.longitud == markerPosition.longitude
+        punt.latitud == markerSelection.position.latitude &&
+            punt.longitud == markerSelection.position.longitude &&
+            (
+                markerSelection.title == null ||
+                    poiTitle(punt) == markerSelection.title
+                )
     }
 }
 
