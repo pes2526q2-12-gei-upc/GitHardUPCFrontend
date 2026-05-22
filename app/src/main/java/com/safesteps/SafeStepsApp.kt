@@ -480,7 +480,10 @@ private fun SafeStepsBody(
                     com.safesteps.profile.ProfileCustomizationScreen(
                         user = currentUser,
                         onBack = onReturnToProfile,
-                        unlockedPremis = profileUiState.premis, // FUSIONADO GAMIFICACIÓN
+                        unlockedPremis = profileUiState.premis,
+                        avatarCatalog = profileUiState.avatarCatalog,
+                        colorCatalog = profileUiState.colorCatalog,
+                        labelCatalog = profileUiState.labelCatalog,
                         onSave = onUpdateUserProfile,
                         modifier = Modifier.fillMaxSize()
                     )

@@ -34,7 +34,10 @@ data class ProfileUiState(
     val showLevelUpAnimation: Boolean = false,
     val newLevel: Long = 1,
     val showPrizeAnimation: Boolean = false,
-    val lastOpenedPrize: PremiResponse? = null
+    val lastOpenedPrize: PremiResponse? = null,
+    val avatarCatalog: List<String> = allAvatarIds,
+    val colorCatalog: List<ColorPrizeEntry> = allColorPrizes,
+    val labelCatalog: List<LabelEntry> = allLabels
 )
 
 class ProfileViewModel(
@@ -352,10 +355,11 @@ class ProfileViewModel(
                 }
                 Log.d("PROFILE_VM", "openPrize: backend response = $prize")
                 if (prize != null) {
+                    val isDuplicate = prize.name == "XP"
                     _uiState.update { state ->
                         state.copy(
                             recompenses = (state.recompenses - 1).coerceAtLeast(0),
-                            premis = state.premis + prize,
+                            premis = if (isDuplicate) state.premis else state.premis + prize,
                             showPrizeAnimation = true,
                             lastOpenedPrize = prize
                         )

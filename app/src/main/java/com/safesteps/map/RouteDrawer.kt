@@ -5,6 +5,7 @@ package com.safesteps.map
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.util.Log
 import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.core.graphics.createBitmap
@@ -83,13 +84,80 @@ private fun hasSameCoordinates(first: LatLng, second: LatLng): Boolean {
     return first.latitude == second.latitude && first.longitude == second.longitude
 }
 
-private fun drawRoutePolyline(map: org.maplibre.android.maps.MapLibreMap, puntsRuta: List<LatLng>, routeColor: String? = null) {
-    map.addPolyline(
-        PolylineOptions()
-            .addAll(puntsRuta)
-            .color((routeColor ?: "#1E88E5").toColorInt())
-            .width(6f)
-    )
+private fun drawRoutePolyline(
+    map: org.maplibre.android.maps.MapLibreMap,
+    puntsRuta: List<LatLng>,
+    routeColor: String? = null
+) {
+    val patternColors = resolvePatternColors(routeColor)
+
+    if (patternColors != null) {
+        val (color1, color2) = patternColors
+        // Línea base más gruesa con color1
+        map.addPolyline(
+            PolylineOptions()
+                .addAll(puntsRuta)
+                .color(color1)
+                .width(10f)
+        )
+        // Línea fina encima con color2
+        map.addPolyline(
+            PolylineOptions()
+                .addAll(puntsRuta)
+                .color(color2)
+                .width(4f)
+        )
+    } else {
+        map.addPolyline(
+            PolylineOptions()
+                .addAll(puntsRuta)
+                .color(resolveRouteColor(routeColor))
+                .width(6f)
+        )
+    }
+}
+
+// Devuelve par de colores si es patrón de dos colores, null si es color simple
+private fun resolvePatternColors(routeColor: String?): Pair<Int, Int>? {
+    if (routeColor == null) return null
+    return when {
+        routeColor.contains("BLAUGRANA") ->
+            Pair("#004D98".toColorInt(), "#A50044".toColorInt())
+        routeColor.contains("TAXI") ->
+            Pair("#FFCC00".toColorInt(), "#1A1A1A".toColorInt())
+        routeColor.contains("NIT") ->
+            Pair("#0A0A1A".toColorInt(), "#2E2E5E".toColorInt())
+        routeColor.contains("RGB_FLUID") ->
+            Pair("#00FFFF".toColorInt(), "#FF00FF".toColorInt())
+        else -> null
+    }
+}
+
+private const val DEFAULT_ROUTE_COLOR = "#1E88E5"
+
+private fun resolveRouteColor(routeColor: String?): Int {
+    if (routeColor == null) return DEFAULT_ROUTE_COLOR.toColorInt()
+    // Si es un hex normal, lo parseamos directamente
+    if (routeColor.startsWith("#")) {
+        return try { routeColor.toColorInt() } catch (e: Exception) { DEFAULT_ROUTE_COLOR.toColorInt() }
+    }
+    // Si es un ID de premio de color, extraemos el color del ID
+    val regex = Regex("_R(\\d+)G(\\d+)B(\\d+)")
+    val match = regex.find(routeColor)
+    if (match != null) {
+        val r = match.groupValues[1].toIntOrNull() ?: return DEFAULT_ROUTE_COLOR.toColorInt()
+        val g = match.groupValues[2].toIntOrNull() ?: return DEFAULT_ROUTE_COLOR.toColorInt()
+        val b = match.groupValues[3].toIntOrNull() ?: return DEFAULT_ROUTE_COLOR.toColorInt()
+        return android.graphics.Color.rgb(r, g, b)
+    }
+    // Patrones especiales — usamos el primer color representativo
+    return when {
+        routeColor.contains("BLAUGRANA") -> "#004D98".toColorInt()
+        routeColor.contains("TAXI")      -> "#FFCC00".toColorInt()
+        routeColor.contains("NIT")       -> "#1B1B3A".toColorInt()
+        routeColor.contains("RGB_FLUID") -> "#00FFFF".toColorInt()
+        else -> DEFAULT_ROUTE_COLOR.toColorInt()
+    }
 }
 
 private fun addRouteMarkers(
@@ -162,6 +230,7 @@ fun crearIconaPoi(context: Context, tipus: String): Icon {
     val y = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
     canvas.drawText(emoji, size / 2f, y, textPaint)
 
+    return IconFactory.getInstance(context).fromBitmap(bitmap)
     return IconFactory.getInstance(context).fromBitmap(bitmap)
 }
 

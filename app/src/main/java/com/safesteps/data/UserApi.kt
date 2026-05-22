@@ -17,7 +17,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40381/"
+private const val USER_BASE_URL = "http://nattech.fib.upc.edu:40382/"
 private const val USERS_PATH = "api/v1/users"
 
 enum class UserSyncResult {
@@ -31,21 +31,23 @@ enum class PrizeRarity {
     COMMON, RARE, EPIC, LEGENDARY;
 
     companion object {
-        // TODO: cuando backend envíe rarity, usar:
-        // fun fromString(value: String?) = values().find { it.name == value } ?: COMMON
+        fun fromString(value: String?): PrizeRarity {
+            return entries.find { it.name.equals(value, ignoreCase = true) } ?: COMMON
+        }
 
-        // Hardcodeado temporalmente para probar animaciones
         fun fromPremi(premi: PremiResponse): PrizeRarity {
-            return EPIC // Cambia esto para probar cada rareza
+            return fromString(premi.oddity) // Conecta con el 'oddity' del backend
         }
     }
 }
 
 data class PremiResponse(
     val id: String? = null,
-    val url: String? = null
-    // val rarity: String? = null  // TODO: descomentar cuando backend lo añada
+    val url: String? = null,
+    val oddity: String? = null,
+    val name: String? = null
 )
+
 data class UserSyncOutcome(
     val result: UserSyncResult,
     val languageTag: String? = null

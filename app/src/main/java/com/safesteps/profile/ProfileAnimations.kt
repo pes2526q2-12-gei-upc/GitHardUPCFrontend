@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -49,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.safesteps.data.PremiResponse
+import com.safesteps.i18n.appString
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.abs
@@ -56,25 +58,20 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
+import com.safesteps.R
 
-// ─── Rareza ──────────────────────────────────────────────────────────────────
 
 enum class PrizeRarity {
     COMMON, RARE, EPIC, LEGENDARY;
 
     companion object {
-        // TODO: descomentar cuando backend envíe rarity
-        // fun fromString(value: String?) = values().find { it.name == value } ?: COMMON
-        fun fromPremi(premi: PremiResponse): PrizeRarity = LEGENDARY
+        fun fromString(value: String?) =
+            entries.find { it.name.equals(value, ignoreCase = true) } ?: COMMON
+
+        fun fromPremi(premi: PremiResponse): PrizeRarity = fromString(premi.oddity)
     }
 }
 
-val PrizeRarity.displayName: String get() = when (this) {
-    PrizeRarity.COMMON -> "Common"
-    PrizeRarity.RARE -> "Rare"
-    PrizeRarity.EPIC -> "Epic"
-    PrizeRarity.LEGENDARY -> "Legendary"
-}
 
 val PrizeRarity.rarityColor: Color get() = when (this) {
     PrizeRarity.COMMON -> Color(0xFF4CAF50)
@@ -522,8 +519,20 @@ private fun GlowRing(rarity: PrizeRarity) {
 private fun OpeningRewardView(wheelRotation: Float) {
     WheelBackground(modifier = Modifier.fillMaxSize())
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        Text("Opening reward...", color = Color(0xFF90CAF9), style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 32.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = appString(R.string.prize_roulette_title),
+                color = Color(0xFF90CAF9),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = appString(R.string.prize_roulette_subtitle),
+                color = Color(0xFF90CAF9).copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
+        }
         Box(contentAlignment = Alignment.Center) {
             Box(modifier = Modifier.size(300.dp).background(
                 brush = Brush.radialGradient(colors = listOf(Color(0xFF2196F3).copy(alpha = 0.12f), Color.Transparent)), shape = CircleShape))
@@ -534,14 +543,13 @@ private fun OpeningRewardView(wheelRotation: Float) {
 
 @Composable
 private fun PrizeResultView(
+    prize: PremiResponse,
     rarity: PrizeRarity,
-    prizeColor: Color,
     patternT: Float,
     showParticles: Boolean,
     resultScale: Float,
     resultAlpha: Float
 ) {
-    // Fondo rico según rareza
     when (rarity) {
         PrizeRarity.COMMON -> CommonBackground(patternT)
         PrizeRarity.RARE -> RareBackground(patternT)
@@ -555,36 +563,169 @@ private fun PrizeResultView(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.scale(resultScale).alpha(resultAlpha)
+            modifier = Modifier.scale(resultScale).alpha(resultAlpha).padding(horizontal = 24.dp)
         ) {
-            Text(
-                text = when (rarity) { PrizeRarity.COMMON -> "🎁"; PrizeRarity.RARE -> "💎"; PrizeRarity.EPIC -> "🔮"; PrizeRarity.LEGENDARY -> "👑" },
-                fontSize = when (rarity) { PrizeRarity.COMMON -> 54.sp; PrizeRarity.RARE -> 62.sp; PrizeRarity.EPIC -> 70.sp; PrizeRarity.LEGENDARY -> 80.sp }
-            )
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(rarity.displayName.uppercase(), color = rarity.rarityColor,
-                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, letterSpacing = 4.sp)
-            Spacer(modifier = Modifier.height(6.dp))
-            Text("New color unlocked!", color = Color.White.copy(alpha = 0.95f),
-                style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+            PrizeResultHeader(prize, rarity)
             Spacer(modifier = Modifier.height(26.dp))
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp).background(
-                brush = Brush.radialGradient(colors = listOf(rarity.rarityColor.copy(alpha = 0.6f), Color.Transparent)), shape = CircleShape)) {
-                Box(modifier = Modifier.size(78.dp).background(prizeColor, CircleShape))
+            PrizeVisualizer(prize, rarity)
+        }
+
+        if (rarity == PrizeRarity.LEGENDARY) {
+            Spacer(modifier = Modifier.height(18.dp))
+            Text(
+                appString(R.string.prize_incredibly_rare), color = Color(0xFFFFD700),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold, letterSpacing = 3.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrizeResultHeader(prize: PremiResponse, rarity: PrizeRarity) {
+    Text(
+        text = when (rarity) {
+            PrizeRarity.COMMON -> "🎁"; PrizeRarity.RARE -> "💎"
+            PrizeRarity.EPIC -> "🔮"; PrizeRarity.LEGENDARY -> "👑"
+        },
+        fontSize = when (rarity) {
+            PrizeRarity.COMMON -> 54.sp; PrizeRarity.RARE -> 62.sp
+            PrizeRarity.EPIC -> 70.sp; PrizeRarity.LEGENDARY -> 80.sp
+        }
+    )
+    Spacer(modifier = Modifier.height(14.dp))
+    Text(
+        text = when (rarity) {
+            PrizeRarity.COMMON -> appString(R.string.prize_rarity_common)
+            PrizeRarity.RARE -> appString(R.string.prize_rarity_rare)
+            PrizeRarity.EPIC -> appString(R.string.prize_rarity_epic)
+            PrizeRarity.LEGENDARY -> appString(R.string.prize_rarity_legendary)
+        }.uppercase(),
+        color = rarity.rarityColor,
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.ExtraBold, letterSpacing = 4.sp
+    )
+    Spacer(modifier = Modifier.height(6.dp))
+    Text(
+        appString(R.string.prize_unlocked), color = Color.White.copy(alpha = 0.95f),
+        style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = prize.name ?: appString(R.string.prize_mystery),
+        color = Color.White,
+        style = MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center
+    )
+}
+
+@Composable
+private fun PrizeVisualizer(prize: PremiResponse, rarity: PrizeRarity) {
+    when {
+        prize.name == "XP" -> {
+            Text("⭐", fontSize = 64.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = appString(R.string.prize_duplicate_title),
+                color = Color.White.copy(alpha = 0.9f),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = appString(R.string.prize_duplicate_subtitle),
+                color = Color(0xFFFFD700),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+        }
+        else -> when (prizeTypeFromId(prize.id)) {
+            PrizeType.AVATAR -> {
+                val url = prize.url
+                if (url != null && url != "NONE") {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(100.dp).background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(rarity.rarityColor.copy(alpha = 0.6f), Color.Transparent)
+                            ), shape = CircleShape
+                        )
+                    ) {
+                        coil.compose.AsyncImage(
+                            model = url,
+                            contentDescription = null,
+                            modifier = Modifier.size(78.dp).clip(CircleShape),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                        )
+                    }
+                } else {
+                    Text("🧑", fontSize = 64.sp)
+                }
             }
-            if (rarity == PrizeRarity.LEGENDARY) {
-                Spacer(modifier = Modifier.height(18.dp))
-                Text("✦ INCREDIBLY RARE ✦", color = Color(0xFFFFD700),
-                    style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, letterSpacing = 3.sp)
+            PrizeType.COLOR -> {
+                val brush = patternBrushFromId(prize.id)
+                val solidColor = parseColorFromPremiId(prize.id)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(100.dp).background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(rarity.rarityColor.copy(alpha = 0.6f), Color.Transparent)
+                        ), shape = CircleShape
+                    )
+                ) {
+                    if (isRgbFluid(prize.id)) {
+                        RgbFluidCircle(modifier = Modifier.size(78.dp))
+                    } else if (brush != null) {
+                        Box(modifier = Modifier.size(78.dp).clip(CircleShape).background(brush))
+                    } else if (solidColor != null) {
+                        Box(modifier = Modifier.size(78.dp).background(solidColor, CircleShape))
+                    }
+                }
+            }
+            PrizeType.LABEL -> {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.size(100.dp).background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(rarity.rarityColor.copy(alpha = 0.6f), Color.Transparent)
+                        ), shape = CircleShape
+                    )
+                ) {
+                    Text("🏷️", fontSize = 48.sp)
+                }
             }
         }
     }
 }
 
 @Composable
+internal fun RgbFluidCircle(modifier: Modifier = Modifier) {
+    val inf = rememberInfiniteTransition(label = "rgb")
+    val t = inf.animateFloat(
+        0f, 1f,
+        infiniteRepeatable(tween(2000, easing = LinearEasing), RepeatMode.Restart),
+        label = "t"
+    )
+    val neonColors = listOf(
+        Color(0xFF00FFFF), Color(0xFF00FF88), Color(0xFF0088FF),
+        Color(0xFF8800FF), Color(0xFFFF00FF), Color(0xFF00FFFF)
+    )
+    val shiftedColors = remember(t.value) {
+        val offset = (t.value * (neonColors.size - 1)).toInt()
+        neonColors.drop(offset) + neonColors.take(offset)
+    }
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(Brush.sweepGradient(shiftedColors))
+    )
+}
+
+@Composable
 fun PrizeAnimationOverlay(prize: PremiResponse, onDismiss: () -> Unit) {
     val rarity = remember { PrizeRarity.fromPremi(prize) }
-    val prizeColor = remember { parseColorFromPremiId(prize.id) ?: Color(0xFF2196F3) }
     val segments = remember { buildWheelSegments() }
     val targetAngle = remember { targetRotationForRarity(rarity, segments) }
 
@@ -620,12 +761,12 @@ fun PrizeAnimationOverlay(prize: PremiResponse, onDismiss: () -> Unit) {
             OpeningRewardView(wheelRotation = wheelRotation.value)
         } else {
             PrizeResultView(
+                prize = prize,
                 rarity = rarity,
-                prizeColor = prizeColor,
                 patternT = patternT.value,
                 showParticles = showParticles,
                 resultScale = resultScale.value,
-                resultAlpha = resultAlpha.value
+                resultAlpha = resultAlpha.value,
             )
         }
     }
@@ -677,14 +818,44 @@ fun LevelUpAnimationOverlay(level: Long, onDismiss: () -> Unit) {
     }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// ─── Prize type detection ─────────────────────────────────────────────────────
+
+enum class PrizeType { AVATAR, COLOR, LABEL }
+
+fun prizeTypeFromId(id: String?): PrizeType = when {
+    id == null -> PrizeType.AVATAR
+    id.startsWith("A") -> PrizeType.AVATAR
+    id.startsWith("R") -> PrizeType.COLOR
+    id.startsWith("T") -> PrizeType.LABEL
+    else -> PrizeType.AVATAR
+}
 
 internal fun parseColorFromPremiId(id: String?): Color? {
     if (id == null) return null
-    val regex = Regex("R(\\d+)G(\\d+)B(\\d+)")
+    // Formato: R001_RTCOL_R0G255B0  → extrae R0G255B0
+    val regex = Regex("_R(\\d+)G(\\d+)B(\\d+)")
     val match = regex.find(id) ?: return null
     val r = match.groupValues[1].toIntOrNull() ?: return null
     val g = match.groupValues[2].toIntOrNull() ?: return null
     val b = match.groupValues[3].toIntOrNull() ?: return null
     return Color(r, g, b)
 }
+
+// Patrones especiales EPIC / LEGENDARY
+fun patternBrushFromId(id: String?): Brush? = when {
+    id == null -> null
+    id.contains("BLAUGRANA") -> Brush.linearGradient(
+        colors = listOf(Color(0xFF004D98), Color(0xFFA50044))
+    )
+    id.contains("TAXI") -> Brush.linearGradient(
+        colors = listOf(Color(0xFFFFCC00), Color(0xFF1A1A1A), Color(0xFFFFCC00))
+    )
+    id.contains("NIT") -> Brush.linearGradient(
+        colors = listOf(Color(0xFF0A0A1A), Color(0xFF1B1B3A), Color(0xFF2E2E5E), Color(0xFF0A0A1A))
+    )
+    id.contains("RGB_FLUID") -> null // animado, se gestiona aparte
+    else -> null
+}
+
+fun isRgbFluid(id: String?) = id?.contains("RGB_FLUID") == true
