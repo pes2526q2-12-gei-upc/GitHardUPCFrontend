@@ -5,6 +5,12 @@ plugins {
     id("jacoco")
 }
 
+val apiKey = rootProject.file("local.properties")
+    .readLines()
+    .firstOrNull { it.startsWith("API_KEY=") }
+    ?.substringAfter("API_KEY=")
+    ?: ""
+
 android {
     namespace = "com.safesteps"
     compileSdk = 36
@@ -17,6 +23,7 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "API_KEY", "\"$apiKey\"")
     }
 
     signingConfigs {
@@ -47,6 +54,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

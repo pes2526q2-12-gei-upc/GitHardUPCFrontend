@@ -27,10 +27,27 @@ enum class UserSyncResult {
     ACCOUNT_BANNED
 }
 
+enum class PrizeRarity {
+    COMMON, RARE, EPIC, LEGENDARY;
+
+    companion object {
+        fun fromString(value: String?): PrizeRarity {
+            return entries.find { it.name.equals(value, ignoreCase = true) } ?: COMMON
+        }
+
+        fun fromPremi(premi: PremiResponse): PrizeRarity {
+            return fromString(premi.oddity) // Conecta con el 'oddity' del backend
+        }
+    }
+}
+
 data class PremiResponse(
     val id: String? = null,
-    val url: String? = null
+    val url: String? = null,
+    val oddity: String? = null,
+    val name: String? = null
 )
+
 data class UserSyncOutcome(
     val result: UserSyncResult,
     val languageTag: String? = null
@@ -178,9 +195,21 @@ private interface UserApiService {
 }
 
 private object UserBackend {
+    private val okHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("X-API-KEY", com.safesteps.BuildConfig.API_KEY)
+                    .build()
+                chain.proceed(request)
+            }
+            .build()
+    }
+
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(USER_BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }

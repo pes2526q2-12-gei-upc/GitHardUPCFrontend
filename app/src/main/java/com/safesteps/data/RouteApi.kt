@@ -53,6 +53,7 @@ private object RouteCoordinatesBackend {
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
@@ -110,32 +111,48 @@ fun normalizarResposta(
     }
 
     val primeraRuta = routes[0].asJsonObject
-    val coordinatesJson = primeraRuta.getAsJsonArray("coordinates")
+
+    val coordenades = extractCoordinates(primeraRuta)
+    val temps = extractTime(primeraRuta)
+    val distancia = extractDistance(primeraRuta)
+    val puntsInteresList = extractPois(primeraRuta)
+
+    return Triple(coordenades, temps to distancia, puntsInteresList)
+}
+
+private fun extractCoordinates(ruta: JsonObject): List<Coordenada> {
+    val coordinatesJson = ruta.getAsJsonArray("coordinates")
         ?: throw IOException("No hi ha coordinates")
 
-    val coordenades = coordinatesJson.map { pointElement ->
+    return coordinatesJson.map { pointElement ->
         val point = pointElement.asJsonArray
         Coordenada(lat = point[1].asDouble, lon = point[0].asDouble)
     }
+}
 
-    val estimatedTimeMinutes = primeraRuta["estimatedTimeMinutes"]
-    val temps = if (primeraRuta.has("estimatedTimeMinutes") && !estimatedTimeMinutes.isJsonNull) {
+private fun extractTime(ruta: JsonObject): Int {
+    val estimatedTimeMinutes = ruta["estimatedTimeMinutes"]
+    return if (ruta.has("estimatedTimeMinutes") && !estimatedTimeMinutes.isJsonNull) {
         estimatedTimeMinutes.asDouble.toInt()
     } else {
         0
     }
+}
 
-    val distanceMeters = primeraRuta["distanceMeters"]
-    val distancia = if (primeraRuta.has("distanceMeters") && !distanceMeters.isJsonNull) {
+private fun extractDistance(ruta: JsonObject): Double {
+    val distanceMeters = ruta["distanceMeters"]
+    return if (ruta.has("distanceMeters") && !distanceMeters.isJsonNull) {
         distanceMeters.asDouble
     } else {
         0.0
     }
+}
 
+private fun extractPois(ruta: JsonObject): List<PuntInteres> {
     val puntsInteresList = mutableListOf<PuntInteres>()
-    val pois = primeraRuta["pois"]
-    if (primeraRuta.has("pois") && !pois.isJsonNull) {
-        val poisJson = primeraRuta.getAsJsonArray("pois")
+    val pois = ruta["pois"]
+    if (ruta.has("pois") && !pois.isJsonNull) {
+        val poisJson = ruta.getAsJsonArray("pois")
         poisJson.forEach { element ->
             val obj = element.asJsonObject
             val name = obj["name"]
@@ -156,6 +173,5 @@ fun normalizarResposta(
             )
         }
     }
-
-    return Triple(coordenades, temps to distancia, puntsInteresList)
+    return puntsInteresList
 }

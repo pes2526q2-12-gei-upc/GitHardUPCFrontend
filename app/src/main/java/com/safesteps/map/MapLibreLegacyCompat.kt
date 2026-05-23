@@ -14,8 +14,30 @@ internal data class LegacyMarkerSelection(
     val snippet: String?
 )
 
+internal const val ROUTE_SOURCE_ID = "route-source-solid"
+internal const val ROUTE_LAYER_ID = "route-layer-solid"
+internal const val ROUTE_LAYER_ID_2 = "route-layer-solid-2"
+
 internal fun clearLegacyAnnotations(map: MapLibreMap) {
     map.clear()
+    val style = map.style ?: return
+
+    // Limpiar color simple y overlapping
+    style.removeLayer(ROUTE_LAYER_ID)
+    style.removeLayer(ROUTE_LAYER_ID_2)
+    style.removeSource(ROUTE_SOURCE_ID)
+
+    // Limpiar segmentos de degradado y alternos
+    for (i in 0..999) {
+        val layerId = "route-layer-$i"
+        val sourceId = "route-source-$i"
+        if (style.getLayer(layerId) != null) {
+            style.removeLayer(layerId)
+            style.removeSource(sourceId)
+        } else {
+            break
+        }
+    }
 }
 
 internal fun addLegacyMarker(

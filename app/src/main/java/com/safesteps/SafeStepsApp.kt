@@ -563,7 +563,7 @@ private fun SafeStepsLocalizedContent(
             ),
             onDeleteAccount = authViewModel::onDeleteAccountRequested,
             onUpdateUserProfile = authViewModel::onUpdateUserProfile,
-            onRouteCompleted = onRouteCompleted,
+            onRouteCompleted = onRouteCompleted, // FUSIONADO GAMIFICACIÓN
             onOpenPrize = onOpenPrize,
             onDismissLevelUp = onDismissLevelUp,
             onDismissPrize = onDismissPrize,
@@ -694,6 +694,9 @@ private fun SafeStepsBody(
                         user = currentUser,
                         onBack = onReturnToProfile,
                         unlockedPremis = profileUiState.premis,
+                        avatarCatalog = profileUiState.avatarCatalog,
+                        colorCatalog = profileUiState.colorCatalog,
+                        labelCatalog = profileUiState.labelCatalog,
                         onSave = onUpdateUserProfile,
                         modifier = Modifier.fillMaxSize()
                     )

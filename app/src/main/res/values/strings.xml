@@ -1,5 +1,6 @@
 ﻿<resources>
     <string name="app_name" translatable="false">SafeSteps</string>
+    <string name="server_client_id" translatable="false">48435478487-tupu01hq8mjcjgvrm1ckh32ak4heff8q.apps.googleusercontent.com</string>
     <string name="change_language">Change language</string>
     <string name="log_in">Sign in</string>
     <string name="log_out">Sign out</string>
@@ -475,7 +476,6 @@
         <item quantity="one">%d filter</item>
         <item quantity="other">%d filters</item>
     </plurals>
-    <string name="route_completed_points">Congratulations! You earned %1$d points.</string>
     <!-- ════════ SHARE ROUTE ════════ -->
     <string name="share_route_title">Share route</string>
     <string name="share_route_tab_share">Share route</string>
@@ -498,4 +498,52 @@
     <string name="share_route_view_button">View route</string>
     <string name="share_route_message_shared">🗺 Shared a route</string>
     <string name="share_route_message_planned">📅 Planned a route</string>
+    <string name="route_completed_points">Congratulations! You have earned %1$d points.</string>
+    <string name="customize_label">Profile Label</string>
+    <string name="customize_label_none">No label</string>
+    <string name="label_caminante">The Walker</string>
+    <string name="label_explorador">Urban Explorer</string>
+    <string name="label_vigia">Street Lookout</string>
+    <string name="label_guia">Local Guide</string>
+    <string name="label_trotacalles">Pavement Pounder</string>
+    <string name="label_brujula">Human Compass</string>
+    <string name="label_cartografo">Cartographer</string>
+    <string name="label_pisapanots">Pisa-Panots</string>
+    <string name="label_vigia_eixample">Eixample Lookout</string>
+    <string name="label_explorador_gotico">Gothic Explorer</string>
+    <string name="label_paseante_gracia">Gràcia Stroller</string>
+    <string name="label_domador_rondas">Rondas Tamer</string>
+    <string name="label_heredero_cerda">Cerdà\'s Heir</string>
+    <string name="label_alma_blaugrana">Blaugrana Soul</string>
+    <string name="label_mestre_obres">Mestre d\'Obres</string>
+    <string name="label_leyenda_condal">The Condal Legend</string>
+    <string name="prize_duplicate_title">You already have this prize!</string>
+    <string name="prize_duplicate_subtitle">You received bonus XP points</string>
+    <!-- Gamification -->
+    <string name="prize_open_button">Open reward</string>
+    <string name="prize_roulette_title">Opening reward…</string>
+    <string name="prize_roulette_subtitle">Good luck!</string>
+    <string name="prize_unlocked">New reward unlocked!</string>
+    <string name="prize_rarity_common">Common</string>
+    <string name="prize_rarity_rare">Rare</string>
+    <string name="prize_rarity_epic">Epic</string>
+    <string name="prize_rarity_legendary">Legendary</string>
+    <string name="prize_incredibly_rare">✦ INCREDIBLY RARE ✦</string>
+    <string name="color_green">Green</string>
+    <string name="color_pink">Pink</string>
+    <string name="color_lilac">Lilac</string>
+    <string name="color_red">Red</string>
+    <string name="color_orange">Orange</string>
+    <string name="color_cyan">Cyan</string>
+    <string name="color_gold">Gold</string>
+    <string name="color_lime">Lime</string>
+    <string name="color_coral">Coral</string>
+    <string name="color_turquoise">Turquoise</string>
+    <string name="color_burgundy">Burgundy</string>
+    <string name="color_purple">Purple</string>
+    <string name="color_blaugrana">Blaugrana</string>
+    <string name="color_taxi">Taxi</string>
+    <string name="color_night">Night</string>
+    <string name="color_rgb_fluid">RGB Fluid</string>
+    <string name="prize_mystery">Mystery Prize</string>
 </resources>
