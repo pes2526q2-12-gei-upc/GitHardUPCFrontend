@@ -494,6 +494,7 @@ private fun RoutePlannerSheet(
 private fun NavigationTopBanner(
     destinationText: String,
     activeInstruction: ActiveNavigationInstruction?,
+    routeColor: String? = null,
     modifier: Modifier = Modifier
 ) {
     val navigationActiveLabel = appString(R.string.navigation_active)
@@ -522,14 +523,7 @@ private fun NavigationTopBanner(
     ) {
         Box(
             modifier = Modifier
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF1A73E8),
-                            Color(0xFF4A8DF7)
-                        )
-                    )
-                )
+                .background(resolveRouteBrushCompose(routeColor))
                 .padding(horizontal = 18.dp, vertical = 18.dp)
         ) {
             Column {
@@ -595,6 +589,7 @@ private fun FixedRouteSummaryCard(
     destinationText: String,
     distanceText: String,
     durationText: String,
+    routeColor: String? = null,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -675,16 +670,18 @@ private fun FixedRouteSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val accentColor = resolveRouteColorCompose(routeColor)
+
                 NavigationCompactMetric(
                     icon = Icons.Default.LocationOn,
                     value = distanceText,
-                    accentColor = Color(0xFF1A73E8),
+                    accentColor = accentColor,
                     modifier = Modifier.weight(1f)
                 )
                 NavigationCompactMetric(
                     icon = Icons.Default.AccessTime,
                     value = durationText,
-                    accentColor = Color(0xFF34A853),
+                    accentColor = accentColor,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -745,7 +742,8 @@ private fun BoxScope.NavigationTopBannerOverlay(uiState: MapUiState) {
     ) {
         NavigationTopBanner(
             destinationText = uiState.textoDestino,
-            activeInstruction = uiState.activeNavigationInstruction
+            activeInstruction = uiState.activeNavigationInstruction,
+            routeColor = uiState.routeColor
         )
     }
 }
@@ -770,6 +768,7 @@ private fun BoxScope.FixedRouteSummaryBottomCardOverlay(
             destinationText = uiState.textoDestino,
             distanceText = uiState.distanceText,
             durationText = uiState.durationText,
+            routeColor = uiState.routeColor,
             onClose = onClose,
             modifier = Modifier
                 .navigationBarsPadding()
@@ -850,6 +849,7 @@ private fun BoxScope.RouteActiveBottomBarOverlay(
             durationText = uiState.durationText,
             distanceText = uiState.distanceText,
             etaText = uiState.etaText,
+            routeColor = uiState.routeColor,
             onClose = onClose
         )
     }
@@ -1054,8 +1054,9 @@ private fun RouteActiveBottomBar(
     durationText: String,
     distanceText: String,
     etaText: String,
+    routeColor: String? = null,
     onClose: () -> Unit
-) {
+){
     val closeLabel = appString(R.string.close)
     val remainingLabel = appString(R.string.navigation_remaining)
 
@@ -1095,21 +1096,23 @@ private fun RouteActiveBottomBar(
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                NavigationCompactMetric(
-                    icon = Icons.Default.LocationOn,
-                    value = distanceText,
-                    accentColor = Color(0xFF1A73E8),
-                    valueTestTag = "active_route_distance"
-                )
+            val accentColor = resolveRouteColorCompose(routeColor)
 
-                Spacer(modifier = Modifier.width(8.dp))
+            NavigationCompactMetric(
+                icon = Icons.Default.LocationOn,
+                value = distanceText,
+                accentColor = accentColor,
+                valueTestTag = "active_route_distance"
+            )
 
-                NavigationCompactMetric(
-                    icon = Icons.Default.AccessTime,
-                    value = etaText,
-                    accentColor = Color(0xFF34A853),
-                    valueTestTag = "active_route_eta"
-                )
+            Spacer(modifier = Modifier.width(8.dp))
+
+            NavigationCompactMetric(
+                icon = Icons.Default.AccessTime,
+                value = etaText,
+                accentColor = accentColor,
+                valueTestTag = "active_route_eta"
+            )
 
             Spacer(modifier = Modifier.width(8.dp))
 

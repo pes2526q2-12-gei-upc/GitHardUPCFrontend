@@ -183,9 +183,21 @@ private interface UserApiService {
 }
 
 private object UserBackend {
+    private val okHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .addHeader("X-API-KEY", com.safesteps.BuildConfig.API_KEY)
+                    .build()
+                chain.proceed(request)
+            }
+            .build()
+    }
+
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(USER_BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }

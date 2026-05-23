@@ -4,22 +4,29 @@ package com.safesteps.map
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.compose.ui.graphics.Color
 import android.graphics.Canvas
 import android.util.Log
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.compose.ui.graphics.Brush
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
 import com.safesteps.data.Coordenada
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
-import org.maplibre.android.annotations.PolylineOptions
-import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.style.layers.LineLayer
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.camera.CameraUpdateFactory
 
 fun drawRoute(
     mapView: MapView,
@@ -84,81 +91,217 @@ private fun hasSameCoordinates(first: LatLng, second: LatLng): Boolean {
     return first.latitude == second.latitude && first.longitude == second.longitude
 }
 
+// ─── Strategy interface ───────────────────────────────────────────────────────
+
+private interface RouteDrawingStrategy {
+    fun matches(routeColor: String?): Boolean
+    fun draw(style: org.maplibre.android.maps.Style, puntsRuta: List<LatLng>)
+    fun primaryColor(): Int
+    fun secondaryColor(): Int? = null
+}
+// ─── Strategies ───────────────────────────────────────────────────────────────
+
+private class BlaugranaStrategy : RouteDrawingStrategy {
+    override fun matches(routeColor: String?) = routeColor?.contains("BLAUGRANA") == true
+    override fun draw(style: org.maplibre.android.maps.Style, puntsRuta: List<LatLng>) {
+        drawAlternatingSegments(style, puntsRuta, "#004D98".toColorInt(), "#A50044".toColorInt())
+    }
+    override fun primaryColor() = "#004D98".toColorInt()
+    override fun secondaryColor() = "#A50044".toColorInt()
+}
+
+private class TaxiStrategy : RouteDrawingStrategy {
+    override fun matches(routeColor: String?) = routeColor?.contains("TAXI") == true
+    override fun draw(style: org.maplibre.android.maps.Style, puntsRuta: List<LatLng>) {
+        drawOverlappingLayers(style, puntsRuta, "#FFCC00".toColorInt(), "#1A1A1A".toColorInt(), 10f, 4f)
+    }
+    override fun primaryColor() = "#FFCC00".toColorInt()
+    override fun secondaryColor() = "#1A1A1A".toColorInt()
+}
+
+private class NitStrategy : RouteDrawingStrategy {
+    override fun matches(routeColor: String?) = routeColor?.contains("NIT") == true
+    override fun draw(style: org.maplibre.android.maps.Style, puntsRuta: List<LatLng>) {
+        drawGradientSegments(style, puntsRuta, "#000000".toColorInt(), "#1A0030".toColorInt())
+    }
+    override fun primaryColor() = "#000000".toColorInt()
+    override fun secondaryColor() = "#1A0030".toColorInt()
+}
+
+private class RgbFluidStrategy : RouteDrawingStrategy {
+    override fun matches(routeColor: String?) = routeColor?.contains("RGB_FLUID") == true
+    override fun draw(style: org.maplibre.android.maps.Style, puntsRuta: List<LatLng>) {
+        drawGradientSegments(style, puntsRuta, "#00FFFF".toColorInt(), "#FF00FF".toColorInt())
+    }
+    override fun primaryColor() = "#00FFFF".toColorInt()
+    override fun secondaryColor() = "#FF00FF".toColorInt()
+}
+
+private const val DEFAULT_ROUTE_COLOR = "#1E88E5"
+
+private class SolidColorStrategy(private val routeColor: String?) : RouteDrawingStrategy {
+    override fun matches(routeColor: String?) = true
+    override fun draw(style: org.maplibre.android.maps.Style, puntsRuta: List<LatLng>) {
+        drawSolidLine(style, puntsRuta, primaryColor())
+    }
+    override fun primaryColor(): Int {
+        if (routeColor == null) return DEFAULT_ROUTE_COLOR.toColorInt()
+        if (routeColor.startsWith("#")) {
+            return try { routeColor.toColorInt() } catch (e: Exception) { DEFAULT_ROUTE_COLOR.toColorInt() }
+        }
+        val regex = Regex("_R(\\d+)G(\\d+)B(\\d+)")
+        val match = regex.find(routeColor)
+        if (match != null) {
+            val r = match.groupValues[1].toIntOrNull() ?: return DEFAULT_ROUTE_COLOR.toColorInt()
+            val g = match.groupValues[2].toIntOrNull() ?: return DEFAULT_ROUTE_COLOR.toColorInt()
+            val b = match.groupValues[3].toIntOrNull() ?: return DEFAULT_ROUTE_COLOR.toColorInt()
+            return android.graphics.Color.rgb(r, g, b)
+        }
+        return DEFAULT_ROUTE_COLOR.toColorInt()
+    }
+}
+// ─── Strategy registry ────────────────────────────────────────────────────────
+
+private fun buildStrategies(routeColor: String?): List<RouteDrawingStrategy> = listOf(
+    BlaugranaStrategy(),
+    TaxiStrategy(),
+    NitStrategy(),
+    RgbFluidStrategy(),
+    SolidColorStrategy(routeColor)
+)
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
 private fun drawRoutePolyline(
     map: org.maplibre.android.maps.MapLibreMap,
     puntsRuta: List<LatLng>,
     routeColor: String? = null
 ) {
-    val patternColors = resolvePatternColors(routeColor)
+    val style = map.style ?: return
+    buildStrategies(routeColor)
+        .first { it.matches(routeColor) }
+        .draw(style, puntsRuta)
+}
 
-    if (patternColors != null) {
-        val (color1, color2) = patternColors
-        // Línea base más gruesa con color1
-        map.addPolyline(
-            PolylineOptions()
-                .addAll(puntsRuta)
-                .color(color1)
-                .width(10f)
-        )
-        // Línea fina encima con color2
-        map.addPolyline(
-            PolylineOptions()
-                .addAll(puntsRuta)
-                .color(color2)
-                .width(4f)
-        )
+// ─── Drawing primitives ───────────────────────────────────────────────────────
+
+private fun drawAlternatingSegments(
+    style: org.maplibre.android.maps.Style,
+    puntsRuta: List<LatLng>,
+    color1: Int,
+    color2: Int
+) {
+    puntsRuta.zipWithNext().forEachIndexed { index, (from, to) ->
+        val color = if (index % 2 == 0) color1 else color2
+        addSegmentLayer(style, index, from, to, color, 6f)
+    }
+}
+
+private fun drawOverlappingLayers(
+    style: org.maplibre.android.maps.Style,
+    puntsRuta: List<LatLng>,
+    colorBase: Int,
+    colorTop: Int,
+    widthBase: Float,
+    widthTop: Float
+) {
+    val points = puntsRuta.toPoints()
+    style.addSource(GeoJsonSource(ROUTE_SOURCE_ID, Feature.fromGeometry(LineString.fromLngLats(points))))
+    style.addLayer(buildLineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID, colorBase, widthBase))
+    style.addLayer(buildLineLayer(ROUTE_LAYER_ID_2, ROUTE_SOURCE_ID, colorTop, widthTop))
+}
+
+private fun drawGradientSegments(
+    style: org.maplibre.android.maps.Style,
+    puntsRuta: List<LatLng>,
+    color1: Int,
+    color2: Int
+) {
+    val segments = puntsRuta.zipWithNext()
+    val total = segments.size
+    segments.forEachIndexed { index, (from, to) ->
+        val t = if (total <= 1) 0f else index.toFloat() / (total - 1)
+        addSegmentLayer(style, index, from, to, interpolateColor(color1, color2, t), 6f)
+    }
+}
+
+private fun drawSolidLine(
+    style: org.maplibre.android.maps.Style,
+    puntsRuta: List<LatLng>,
+    color: Int
+) {
+    val points = puntsRuta.toPoints()
+    style.addSource(GeoJsonSource(ROUTE_SOURCE_ID, Feature.fromGeometry(LineString.fromLngLats(points))))
+    style.addLayer(buildLineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID, color, 6f))
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+private fun addSegmentLayer(
+    style: org.maplibre.android.maps.Style,
+    index: Int,
+    from: LatLng,
+    to: LatLng,
+    color: Int,
+    width: Float
+) {
+    val sourceId = "route-source-$index"
+    val layerId = "route-layer-$index"
+    val points = listOf(
+        Point.fromLngLat(from.longitude, from.latitude),
+        Point.fromLngLat(to.longitude, to.latitude)
+    )
+    style.addSource(GeoJsonSource(sourceId, Feature.fromGeometry(LineString.fromLngLats(points))))
+    style.addLayer(buildLineLayer(layerId, sourceId, color, width))
+}
+
+private fun buildLineLayer(
+    layerId: String,
+    sourceId: String,
+    color: Int,
+    width: Float
+): LineLayer {
+    return LineLayer(layerId, sourceId).withProperties(
+        PropertyFactory.lineColor(color),
+        PropertyFactory.lineWidth(width),
+        PropertyFactory.lineCap("round"),
+        PropertyFactory.lineJoin("round")
+    )
+}
+
+private fun List<LatLng>.toPoints(): List<Point> =
+    map { Point.fromLngLat(it.longitude, it.latitude) }
+
+private fun interpolateColor(color1: Int, color2: Int, t: Float): Int {
+    val r = (android.graphics.Color.red(color1) * (1 - t) + android.graphics.Color.red(color2) * t).toInt()
+    val g = (android.graphics.Color.green(color1) * (1 - t) + android.graphics.Color.green(color2) * t).toInt()
+    val b = (android.graphics.Color.blue(color1) * (1 - t) + android.graphics.Color.blue(color2) * t).toInt()
+    return android.graphics.Color.rgb(r, g, b)
+}
+
+fun resolveRouteBrushCompose(routeColor: String?): Brush {
+    val strategy = buildStrategies(routeColor).first { it.matches(routeColor) }
+    val primary = Color(strategy.primaryColor())
+    val secondary = strategy.secondaryColor()?.let { Color(it) }
+    return if (secondary != null) {
+        Brush.horizontalGradient(colors = listOf(primary, secondary, primary))
     } else {
-        map.addPolyline(
-            PolylineOptions()
-                .addAll(puntsRuta)
-                .color(resolveRouteColor(routeColor))
-                .width(6f)
+        Brush.verticalGradient(
+            colors = listOf(
+                primary,
+                primary.copy(
+                    red = (primary.red + 0.1f).coerceAtMost(1f),
+                    blue = (primary.blue + 0.1f).coerceAtMost(1f)
+                )
+            )
         )
     }
 }
+fun resolveRouteColor(routeColor: String?): Int =
+    buildStrategies(routeColor).first { it.matches(routeColor) }.primaryColor()
 
-// Devuelve par de colores si es patrón de dos colores, null si es color simple
-private fun resolvePatternColors(routeColor: String?): Pair<Int, Int>? {
-    if (routeColor == null) return null
-    return when {
-        routeColor.contains("BLAUGRANA") ->
-            Pair("#004D98".toColorInt(), "#A50044".toColorInt())
-        routeColor.contains("TAXI") ->
-            Pair("#FFCC00".toColorInt(), "#1A1A1A".toColorInt())
-        routeColor.contains("NIT") ->
-            Pair("#0A0A1A".toColorInt(), "#2E2E5E".toColorInt())
-        routeColor.contains("RGB_FLUID") ->
-            Pair("#00FFFF".toColorInt(), "#FF00FF".toColorInt())
-        else -> null
-    }
-}
-
-private const val DEFAULT_ROUTE_COLOR = "#1E88E5"
-
-private fun resolveRouteColor(routeColor: String?): Int {
-    if (routeColor == null) return DEFAULT_ROUTE_COLOR.toColorInt()
-    // Si es un hex normal, lo parseamos directamente
-    if (routeColor.startsWith("#")) {
-        return try { routeColor.toColorInt() } catch (e: Exception) { DEFAULT_ROUTE_COLOR.toColorInt() }
-    }
-    // Si es un ID de premio de color, extraemos el color del ID
-    val regex = Regex("_R(\\d+)G(\\d+)B(\\d+)")
-    val match = regex.find(routeColor)
-    if (match != null) {
-        val r = match.groupValues[1].toIntOrNull() ?: return DEFAULT_ROUTE_COLOR.toColorInt()
-        val g = match.groupValues[2].toIntOrNull() ?: return DEFAULT_ROUTE_COLOR.toColorInt()
-        val b = match.groupValues[3].toIntOrNull() ?: return DEFAULT_ROUTE_COLOR.toColorInt()
-        return android.graphics.Color.rgb(r, g, b)
-    }
-    // Patrones especiales — usamos el primer color representativo
-    return when {
-        routeColor.contains("BLAUGRANA") -> "#004D98".toColorInt()
-        routeColor.contains("TAXI")      -> "#FFCC00".toColorInt()
-        routeColor.contains("NIT")       -> "#1B1B3A".toColorInt()
-        routeColor.contains("RGB_FLUID") -> "#00FFFF".toColorInt()
-        else -> DEFAULT_ROUTE_COLOR.toColorInt()
-    }
-}
+fun resolveRouteColorCompose(routeColor: String?): Color =
+    Color(resolveRouteColor(routeColor))
 
 private fun addRouteMarkers(
     map: org.maplibre.android.maps.MapLibreMap,
