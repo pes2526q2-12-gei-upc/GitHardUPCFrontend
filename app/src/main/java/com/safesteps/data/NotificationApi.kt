@@ -32,6 +32,7 @@ private object NotificationBackend {
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(NOTIFICATION_BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
