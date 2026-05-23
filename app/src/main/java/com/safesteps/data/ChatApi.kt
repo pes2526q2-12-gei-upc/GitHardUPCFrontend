@@ -148,6 +148,7 @@ private object ChatBackend {
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(CHAT_BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
