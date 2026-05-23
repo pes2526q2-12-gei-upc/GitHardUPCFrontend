@@ -7,7 +7,8 @@ data class UserInfo(
     val photoUrl: String? = null,
     val backendLanguageTag: String? = null,
     val routeColor: String? = null,
-    val nameStyle: String? = "Normal"
+    val nameStyle: String? = "Normal",
+    val selectedLabel: String? = null
 )
 
 enum class AuthNoticeMessage {

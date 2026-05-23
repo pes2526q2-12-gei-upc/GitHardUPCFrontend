@@ -21,7 +21,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -31,24 +33,28 @@ import coil.compose.AsyncImage
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
 import com.safesteps.i18n.appString
+import kotlin.collections.any
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileCustomizationScreen(
     user: UserInfo,
     unlockedPremis: List<com.safesteps.data.PremiResponse>,
+    avatarCatalog: List<String>,
+    colorCatalog: List<ColorPrizeEntry>,
+    labelCatalog: List<LabelEntry>,
     onBack: () -> Unit,
     onSave: (UserInfo) -> Unit,
     modifier: Modifier = Modifier
-) {
+){
     var selectedPhoto by remember { mutableStateOf(user.photoUrl) }
     var selectedRouteColor by remember { mutableStateOf(getInitialRouteColor(user.routeColor)) }
+    var selectedColorId by remember { mutableStateOf(user.routeColor?.takeIf { it.startsWith("R") }) }
+    var selectedLabelId by remember { mutableStateOf(user.selectedLabel) }
     var selectedNameStyle by remember { mutableStateOf(getInitialNameStyle(user.nameStyle)) }
 
     Scaffold(
-        topBar = {
-            CustomizationTopBar(onBack)
-        },
+        topBar = { CustomizationTopBar(onBack) },
         containerColor = Color(0xFFF4F7F5)
     ) { paddingValues ->
         Column(
@@ -62,12 +68,17 @@ fun ProfileCustomizationScreen(
             PreviewCard(
                 username = user.username,
                 photoUrl = selectedPhoto,
-                nameStyle = selectedNameStyle,
-                routeColor = selectedRouteColor
+                labelText = selectedLabelId?.let { id ->
+                    labelCatalog.find { it.id == id }?.labelRes?.let { appString(it) }
+                },
+                routeColor = selectedRouteColor,
+                routeColorId = selectedColorId
             )
 
             PhotoSelectionSection(
                 selectedPhoto = selectedPhoto,
+                unlockedPremis = unlockedPremis,
+                avatarCatalog = avatarCatalog,
                 onPhotoSelected = { selectedPhoto = it }
             )
 
@@ -75,26 +86,34 @@ fun ProfileCustomizationScreen(
 
             ColorSelectionSection(
                 selectedColor = selectedRouteColor,
+                selectedColorId = selectedColorId,
                 unlockedPremis = unlockedPremis,
-                onColorSelected = { selectedRouteColor = it }
+                colorCatalog = colorCatalog,
+                onColorSelected = { color, id ->
+                    selectedRouteColor = color
+                    selectedColorId = id
+                }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            NameStyleSelectionSection(
-                username = user.username,
-                selectedStyle = selectedNameStyle,
-                onStyleSelected = { selectedNameStyle = it }
+            LabelSelectionSection(
+                selectedLabelId = selectedLabelId,
+                unlockedPremis = unlockedPremis,
+                labelCatalog = labelCatalog,
+                onLabelSelected = { selectedLabelId = it }
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
             SaveButton(
                 onClick = {
+                    val colorToSave = selectedColorId
+                        ?: String.format("#%06X", (0xFFFFFF and selectedRouteColor.toArgb()))
                     val updatedUser = user.copy(
                         photoUrl = selectedPhoto,
-                        routeColor = String.format("#%06X", (0xFFFFFF and selectedRouteColor.toArgb())),
-                        nameStyle = getNameStyleString(selectedNameStyle)
+                        routeColor = colorToSave,
+                        selectedLabel = selectedLabelId
                     )
                     onSave(updatedUser)
                     onBack()
@@ -129,13 +148,15 @@ private fun CustomizationTopBar(onBack: () -> Unit) {
     )
 }
 
+
 @Composable
 private fun PreviewCard(
     username: String,
     photoUrl: String?,
-    nameStyle: FontWeight,
-    routeColor: Color
-) {
+    labelText: String?,
+    routeColor: Color,
+    routeColorId: String? = null
+)  {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -155,13 +176,23 @@ private fun PreviewCard(
             Text(
                 text = username,
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = nameStyle,
+                fontWeight = FontWeight.SemiBold,
                 color = Color(0xFF23333A)
             )
 
+            if (labelText != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = labelText,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFF5E9F7A),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
-            RouteIndicator(routeColor)
+            RouteIndicator(color = routeColor, colorId = routeColorId)
         }
     }
 }
@@ -193,16 +224,28 @@ private fun ProfileImage(photoUrl: String?, size: androidx.compose.ui.unit.Dp) {
 }
 
 @Composable
-private fun RouteIndicator(color: Color) {
+private fun RouteIndicator(color: Color, colorId: String? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        val brush = patternBrushFromId(colorId)
         Box(
             modifier = Modifier
                 .size(40.dp, 4.dp)
-                .background(color, RoundedCornerShape(2.dp))
-        )
+                .clip(RoundedCornerShape(2.dp))
+                .then(
+                    when {
+                        isRgbFluid(colorId) -> Modifier // pintado dentro
+                        brush != null -> Modifier.background(brush)
+                        else -> Modifier.background(color)
+                    }
+                )
+        ) {
+            if (isRgbFluid(colorId)) {
+                RgbFluidCircle(modifier = Modifier.fillMaxSize())
+            }
+        }
         Text(
             text = appString(R.string.navigation_follow_route),
             style = MaterialTheme.typography.bodySmall,
@@ -214,27 +257,39 @@ private fun RouteIndicator(color: Color) {
 @Composable
 private fun PhotoSelectionSection(
     selectedPhoto: String?,
+    unlockedPremis: List<com.safesteps.data.PremiResponse>,
+    avatarCatalog: List<String>,
     onPhotoSelected: (String?) -> Unit
 ) {
-    val availablePhotos = listOf(
-        null,
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka",
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=Midnight",
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=Jasper",
-        "https://api.dicebear.com/7.x/avataaars/svg?seed=Sawyer"
-    )
+    // La foto de Google siempre disponible + avatares desbloqueados con URL real
+    val unlockedAvatars = unlockedPremis.filter { premi ->
+        prizeTypeFromId(premi.id) == PrizeType.AVATAR &&
+                premi.url != null && premi.url != "NONE"
+    }
 
     CustomizationSection(title = appString(R.string.customize_photo)) {
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(horizontal = 4.dp)
         ) {
-            items(availablePhotos) { photoUrl ->
+
+            // Avatares desbloqueados del backend
+            items(unlockedAvatars) { premi ->
                 PhotoItem(
-                    photoUrl = photoUrl,
-                    isSelected = selectedPhoto == photoUrl,
-                    onClick = { onPhotoSelected(photoUrl) }
+                    photoUrl = premi.url,
+                    isSelected = selectedPhoto == premi.url,
+                    isLocked = false,
+                    onClick = { onPhotoSelected(premi.url) }
+                )
+            }
+            val unlockedIds = unlockedAvatars.map { it.id }.toSet()
+            val lockedIds = avatarCatalog.filter { it !in unlockedIds }
+            items(lockedIds) {
+                PhotoItem(
+                    photoUrl = null,
+                    isSelected = false,
+                    isLocked = true,
+                    onClick = {}
                 )
             }
         }
@@ -242,7 +297,12 @@ private fun PhotoSelectionSection(
 }
 
 @Composable
-private fun PhotoItem(photoUrl: String?, isSelected: Boolean, onClick: () -> Unit) {
+private fun PhotoItem(
+    photoUrl: String?,
+    isSelected: Boolean,
+    isLocked: Boolean = false,
+    onClick: () -> Unit
+) {
     Surface(
         modifier = Modifier
             .size(64.dp)
@@ -285,49 +345,68 @@ private fun PhotoItem(photoUrl: String?, isSelected: Boolean, onClick: () -> Uni
                     )
                 }
             }
+            if (isLocked) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
         }
     }
 }
 
+
 @Composable
 private fun ColorSelectionSection(
     selectedColor: Color,
+    selectedColorId: String?,
     unlockedPremis: List<com.safesteps.data.PremiResponse>,
-    onColorSelected: (Color) -> Unit
+    colorCatalog: List<ColorPrizeEntry>,
+    onColorSelected: (Color, String?) -> Unit
 ) {
-    val defaultColor = Color(0xFF2196F3) // Azul por defecto
-
-    val unlockedColors = unlockedPremis.mapNotNull { premi ->
-        parseColorFromPremiId(premi.id)
-    }
-
-    val allPrizeColors = listOf(
-        Color(0x00, 0xFF, 0x00),   // R001 - verde
-        Color(0xFF, 0xC0, 0xCB),   // R002 - rosa
-        Color(0xC8, 0xA2, 0xC8),   // R003 - lila
-        Color(0xFF, 0x00, 0x00)    // R004 - rojo
-    )
+    val defaultColor = Color(0xFF2196F3)
+    val unlockedIds = unlockedPremis
+        .filter { prizeTypeFromId(it.id) == PrizeType.COLOR }
+        .map { it.id }
+        .toSet()
 
     CustomizationSection(title = appString(R.string.customize_route_color)) {
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(horizontal = 4.dp)
         ) {
+            // Azul por defecto, siempre disponible
             item {
                 ColorItem(
                     color = defaultColor,
-                    isSelected = selectedColor == defaultColor,
+                    isSelected = selectedColorId == null && isSameColor(selectedColor, defaultColor),
                     isLocked = false,
-                    onClick = { onColorSelected(defaultColor) }
+                    onClick = { onColorSelected(defaultColor, null) }
                 )
             }
-            items(allPrizeColors) { prizeColor ->
-                val isUnlocked = unlockedColors.any { isSameColor(it, prizeColor) }
+            items(colorCatalog) { entry ->
+                val isUnlocked = entry.id in unlockedIds
+                val isSelected = selectedColorId == entry.id
                 ColorItem(
-                    color = prizeColor,
-                    isSelected = isSameColor(selectedColor, prizeColor),
+                    color = entry.solidColor ?: defaultColor,
+                    brush = patternBrushFromId(entry.id),
+                    isRgbFluid = isRgbFluid(entry.id),
+                    isSelected = isSelected,
                     isLocked = !isUnlocked,
-                    onClick = { if (isUnlocked) onColorSelected(prizeColor) }
+                    onClick = {
+                        if (isUnlocked) {
+                            onColorSelected(entry.solidColor ?: defaultColor, entry.id)
+                        }
+                    }
                 )
             }
         }
@@ -337,15 +416,24 @@ private fun ColorSelectionSection(
 @Composable
 private fun ColorItem(
     color: Color,
+    brush: Brush? = null,
+    isRgbFluid: Boolean = false,
     isSelected: Boolean,
     isLocked: Boolean = false,
     onClick: () -> Unit
 ) {
+    val alpha = if (isLocked) 0.3f else 1f
     Box(
         modifier = Modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(if (isLocked) color.copy(alpha = 0.3f) else color)
+            .then(
+                when {
+                    isRgbFluid -> Modifier // se pinta dentro
+                    brush != null -> Modifier.background(brush).alpha(alpha)
+                    else -> Modifier.background(color.copy(alpha = alpha))
+                }
+            )
             .clickable(enabled = !isLocked, onClick = onClick)
             .border(
                 width = if (isSelected) 3.dp else 0.dp,
@@ -354,43 +442,102 @@ private fun ColorItem(
             ),
         contentAlignment = Alignment.Center
     ) {
-        if (isSelected) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = null,
-                tint = Color.White
+        if (isRgbFluid) {
+            RgbFluidCircle(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(alpha)
             )
         }
+        if (isSelected) {
+            Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = Color.White)
+        }
         if (isLocked) {
-            Icon(
-                imageVector = Icons.Default.Lock,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.8f),
-                modifier = Modifier.size(20.dp)
+            Icon(imageVector = Icons.Default.Lock, contentDescription = null,
+                tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+
+@Composable
+private fun LabelSelectionSection(
+    selectedLabelId: String?,
+    unlockedPremis: List<com.safesteps.data.PremiResponse>,
+    labelCatalog: List<LabelEntry>,
+    onLabelSelected: (String?) -> Unit
+) {
+    val unlockedIds = unlockedPremis
+        .filter { prizeTypeFromId(it.id) == PrizeType.LABEL }
+        .map { it.id }
+        .toSet()
+
+    CustomizationSection(title = appString(R.string.customize_label)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Opción sin etiqueta
+            LabelItem(
+                text = appString(R.string.customize_label_none),
+                isSelected = selectedLabelId == null,
+                isLocked = false,
+                onClick = { onLabelSelected(null) }
             )
+            labelCatalog.forEach { entry ->
+                val isUnlocked = entry.id in unlockedIds
+                LabelItem(
+                    text = appString(entry.labelRes),
+                    isSelected = selectedLabelId == entry.id,
+                    isLocked = !isUnlocked,
+                    onClick = { if (isUnlocked) onLabelSelected(entry.id) }
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun NameStyleSelectionSection(
-    username: String,
-    selectedStyle: FontWeight,
-    onStyleSelected: (FontWeight) -> Unit
+private fun LabelItem(
+    text: String,
+    isSelected: Boolean,
+    isLocked: Boolean,
+    onClick: () -> Unit
 ) {
-    val availableNameStyles = listOf(
-        FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold,
-        FontWeight.Bold, FontWeight.ExtraBold
-    )
-
-    CustomizationSection(title = appString(R.string.customize_name_style)) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            availableNameStyles.forEach { style ->
-                NameStyleItem(
-                    username = username,
-                    style = style,
-                    isSelected = selectedStyle == style,
-                    onClick = { onStyleSelected(style) }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = !isLocked, onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = when {
+            isSelected -> MaterialTheme.colorScheme.primaryContainer
+            isLocked -> Color(0xFFF0F0F0)
+            else -> Color.White
+        },
+        border = BorderStroke(
+            1.dp,
+            if (isSelected) MaterialTheme.colorScheme.primary else Color(0xFFE5ECE7)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = text,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (isLocked) Color(0xFFAAAAAA) else Color(0xFF23333A)
+            )
+            when {
+                isSelected -> Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                isLocked -> Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = Color(0xFFAAAAAA),
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
@@ -491,16 +638,6 @@ private fun getNameStyleString(fontWeight: FontWeight): String {
         FontWeight.ExtraBold -> "ExtraBold"
         else -> "SemiBold"
     }
-}
-
-private fun parseColorFromPremiId(id: String?): Color? {
-    if (id == null) return null
-    val regex = Regex("R(\\d+)G(\\d+)B(\\d+)")
-    val match = regex.find(id) ?: return null
-    val r = match.groupValues[1].toIntOrNull() ?: return null
-    val g = match.groupValues[2].toIntOrNull() ?: return null
-    val b = match.groupValues[3].toIntOrNull() ?: return null
-    return Color(r, g, b)
 }
 
 private fun isSameColor(a: Color, b: Color): Boolean {

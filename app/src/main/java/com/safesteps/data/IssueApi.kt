@@ -129,6 +129,7 @@ private object IssueBackend {
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
@@ -144,6 +145,7 @@ private object VotesBackend {
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
