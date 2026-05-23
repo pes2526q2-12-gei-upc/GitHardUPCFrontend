@@ -59,6 +59,7 @@ private object FriendshipBackend {
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(FRIENDSHIP_BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }

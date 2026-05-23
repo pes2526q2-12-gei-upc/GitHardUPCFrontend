@@ -29,6 +29,7 @@ private object UserEmergencyBackend {
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(USER_EMERGENCY_BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }

@@ -60,6 +60,7 @@ private object EmergencyContactBackend {
     private val retrofit by lazy {
         Retrofit.Builder()
             .baseUrl(EMERGENCY_CONTACT_BASE_URL)
+            .client(sharedOkHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
