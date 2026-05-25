@@ -32,6 +32,20 @@ class SafeStepsFirebaseMessagingService : FirebaseMessagingService() {
         val senderName = resolveFriendRequestSenderName(data)
         val status = data["status"] ?: data["friendshipStatus"] ?: data["requestStatus"]
 
+        val senderUsername = (message.data["sender_username"] ?: message.data["senderUsername"])?.trim().orEmpty()
+        val messageContent = (message.data["message_content"] ?: message.data["messageContent"])?.trim().orEmpty()
+        val chatId = (message.data["chatId"] ?: message.data["chat_id"])?.toLongOrNull()
+        val senderGoogleId = (message.data["senderGoogleId"] ?: message.data["sender_google_id"])?.trim().orEmpty()
+        val chatName = sequenceOf("chatName", "chat_name", "groupName", "group_name")
+            .mapNotNull { k -> message.data[k]?.trim()?.takeIf { it.isNotBlank() } }
+            .firstOrNull().orEmpty()
+        val isGroup = (message.data["chatType"] ?: message.data["chat_type"]).equals("GROUP", true) ||
+                (message.data["isGroup"] ?: message.data["is_group"]).equals("true", true) ||
+                message.data.containsKey("groupName") || message.data.containsKey("group_name")
+        val avatarUrl = sequenceOf("senderPhotoUrl", "sender_photo_url", "avatarUrl", "photoUrl", "picture")
+            .mapNotNull { k -> message.data[k]?.trim()?.takeIf { it.isNotBlank() } }
+            .firstOrNull()
+
         if (isFriendRequestNotification(title, body, status)) {
             showIncomingFriendRequestNotification(
                 context = applicationContext,
@@ -65,8 +79,13 @@ class SafeStepsFirebaseMessagingService : FirebaseMessagingService() {
         when {
             normalizedType.contains("MESSAGE") -> showIncomingMessageNotification(
                 context = applicationContext,
-                title = resolvedTitle,
-                body = resolvedBody
+                chatId = chatId,
+                chatName = chatName.ifBlank { senderUsername },
+                senderName = senderUsername,
+                messageContent = messageContent.ifBlank { resolvedBody.orEmpty() },
+                isGroup = isGroup,
+                avatarUrl = avatarUrl,
+                senderGoogleId = senderGoogleId.takeIf { it.isNotBlank() }
             )
             normalizedType.contains("FRIEND") -> showIncomingFriendRequestNotification(
                 context = applicationContext,
@@ -183,10 +202,9 @@ class SafeStepsFirebaseMessagingService : FirebaseMessagingService() {
             return "EMERGENCY"
         }
 
-        if (data.containsKey("chatId") ||
-            data.containsKey("senderUsername") ||
-            data.containsKey("senderGoogleId") ||
-            data.containsKey("messageContent")
+        if (data.containsKey("chatId") || data.containsKey("chat_id") ||
+            data.containsKey("senderUsername") || data.containsKey("sender_username") ||
+            data.containsKey("senderGoogleId") || data.containsKey("messageContent") || data.containsKey("message_content")
         ) {
             return "MESSAGE"
         }

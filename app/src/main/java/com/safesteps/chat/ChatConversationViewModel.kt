@@ -17,6 +17,7 @@ import com.safesteps.data.obtenirMissatges
 import com.safesteps.data.obtenirXatsUsuari
 import com.safesteps.data.promocionarAdmin
 import com.safesteps.data.revocarAdmin
+import com.safesteps.data.sortirDelXat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -130,8 +131,15 @@ class ChatConversationViewModel(
         loadChatDetails()
     }
 
-    fun onScreenVisible() { startPolling() }
-    fun onScreenHidden() { stopPolling() }
+    fun onScreenVisible() {
+        ChatEventBus.ActiveChatTracker.activeChatId = chatId
+        UnreadMessagesStore.clear(chatId)
+        startPolling()
+    }
+    fun onScreenHidden() {
+        if (ChatEventBus.ActiveChatTracker.activeChatId == chatId) ChatEventBus.ActiveChatTracker.activeChatId = null
+        stopPolling()
+    }
 
     fun onInputChanged(text: String) = _uiState.update { it.copy(inputText = text, sendFailed = false) }
 
@@ -346,6 +354,24 @@ class ChatConversationViewModel(
         }
     }
 
+    fun exitChat(onLeft: () -> Unit) {
+        if (chatId == -1L || myGoogleId.isBlank()) { onLeft(); return }
+        _uiState.update { it.copy(isProcessingAdmin = true) }
+        viewModelScope.launch {
+            try {
+                withContext(ioDispatcher) { sortirDelXat(chatId, myGoogleId) }
+                ChatEventBus.onParticipantLeft(chatId, myUsername)
+                onLeft()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("CHAT_CONV", "Error sortint del xat: ${e.message}")
+                _uiState.update { it.copy(isProcessingAdmin = false) }
+                _events.emit(ConversationEvent.Error(R.string.error_server_operation))
+            }
+        }
+    }
+
 
     private fun startPolling() {
         launchMessagePolling()
@@ -442,6 +468,7 @@ class ChatConversationViewModel(
                     messages = msgs.map { it.toUiState() } + pending
                 )
             }
+            UnreadMessagesStore.clear(chatId)
             viewModelScope.launch { markIncomingAsRead(msgs) }
         } catch (e: CancellationException) { throw e
         } catch (e: Exception) {
@@ -502,22 +529,28 @@ class ChatConversationViewModel(
             googleIds.firstOrNull { it != myGoogleId && it.isNotBlank() }
         } else null
 
-        val creatorId = if (isGroup) googleIds.firstOrNull { it.isNotBlank() } else null
+        val creatorId = if (isGroup) {
+            chat.creatorGoogleId?.takeIf { it.isNotBlank() }
+                ?: googleIds.firstOrNull { it.isNotBlank() }
+        } else null
 
         _uiState.update { state ->
-            val currentAdmins = state.adminGoogleIds
-            val newAdmins = if (currentAdmins.isEmpty() && creatorId != null) setOf(creatorId)
-            else currentAdmins + listOfNotNull(creatorId)
-
+            val backendAdmins = chat.adminGoogleIds.filter { it.isNotBlank() }.toSet()
+            val resolvedAdmins = when {
+                backendAdmins.isNotEmpty() -> backendAdmins + listOfNotNull(creatorId)
+                state.adminGoogleIds.isNotEmpty() -> state.adminGoogleIds + listOfNotNull(creatorId)
+                creatorId != null -> setOf(creatorId)
+                else -> emptySet()
+            }
             state.copy(
                 isGroup = isGroup,
                 participantNames = chat.participantUsernames,
                 participantGoogleIds = googleIds,
                 otherParticipantGoogleId = otherGoogleId,
                 creatorGoogleId = creatorId,
-                adminGoogleIds = newAdmins,
+                adminGoogleIds = resolvedAdmins,
                 currentUserIsCreator = (creatorId == myGoogleId),
-                currentUserIsAdmin = (myGoogleId in newAdmins)
+                currentUserIsAdmin = (myGoogleId in resolvedAdmins)
             )
         }
     }
@@ -566,5 +599,9 @@ class ChatConversationViewModel(
         } catch (_: Exception) { date.take(10) }
     }
 
-    override fun onCleared() { super.onCleared(); stopPolling() }
+    override fun onCleared() {
+        super.onCleared()
+        if (ChatEventBus.ActiveChatTracker.activeChatId == chatId) ChatEventBus.ActiveChatTracker.activeChatId = null
+        stopPolling()
+    }
 }
