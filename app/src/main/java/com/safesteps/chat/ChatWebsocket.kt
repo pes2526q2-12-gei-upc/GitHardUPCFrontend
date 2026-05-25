@@ -4,6 +4,22 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+
+object UnreadMessagesStore {
+    private val _counts = MutableStateFlow<Map<Long, Int>>(emptyMap())
+    val counts: StateFlow<Map<Long, Int>> = _counts.asStateFlow()
+
+    fun increment(chatId: Long) =
+        _counts.update { it + (chatId to ((it[chatId] ?: 0) + 1)) }
+
+    fun clear(chatId: Long) = _counts.update { it - chatId }
+}
+
+
 sealed class ChatRealtimeEvent {
     abstract val chatId: Long?
 
@@ -17,6 +33,10 @@ sealed class ChatRealtimeEvent {
 }
 
 object ChatEventBus {
+
+    object ActiveChatTracker {
+        @Volatile var activeChatId: Long? = null
+    }
     private val _events = MutableSharedFlow<ChatRealtimeEvent>(replay = 0, extraBufferCapacity = 16)
     val events: SharedFlow<ChatRealtimeEvent> = _events.asSharedFlow()
 

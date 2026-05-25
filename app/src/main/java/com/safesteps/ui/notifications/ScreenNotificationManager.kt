@@ -58,6 +58,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import coil.compose.AsyncImage
 import com.safesteps.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -99,6 +101,8 @@ data class ScreenNotification(
     val id: Long,
     val name: String,
     val text: String,
+    val avatarUrl: String? = null,
+    val isGroup: Boolean = false,
     val durationMillis: Long
 )
 
@@ -119,16 +123,18 @@ object ScreenNotificationManager {
     fun showNotification(
         notificationName: String,
         text: String,
-        durationMillis: Long = DefaultNotificationDurationMillis
+        durationMillis: Long = DefaultNotificationDurationMillis,
+        avatarUrl: String? = null,
+        isGroup: Boolean = false        // nou
     ) {
-        if (notificationName.isBlank() || text.isBlank()) {
-            return
-        }
+        if (notificationName.isBlank() || text.isBlank()) return
 
         val notification = ScreenNotification(
             id = nextId.getAndIncrement(),
             name = notificationName.trim(),
             text = text.trim(),
+            avatarUrl = avatarUrl,
+            isGroup = isGroup,
             durationMillis = durationMillis.coerceAtLeast(MinimumNotificationDurationMillis)
         )
 
@@ -307,10 +313,7 @@ private fun DismissibleScreenNotification(
 }
 
 @Composable
-private fun NotificationCard(
-    notification: ScreenNotification,
-    progress: Float
-) {
+private fun NotificationCard(notification: ScreenNotification, progress: Float) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = NotificationShape,
@@ -318,53 +321,55 @@ private fun NotificationCard(
         shadowElevation = 18.dp,
         border = BorderStroke(1.dp, NotificationBorder)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.linearGradient(NotificationCardGradient)
-                )
-        ) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = NotificationGlowGradient,
-                            radius = 700f
-                        )
-                    )
-            )
+        Box(Modifier.fillMaxWidth().background(Brush.linearGradient(NotificationCardGradient))) {
+            Box(Modifier.matchParentSize().background(
+                Brush.radialGradient(colors = NotificationGlowGradient, radius = 700f)))
 
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        modifier = Modifier.size(18.dp).clip(CircleShape).background(NotificationLogoBackground),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.mipmap.safesteps_launchapp_foreground),
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
+                    Text(
+                        text = stringResource(id = R.string.app_name),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = NotificationTextSecondary,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                    )
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    NotificationAvatar()
-
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
+                    NotificationLeadingAvatar(name = notification.name, avatarUrl = notification.avatarUrl, isGroup = notification.isGroup)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
                             text = notification.name,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = NotificationTextPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = notification.text,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = NotificationTextSecondary
+                            color = NotificationTextSecondary,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -376,21 +381,39 @@ private fun NotificationCard(
 }
 
 @Composable
-private fun NotificationAvatar() {
-    Box(
-        modifier = Modifier
-            .size(52.dp)
-            .clip(CircleShape)
-            .background(NotificationLogoBackground)
-            .border(width = 1.dp, color = Color.White.copy(alpha = 0.24f), shape = CircleShape),
-        contentAlignment = Alignment.Center
-    ) {
-        Image(
-            painter = painterResource(id = R.mipmap.safesteps_launchapp_foreground),
-            contentDescription = "SafeSteps",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.size(34.dp)
+private fun NotificationLeadingAvatar(name: String, avatarUrl: String?, isGroup: Boolean) {
+    when {
+        avatarUrl != null -> AsyncImage(
+            model = avatarUrl,
+            contentDescription = name,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.size(48.dp).clip(CircleShape)
+                .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
         )
+        isGroup -> Box(
+            modifier = Modifier.size(48.dp).clip(CircleShape).background(NotificationLogoBackground)
+                .border(1.dp, Color.White.copy(alpha = 0.24f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_group_notification),
+                contentDescription = name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(30.dp)
+            )
+        }
+        else -> Box(
+            modifier = Modifier.size(48.dp).clip(CircleShape).background(NotificationLogoBackground)
+                .border(1.dp, Color.White.copy(alpha = 0.24f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                painter = painterResource(id = R.mipmap.safesteps_launchapp_foreground),
+                contentDescription = "SafeSteps",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(30.dp)
+            )
+        }
     }
 }
 
