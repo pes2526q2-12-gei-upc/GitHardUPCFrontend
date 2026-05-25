@@ -349,12 +349,15 @@ fun SafeStepsApp(
         onDismissLevelUp = profileViewModel::dismissLevelUpAnimation,
         onDismissPrize = profileViewModel::dismissPrizeAnimation,
                 onViewRouteFromChat = onViewRouteFromChat,
-        pendingRoute = if (hasPendingRoute) PendingRoute(
-            originLat = pendingRouteOriginLat,
-            originLng = pendingRouteOriginLng,
-            destLat = pendingRouteDestLat,
-            destLng = pendingRouteDestLng
-        ) else null
+        pendingRoute = if (hasPendingRoute) {
+            hasPendingRoute = false
+            PendingRoute(
+                originLat = pendingRouteOriginLat,
+                originLng = pendingRouteOriginLng,
+                destLat = pendingRouteDestLat,
+                destLng = pendingRouteDestLng
+            )
+        } else null
     )
 }
 

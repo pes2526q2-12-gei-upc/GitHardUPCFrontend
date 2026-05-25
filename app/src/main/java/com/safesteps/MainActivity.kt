@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.safesteps.auth.AuthViewModel
 import com.safesteps.notifications.BackendWebSocketManager
@@ -31,10 +32,11 @@ private const val NotificationPermissionRequestCode = 1001
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         MapLibre.getInstance(this)
         initializeEmergencyMessaging(applicationContext)
         requestNotificationPermissionIfNeeded()
+
 
         enableEdgeToEdge()
         setContent {
@@ -86,4 +88,5 @@ class MainActivity : AppCompatActivity() {
             NotificationPermissionRequestCode
         )
     }
+
 }
