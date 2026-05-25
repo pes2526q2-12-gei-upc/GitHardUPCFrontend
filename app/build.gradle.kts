@@ -5,11 +5,15 @@ plugins {
     id("jacoco")
 }
 
-val apiKey = rootProject.file("local.properties")
-    .readLines()
-    .firstOrNull { it.startsWith("API_KEY=") }
-    ?.substringAfter("API_KEY=")
-    ?: ""
+val localPropertiesFile = rootProject.file("local.properties")
+val apiKey = if (localPropertiesFile.exists()) {
+    localPropertiesFile.readLines()
+        .firstOrNull { it.startsWith("API_KEY=") }
+        ?.substringAfter("API_KEY=")
+        ?: ""
+} else {
+    System.getenv("API_KEY") ?: ""
+}
 
 android {
     namespace = "com.safesteps"
