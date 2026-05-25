@@ -394,11 +394,12 @@ private fun BoxScope.ShareRouteOverlay(
         ) {
             ShareRouteScreen(
                 user = currentUser,
-                originLat = uiState.origenSeleccionado?.latitude ?: 0.0,
-                originLng = uiState.origenSeleccionado?.longitude ?: 0.0,
+                originLat = uiState.origenSeleccionado?.latitude ?: uiState.ultimaUbicacion?.latitude ?: 0.0,
+                originLng = uiState.origenSeleccionado?.longitude ?: uiState.ultimaUbicacion?.longitude ?: 0.0,
                 destLat = uiState.destinoSeleccionado?.latitude ?: 0.0,
                 destLng = uiState.destinoSeleccionado?.longitude ?: 0.0,
-                originAddress = uiState.textoOrigen.takeIf { it.isNotBlank() },
+                originAddress = uiState.resolvedOriginAddress?.takeIf { it.isNotBlank() }
+                    ?: uiState.textoOrigen.takeIf { it.isNotBlank() },
                 destAddress = uiState.textoDestino.takeIf { it.isNotBlank() },
                 distanceText = uiState.distanceText,
                 durationText = uiState.durationText,
@@ -800,7 +801,7 @@ fun MapLibreScreen(
             puntInteresSeleccionat = displayedSelectedPoi
         )
     }
-    LaunchedEffect(pendingRoute) {
+    LaunchedEffect(pendingRoute?.originLat, pendingRoute?.originLng, pendingRoute?.destLat, pendingRoute?.destLng) {
         if (pendingRoute != null) {
             viewModel.calcularRuta(
                 origenLong = pendingRoute.originLng,
