@@ -119,6 +119,7 @@ class MapViewModel(
     private var userVoteIds: Map<Long, Long> = emptyMap()
 
     var routeResult by mutableStateOf<RouteCompletionResponse?>(null)
+    var voteCompleted by mutableStateOf(0)
         private set
 
     init {
@@ -1104,9 +1105,8 @@ class MapViewModel(
                     voteScoreValid = true
                 )
 
-                Log.d("VOTES", "Enviant POST vot: incidenciaId=$incidenciaId, score=$score, googleId=$googleId")
                 val resposta = votarIncidencia(incidenciaId, request)
-                Log.d("VOTES", "POST OK: response=$resposta")
+                voteCompleted++
 
                 userVoteIds = userVoteIds + (incidenciaId to resposta.id)
 
@@ -1135,18 +1135,34 @@ class MapViewModel(
         }
     }
 
+    private suspend fun getUpdatedIssues(): List<IssueResponseDTO>? {
+        return try {
+            getAllIssues()
+                .groupBy { Pair(it.coordinates.lat, it.coordinates.lon) }
+                .map { (_, issuesEnAquestPunt) ->
+                    issuesEnAquestPunt.minByOrNull { it.createdAt } ?: issuesEnAquestPunt.first()
+                }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private suspend fun ensureVoteId(idIncidencia: Long, googleId: String): Long? {
+        var voteId = userVoteIds[idIncidencia]
+        if (voteId == null) {
+            Log.d("VOTES", "voteId desconegut per incidencia=$idIncidencia, refrescant")
+            refreshUserVotesFromBackend(googleId)
+            voteId = userVoteIds[idIncidencia]
+        }
+        return voteId
+    }
+
     fun desferVot(idIncidencia: Long, googleId: String) {
         val votActual = uiState.value.userVotes[idIncidencia] ?: return
 
         viewModelScope.launch {
             try {
-                var voteId = userVoteIds[idIncidencia]
-                if (voteId == null) {
-                    Log.d("VOTES", "voteId desconegut per incidencia=$idIncidencia, refrescant")
-                    refreshUserVotesFromBackend(googleId)
-                    voteId = userVoteIds[idIncidencia]
-                }
-
+                val voteId = ensureVoteId(idIncidencia, googleId)
                 if (voteId == null) {
                     Log.w("VOTES", "No s'ha pogut trobar voteId per incidencia=$idIncidencia")
                     return@launch
@@ -1158,15 +1174,7 @@ class MapViewModel(
 
                 userVoteIds = userVoteIds - idIncidencia
 
-                val totesActualitzades = try {
-                    getAllIssues()
-                        .groupBy { Pair(it.coordinates.lat, it.coordinates.lon) }
-                        .map { (_, issuesEnAquestPunt) ->
-                            issuesEnAquestPunt.minByOrNull { it.createdAt } ?: issuesEnAquestPunt.first()
-                        }
-                } catch (_: Exception) {
-                    null
-                }
+                val totesActualitzades = getUpdatedIssues()
 
                 _uiState.update { currentState ->
                     val nousVots = currentState.userVotes.toMutableMap()

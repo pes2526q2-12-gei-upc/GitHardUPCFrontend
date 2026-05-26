@@ -348,7 +348,8 @@ fun SafeStepsApp(
         onOpenPrize = profileViewModel::openPrize,
         onDismissLevelUp = profileViewModel::dismissLevelUpAnimation,
         onDismissPrize = profileViewModel::dismissPrizeAnimation,
-                onViewRouteFromChat = onViewRouteFromChat,
+        onVoted = {},
+        onViewRouteFromChat = onViewRouteFromChat,
         pendingRoute = if (hasPendingRoute) PendingRoute(
             originLat = pendingRouteOriginLat,
             originLng = pendingRouteOriginLng,
@@ -502,6 +503,7 @@ private fun SafeStepsLocalizedContent(
     onOpenPrize: () -> Unit,
     onDismissLevelUp: () -> Unit,
     onDismissPrize: () -> Unit,
+    onVoted: () -> Unit = {},
     onViewRouteFromChat: (Double, Double, Double, Double) -> Unit,
     pendingRoute: PendingRoute?
 ) {
@@ -567,6 +569,7 @@ private fun SafeStepsLocalizedContent(
             onOpenPrize = onOpenPrize,
             onDismissLevelUp = onDismissLevelUp,
             onDismissPrize = onDismissPrize,
+            onVoted = onVoted,
             onViewRouteFromChat = onViewRouteFromChat,
             pendingRoute = pendingRoute
         )
@@ -640,6 +643,7 @@ private fun SafeStepsBody(
     onOpenPrize: () -> Unit,
     onDismissLevelUp: () -> Unit,
     onDismissPrize: () -> Unit,
+    onVoted: () -> Unit = {},
     onViewRouteFromChat: (Double, Double, Double, Double) -> Unit,
     pendingRoute: PendingRoute?
 ) {
@@ -742,6 +746,7 @@ private fun SafeStepsBody(
                         onMenuClick = onNavigateToMenu,
                         onProfileClick = onNavigateToProfileFromMap,
                         onRouteCompleted = onRouteCompleted,
+                        onVoted = {},
                         pendingRoute = pendingRoute
                     )
                 }

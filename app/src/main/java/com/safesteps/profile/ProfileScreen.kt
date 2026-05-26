@@ -253,17 +253,15 @@ private fun ProfileOverlays(
     gamificationCallbacks: ProfileGamificationCallbacks,
     issuesState: ProfileIssuesState
 ) {
-    if (gamification.showLevelUpAnimation) {
-        LevelUpAnimationOverlay(
-            level = gamification.level,
-            onDismiss = gamificationCallbacks.onDismissLevelUp
-        )
-    }
-
     if (gamification.showPrizeAnimation && gamification.lastOpenedPrize != null) {
         PrizeAnimationOverlay(
             prize = gamification.lastOpenedPrize,
             onDismiss = gamificationCallbacks.onDismissPrize
+        )
+    } else if (gamification.showLevelUpAnimation) {
+        LevelUpAnimationOverlay(
+            level = gamification.level,
+            onDismiss = gamificationCallbacks.onDismissLevelUp
         )
     }
 
@@ -296,6 +294,7 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     onDeleteAccount: () -> Unit,
     onCustomizeClick: () -> Unit,
+    onRefreshProfile: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isIssuesSectionExpanded by rememberSaveable { mutableStateOf(false) }
@@ -305,6 +304,11 @@ fun ProfileScreen(
 
     val appContext = LocalContext.current.applicationContext
     val issuesState = rememberProfileIssuesState(userGoogleId = user.googleId)
+
+    LaunchedEffect(user.googleId) {
+        onRefreshProfile()
+    }
+
     val socketChannelSettings by remember(appContext) {
         SocketChannelPreferences.settings(appContext)
     }.collectAsState()

@@ -220,7 +220,12 @@ class ShareRouteViewModel(
                 appendLine("📍 $origin → $dest")
                 if (priority.isNotBlank()) appendLine("🛡 $priority")
                 appendLine("📏 $distanceText · ⏱ $durationText")
-                appendLine("🗓 $scheduledDate")
+                val formattedDate = try {
+                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", java.util.Locale.getDefault())
+                    val parsed = sdf.parse(scheduledDate)
+                    if (parsed != null) java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(parsed) else scheduledDate
+                } catch (e: Exception) { scheduledDate }
+                appendLine("🗓 $formattedDate")
                 append(routeTag)
             }
         } else {
