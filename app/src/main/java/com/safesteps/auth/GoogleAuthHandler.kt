@@ -46,7 +46,6 @@ fun rememberGoogleSignInAction(
                 notifySignInFailure(context)
             }
         } catch (e: ApiException) {
-            Log.e("GOOGLE_AUTH", "Sign in failed: ${e.statusCode}")
             notifySignInFailure(context)
         }
     }
