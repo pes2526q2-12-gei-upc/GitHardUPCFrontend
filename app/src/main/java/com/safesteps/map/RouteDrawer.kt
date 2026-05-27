@@ -17,6 +17,7 @@ import androidx.core.graphics.toColorInt
 import com.safesteps.data.Coordenada
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
+import org.maplibre.android.constants.MapLibreConstants
 import org.maplibre.android.style.layers.LineLayer
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
@@ -209,8 +210,8 @@ private fun drawOverlappingLayers(
 ) {
     val points = puntsRuta.toPoints()
     style.addSource(GeoJsonSource(ROUTE_SOURCE_ID, Feature.fromGeometry(LineString.fromLngLats(points))))
-    style.addLayer(buildLineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID, colorBase, widthBase))
-    style.addLayer(buildLineLayer(ROUTE_LAYER_ID_2, ROUTE_SOURCE_ID, colorTop, widthTop))
+    addRouteLayer(style, buildLineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID, colorBase, widthBase))
+    addRouteLayer(style, buildLineLayer(ROUTE_LAYER_ID_2, ROUTE_SOURCE_ID, colorTop, widthTop))
 }
 
 private fun drawGradientSegments(
@@ -234,7 +235,7 @@ private fun drawSolidLine(
 ) {
     val points = puntsRuta.toPoints()
     style.addSource(GeoJsonSource(ROUTE_SOURCE_ID, Feature.fromGeometry(LineString.fromLngLats(points))))
-    style.addLayer(buildLineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID, color, 6f))
+    addRouteLayer(style, buildLineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID, color, 6f))
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -254,7 +255,18 @@ private fun addSegmentLayer(
         Point.fromLngLat(to.longitude, to.latitude)
     )
     style.addSource(GeoJsonSource(sourceId, Feature.fromGeometry(LineString.fromLngLats(points))))
-    style.addLayer(buildLineLayer(layerId, sourceId, color, width))
+    addRouteLayer(style, buildLineLayer(layerId, sourceId, color, width))
+}
+
+private fun addRouteLayer(
+    style: org.maplibre.android.maps.Style,
+    layer: LineLayer
+) {
+    if (style.getLayer(MapLibreConstants.LAYER_ID_ANNOTATIONS) != null) {
+        style.addLayerBelow(layer, MapLibreConstants.LAYER_ID_ANNOTATIONS)
+    } else {
+        style.addLayer(layer)
+    }
 }
 
 private fun buildLineLayer(
