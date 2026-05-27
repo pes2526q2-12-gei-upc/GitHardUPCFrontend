@@ -19,7 +19,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private const val CHAT_BASE_URL = "http://nattech.fib.upc.edu:40382/"
+private const val CHAT_BASE_URL = "http://nattech.fib.upc.edu:40381/"
 
 data class ChatDto(
     val id: Long,
