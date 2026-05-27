@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -279,8 +280,9 @@ private fun MapScreenDialogs(
     currentUser: UserInfo?,
     strings: MapScreenStrings,
     context: Context,
-    onLoginClick: () -> Unit
-) {
+    onLoginClick: () -> Unit,
+    onVoted: () -> Unit = {}
+){
     val textMevaUbicacio = appString(R.string.my_location)
     val textExit = context.getString(R.string.report_registered)
 
@@ -323,8 +325,8 @@ private fun MapScreenDialogs(
             isLoggedIn = currentUser != null,
             miVot = miVot,
             onDismiss = { viewModel.selectIssue(null) },
-            onConfirmar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, true, it) } },
-            onRebutjar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, false, it) } },
+            onConfirmar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, true, it) }; onVoted() },
+            onRebutjar = { currentUser?.googleId?.let { viewModel.voteIssue(incidencia.id, false, it) }; onVoted() },
             onEditar = { viewModel.iniciarEdicio(incidencia) },
             onEsborrar = { viewModel.esborrarIncidencia(incidencia.id) },
             onDesferVot = { currentUser?.googleId?.let { viewModel.desferVot(incidencia.id, it) } }
@@ -561,6 +563,120 @@ private fun BoxScope.ActiveRouteExperienceOverlay(
     )
 }
 
+private fun handleEmergencyHelpRouteClick(
+    uiState: MapUiState,
+    strings: MapScreenStrings,
+    viewModel: MapViewModel
+) {
+    val pendingLocation = uiState.pendingEmergencyContactLocation ?: return
+    val hasRouteOrigin = uiState.origenSeleccionado != null || uiState.ultimaUbicacion != null
+    if (!hasRouteOrigin) {
+        ScreenNotificationManager.showNotification(
+            notificationName = strings.mapNotificationTitle,
+            text = strings.waitingGpsLocationMessage
+        )
+        return
+    }
+    viewModel.prepareEmergencyHelpRoute(pendingLocation)
+}
+
+@Composable
+private fun BoxScope.EmergencyContactHelpOverlayWrapper(
+    uiState: MapUiState,
+    strings: MapScreenStrings,
+    emergencyHelpBottomPadding: Dp,
+    mapView: MapView,
+    viewModel: MapViewModel
+) {
+    EmergencyContactHelpOverlay(
+        pendingLocation = uiState.pendingEmergencyContactLocation,
+        titleFallback = strings.emergencyContactHelpTitle,
+        actionLabel = strings.emergencyContactHelpRouteAction,
+        dismissLabel = strings.emergencyContactDismissLabel,
+        bottomPadding = emergencyHelpBottomPadding,
+        onFocusLocationClick = {
+            focusOnEmergencyContactLocation(
+                mapView = mapView,
+                uiState = uiState,
+                viewModel = viewModel
+            )
+        },
+        onHelpRouteClick = { handleEmergencyHelpRouteClick(uiState, strings, viewModel) },
+        onDismissClick = {
+            uiState.pendingEmergencyContactLocation?.id?.let(viewModel::dismissEmergencyContactLocation)
+        }
+    )
+}
+
+@Composable
+private fun BoxScope.MapScreenInteractiveActions(
+    uiState: MapUiState,
+    isPlanningRoute: Boolean,
+    isActiveRoute: Boolean,
+    floatingActionsLayout: FloatingActionsLayout,
+    effectiveFloatingActionsBottomPadding: Dp,
+    emergencyHelpBottomPadding: Dp,
+    mapStyleTopOffset: Dp,
+    showEmergencyAction: Boolean,
+    isEmergencyActive: Boolean,
+    strings: MapScreenStrings,
+    viewModel: MapViewModel,
+    actions: MapScreenActions,
+    mapView: MapView,
+    onEmergencyClick: () -> Unit
+) {
+    MapActionButtons(
+        uiState = uiState,
+        isPlanningRoute = isPlanningRoute,
+        isActiveRoute = isActiveRoute,
+        floatingActionsLayout = floatingActionsLayout,
+        effectiveFloatingActionsBottomPadding = effectiveFloatingActionsBottomPadding,
+        showEmergencyAction = showEmergencyAction,
+        isEmergencyActive = isEmergencyActive,
+        strings = strings,
+        viewModel = viewModel,
+        actions = actions,
+        onEmergencyClick = onEmergencyClick
+    )
+
+    MapStyleTopRightOverlay(
+        visible = floatingActionsLayout.showMapStyleAction,
+        isSatelliteStyle = uiState.estiloSatelite,
+        topOffset = mapStyleTopOffset,
+        standardMapStyleLabel = strings.standardMapStyleLabel,
+        satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
+        onClick = { viewModel.toggleEstiloSatelite() }
+    )
+
+    if (isPlanningRoute || isActiveRoute) {
+        RouteModeFloatingActions(
+            uiState = uiState,
+            bottomPadding = effectiveFloatingActionsBottomPadding,
+            onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
+            onMyLocationClick = actions.onCenterCurrentLocation,
+            onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
+            hideExtraInfoLabel = strings.hideExtraInfoLabel,
+            showExtraInfoLabel = strings.showExtraInfoLabel,
+            myLocationLabel = strings.myLocationLabel,
+            reportIssueLabel = strings.reportIssueLabel,
+            emergencyActionLabel = strings.emergencyActionLabel,
+            isEmergencyActive = isEmergencyActive,
+            showEmergencyAction = showEmergencyAction,
+            onEmergencyClick = onEmergencyClick
+        )
+    }
+
+    if (!isPlanningRoute && !isActiveRoute) {
+        EmergencyContactHelpOverlayWrapper(
+            uiState = uiState,
+            strings = strings,
+            emergencyHelpBottomPadding = emergencyHelpBottomPadding,
+            mapView = mapView,
+            viewModel = viewModel
+        )
+    }
+}
+
 @Composable
 private fun MapScreenContent(
     modifier: Modifier,
@@ -577,7 +693,8 @@ private fun MapScreenContent(
     onEmergencyClick: () -> Unit,
     onLoginClick: () -> Unit,
     onMenuClick: () -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onVoted: () -> Unit = {}
 ) {
     var floatingActionsBottomPadding by remember { mutableStateOf(16.dp) }
     var topOverlayHeightPx by remember { mutableFloatStateOf(0f) }
@@ -657,7 +774,7 @@ private fun MapScreenContent(
                 routeTopBannerHeightPx = heightPx
             }
         )
-        
+
         ShareRouteOverlay(
             currentUser = currentUser,
             showShareRoute = showShareRoute,
@@ -666,77 +783,22 @@ private fun MapScreenContent(
             onShared = { showShareRoute = false }
         )
 
-        MapActionButtons(
-            uiState = uiState,
-            isPlanningRoute = isPlanningRoute,
-            isActiveRoute = isActiveRoute,
-            floatingActionsLayout = floatingActionsLayout,
-            effectiveFloatingActionsBottomPadding = effectiveFloatingActionsBottomPadding,
-            showEmergencyAction = showEmergencyAction,
-            isEmergencyActive = isEmergencyActive,
-            strings = strings,
-            viewModel = viewModel,
-            actions = actions,
-            onEmergencyClick = onEmergencyClick
-        )
-
-        MapStyleTopRightOverlay(
-            visible = floatingActionsLayout.showMapStyleAction,
-            isSatelliteStyle = uiState.estiloSatelite,
-            topOffset = mapStyleTopOffset,
-            standardMapStyleLabel = strings.standardMapStyleLabel,
-            satelliteMapStyleLabel = strings.satelliteMapStyleLabel,
-            onClick = { viewModel.toggleEstiloSatelite() }
-        )
-
-        if (isPlanningRoute || isActiveRoute) {
-            RouteModeFloatingActions(
+        if (!showShareRoute) {
+            MapScreenInteractiveActions(
                 uiState = uiState,
-                bottomPadding = effectiveFloatingActionsBottomPadding,
-                onTogglePuntsInteres = { viewModel.togglePuntsInteres() },
-                onMyLocationClick = actions.onCenterCurrentLocation,
-                onReportIssueClick = { viewModel.toggleMenuIncidencies(true) },
-                hideExtraInfoLabel = strings.hideExtraInfoLabel,
-                showExtraInfoLabel = strings.showExtraInfoLabel,
-                myLocationLabel = strings.myLocationLabel,
-                reportIssueLabel = strings.reportIssueLabel,
-                emergencyActionLabel = strings.emergencyActionLabel,
-                isEmergencyActive = isEmergencyActive,
+                isPlanningRoute = isPlanningRoute,
+                isActiveRoute = isActiveRoute,
+                floatingActionsLayout = floatingActionsLayout,
+                effectiveFloatingActionsBottomPadding = effectiveFloatingActionsBottomPadding,
+                emergencyHelpBottomPadding = emergencyHelpBottomPadding,
+                mapStyleTopOffset = mapStyleTopOffset,
                 showEmergencyAction = showEmergencyAction,
+                isEmergencyActive = isEmergencyActive,
+                strings = strings,
+                viewModel = viewModel,
+                actions = actions,
+                mapView = mapView,
                 onEmergencyClick = onEmergencyClick
-            )
-        }
-
-        if (!isPlanningRoute && !isActiveRoute) {
-            EmergencyContactHelpOverlay(
-                pendingLocation = uiState.pendingEmergencyContactLocation,
-                titleFallback = strings.emergencyContactHelpTitle,
-                actionLabel = strings.emergencyContactHelpRouteAction,
-                dismissLabel = strings.emergencyContactDismissLabel,
-                bottomPadding = emergencyHelpBottomPadding,
-                onFocusLocationClick = {
-                    focusOnEmergencyContactLocation(
-                        mapView = mapView,
-                        uiState = uiState,
-                        viewModel = viewModel
-                    )
-                },
-                onHelpRouteClick = {
-                    val pendingLocation = uiState.pendingEmergencyContactLocation ?: return@EmergencyContactHelpOverlay
-                    val hasRouteOrigin =
-                        uiState.origenSeleccionado != null || uiState.ultimaUbicacion != null
-                    if (!hasRouteOrigin) {
-                        ScreenNotificationManager.showNotification(
-                            notificationName = strings.mapNotificationTitle,
-                            text = strings.waitingGpsLocationMessage
-                        )
-                        return@EmergencyContactHelpOverlay
-                    }
-                    viewModel.prepareEmergencyHelpRoute(pendingLocation)
-                },
-                onDismissClick = {
-                    uiState.pendingEmergencyContactLocation?.id?.let(viewModel::dismissEmergencyContactLocation)
-                }
             )
         }
 
@@ -751,7 +813,155 @@ private fun MapScreenContent(
             currentUser = currentUser,
             strings = strings,
             context = LocalContext.current,
-            onLoginClick = onLoginClick
+            onLoginClick = onLoginClick,
+            onVoted = onVoted
+        )
+    }
+}
+
+@Stable
+private class LevelUpManager(
+    showOverlay: Boolean = false,
+    level: Long = 1L
+) {
+    var showOverlay by mutableStateOf(showOverlay)
+    var level by mutableStateOf(level)
+    var pendingCheck by mutableStateOf(false)
+
+    fun triggerCheck() {
+        pendingCheck = true
+    }
+
+    fun dismissOverlay() {
+        showOverlay = false
+    }
+}
+
+@Composable
+private fun rememberLevelUpManager(
+    currentUser: UserInfo?,
+    routeResult: RouteCompletionResponse?,
+    onRouteCompleted: (RouteCompletionResponse) -> Unit,
+    onRouteResultDismissed: () -> Unit,
+    onVoted: () -> Unit
+): LevelUpManager {
+    val manager = remember { LevelUpManager() }
+
+    LaunchedEffect(routeResult) {
+        if (routeResult != null) {
+            onRouteCompleted(routeResult)
+            if (routeResult.levelUpdated == true) {
+                manager.level = routeResult.level ?: 1
+                manager.showOverlay = true
+            }
+            onRouteResultDismissed()
+        }
+    }
+    LaunchedEffect(manager.pendingCheck) {
+        if (!manager.pendingCheck) return@LaunchedEffect
+        manager.pendingCheck = false
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        val profileBefore = com.safesteps.data.cargarPerfilDeUsuario(googleId) ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(1500)
+        val profileAfter = com.safesteps.data.cargarPerfilDeUsuario(googleId) ?: return@LaunchedEffect
+        if ((profileAfter.level ?: 1) > (profileBefore.level ?: 1)) {
+            manager.level = profileAfter.level ?: 1
+            manager.showOverlay = true
+        }
+        onVoted()
+    }
+    return manager
+}
+
+@Stable
+private class EmergencyManager(
+    hasContacts: Boolean = false,
+    isActive: Boolean = false
+) {
+    var hasContacts by mutableStateOf(hasContacts)
+    var isActive by mutableStateOf(isActive)
+}
+
+@Composable
+private fun rememberEmergencyManager(
+    currentUser: UserInfo?,
+    latestLocation: Location?
+): EmergencyManager {
+    val manager = remember { EmergencyManager() }
+
+    LaunchedEffect(currentUser?.googleId) {
+        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
+        if (googleId == null) {
+            manager.hasContacts = false
+            manager.isActive = false
+            return@LaunchedEffect
+        }
+
+        manager.hasContacts = runCatching {
+            cargarContactosEmergenciaUsuario(googleId).isNotEmpty()
+        }.getOrDefault(false)
+
+        manager.isActive = runCatching {
+            obtenerEstadoEmergenciaUsuario(googleId)
+        }.getOrDefault(false)
+    }
+
+    val latestEmergencyLocation = rememberUpdatedState(latestLocation)
+    LaunchedEffect(manager.isActive) {
+        if (!manager.isActive) return@LaunchedEffect
+        while (true) {
+            latestEmergencyLocation.value?.let { location ->
+                BackendWebSocketManager.sendLocationUpdate(
+                    latitude = location.latitude,
+                    longitude = location.longitude
+                )
+            }
+            kotlinx.coroutines.delay(EmergencyLocationBroadcastIntervalMillis)
+        }
+    }
+    return manager
+}
+
+@Composable
+private fun rememberDisplayedUiState(
+    uiState: MapUiState,
+    context: Context,
+    onClearSelectedPoi: () -> Unit
+): MapUiState {
+    val eventSettings by remember(context.applicationContext) {
+        MapEventPreferences.settings(context.applicationContext)
+    }.collectAsState()
+    
+    val shouldHideRouteEvents = remember(uiState, eventSettings) {
+        resolveShouldHideRouteEvents(
+            uiState = uiState,
+            settings = eventSettings
+        )
+    }
+    
+    val displayedPuntsInteres = remember(uiState.puntsInteres, shouldHideRouteEvents) {
+        filterDisplayedPuntsInteres(
+            puntsInteres = uiState.puntsInteres,
+            hideRouteEvents = shouldHideRouteEvents
+        )
+    }
+    
+    val displayedSelectedPoi = remember(uiState.puntInteresSeleccionat, displayedPuntsInteres) {
+        uiState.puntInteresSeleccionat?.takeIf { selectedPoi ->
+            displayedPuntsInteres.any { it.id == selectedPoi.id }
+        }
+    }
+    
+    LaunchedEffect(shouldHideRouteEvents, uiState.puntInteresSeleccionat?.id) {
+        if (shouldHideRouteEvents && uiState.puntInteresSeleccionat?.esEsdeveniment() == true) {
+            onClearSelectedPoi()
+        }
+    }
+    
+    return remember(uiState, displayedPuntsInteres, displayedSelectedPoi) {
+        uiState.copy(
+            puntsInteres = displayedPuntsInteres,
+            puntInteresSeleccionat = displayedSelectedPoi
         )
     }
 }
@@ -766,42 +976,23 @@ fun MapLibreScreen(
     onMenuClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onRouteCompleted: (RouteCompletionResponse) -> Unit = {},
-    pendingRoute: PendingRoute? = null
-) {
-
+    onVoted: () -> Unit = {},
+    pendingRoute: PendingRoute? = null,
+){
     val context = LocalContext.current
     val viewModel: MapViewModel = viewModel(
         factory = MapViewModelFactory(context.applicationContext)
     )
     val mapView = rememberMapViewWithLifecycle()
     val uiState by viewModel.uiState.collectAsState()
-    val eventSettings by remember(context.applicationContext) {
-        MapEventPreferences.settings(context.applicationContext)
-    }.collectAsState()
-    val shouldHideRouteEvents = remember(uiState, eventSettings) {
-        resolveShouldHideRouteEvents(
-            uiState = uiState,
-            settings = eventSettings
-        )
-    }
-    val displayedPuntsInteres = remember(uiState.puntsInteres, shouldHideRouteEvents) {
-        filterDisplayedPuntsInteres(
-            puntsInteres = uiState.puntsInteres,
-            hideRouteEvents = shouldHideRouteEvents
-        )
-    }
-    val displayedSelectedPoi = remember(uiState.puntInteresSeleccionat, displayedPuntsInteres) {
-        uiState.puntInteresSeleccionat?.takeIf { selectedPoi ->
-            displayedPuntsInteres.any { it.id == selectedPoi.id }
-        }
-    }
-    val displayedUiState = remember(uiState, displayedPuntsInteres, displayedSelectedPoi) {
-        uiState.copy(
-            puntsInteres = displayedPuntsInteres,
-            puntInteresSeleccionat = displayedSelectedPoi
-        )
-    }
-    LaunchedEffect(pendingRoute?.originLat, pendingRoute?.originLng, pendingRoute?.destLat, pendingRoute?.destLng) {
+    
+    val displayedUiState = rememberDisplayedUiState(
+        uiState = uiState,
+        context = context,
+        onClearSelectedPoi = { viewModel.onPuntInteresSeleccionat(null) }
+    )
+
+    LaunchedEffect(pendingRoute) {
         if (pendingRoute != null) {
             viewModel.calcularRuta(
                 origenLong = pendingRoute.originLng,
@@ -811,36 +1002,30 @@ fun MapLibreScreen(
             )
         }
     }
-    LaunchedEffect(shouldHideRouteEvents, uiState.puntInteresSeleccionat?.id) {
-        if (shouldHideRouteEvents && uiState.puntInteresSeleccionat?.esEsdeveniment() == true) {
-            viewModel.onPuntInteresSeleccionat(null)
-        }
-    }
-    val routeCompletionResult = viewModel.routeResult
-    var showLevelUpOverlay by remember { mutableStateOf(false) }
-    var levelUpLevel by remember { mutableStateOf(1L) }
-    var hasEmergencyContacts by remember(currentUser?.googleId) { mutableStateOf(false) }
-    var isEmergencyActive by remember(currentUser?.googleId) { mutableStateOf(false) }
+
+    val levelUpManager = rememberLevelUpManager(
+        currentUser = currentUser,
+        routeResult = viewModel.routeResult,
+        onRouteCompleted = onRouteCompleted,
+        onRouteResultDismissed = { viewModel.dismissRouteResult() },
+        onVoted = onVoted
+    )
+
+    val emergencyManager = rememberEmergencyManager(
+        currentUser = currentUser,
+        latestLocation = uiState.ultimaUbicacion
+    )
+
     var attachedMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var routeExitCameraSnapshot by remember { mutableStateOf<RouteExitCameraSnapshot?>(null) }
+    var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
 
-    LaunchedEffect(routeCompletionResult) {
-        if (routeCompletionResult != null) {
-            onRouteCompleted(routeCompletionResult)
-            if (routeCompletionResult.levelUpdated == true) {
-                levelUpLevel = routeCompletionResult.level ?: 1
-                showLevelUpOverlay = true
-            }
-            viewModel.dismissRouteResult()
-        }
-    }
     val strings = mapScreenStrings()
     val onEmergencyClick = rememberEmergencyStatusToggleAction(
         currentUser = currentUser,
         strings = strings,
-        onEmergencyStateChanged = { isEmergencyActive = it }
+        onEmergencyStateChanged = { emergencyManager.isActive = it }
     )
-    var navigationHeadingDegrees by remember { mutableStateOf<Float?>(null) }
 
     val actions = rememberMapScreenActions(
         uiState = uiState,
@@ -873,23 +1058,6 @@ fun MapLibreScreen(
         viewModel.onCurrentUserChanged(currentUser)
     }
 
-    LaunchedEffect(currentUser?.googleId) {
-        val googleId = currentUser?.googleId?.takeIf { it.isNotBlank() }
-        if (googleId == null) {
-            hasEmergencyContacts = false
-            isEmergencyActive = false
-            return@LaunchedEffect
-        }
-
-        hasEmergencyContacts = runCatching {
-            cargarContactosEmergenciaUsuario(googleId).isNotEmpty()
-        }.getOrDefault(false)
-
-        isEmergencyActive = runCatching {
-            obtenerEstadoEmergenciaUsuario(googleId)
-        }.getOrDefault(false)
-    }
-
     LaunchedEffect(issuesRefreshTrigger) {
         viewModel.loadIssuesMap()
     }
@@ -897,26 +1065,6 @@ fun MapLibreScreen(
     LaunchedEffect(viewModel) {
         BackendWebSocketManager.locationEvents.collectLatest { event ->
             viewModel.onEmergencyContactLocationReceived(event)
-        }
-    }
-
-    val latestEmergencyLocation = rememberUpdatedState(uiState.ultimaUbicacion)
-
-    LaunchedEffect(isEmergencyActive) {
-        if (!isEmergencyActive) {
-            return@LaunchedEffect
-        }
-
-        // Keep a fixed 60-second cadence while emergency mode is active,
-        // instead of restarting the timer on each GPS update.
-        while (true) {
-            latestEmergencyLocation.value?.let { location ->
-                BackendWebSocketManager.sendLocationUpdate(
-                    latitude = location.latitude,
-                    longitude = location.longitude
-                )
-            }
-            delay(EmergencyLocationBroadcastIntervalMillis)
         }
     }
 
@@ -937,8 +1085,8 @@ fun MapLibreScreen(
         viewModel = viewModel,
         mapView = mapView,
         currentUser = currentUser,
-        showEmergencyAction = hasEmergencyContacts,
-        isEmergencyActive = isEmergencyActive,
+        showEmergencyAction = emergencyManager.hasContacts,
+        isEmergencyActive = emergencyManager.isActive,
         strings = strings,
         actions = actions,
         onMapReady = { map -> attachedMap = map },
@@ -946,13 +1094,14 @@ fun MapLibreScreen(
         onEmergencyClick = onEmergencyClick,
         onLoginClick = onLoginClick,
         onMenuClick = onMenuClick,
-        onProfileClick = onProfileClick
+        onProfileClick = onProfileClick,
+        onVoted = { levelUpManager.triggerCheck() }
     )
 
-    if (showLevelUpOverlay) {
+    if (levelUpManager.showOverlay) {
         com.safesteps.profile.LevelUpAnimationOverlay(
-            level = levelUpLevel,
-            onDismiss = { showLevelUpOverlay = false }
+            level = levelUpManager.level,
+            onDismiss = { levelUpManager.dismissOverlay() }
         )
     }
 }
@@ -2063,6 +2212,42 @@ private fun processAddressSelection(
     )
 }
 
+private fun handleMissingLocation(notificationTitle: String, searchingGpsSignalMessage: String) {
+    ScreenNotificationManager.showNotification(
+        notificationName = notificationTitle,
+        text = searchingGpsSignalMessage
+    )
+}
+
+private fun handleRouteModeRecenter(
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    mapView: MapView,
+    map: MapLibreMap?,
+    currentLocation: Location?,
+    navigationHeadingDegrees: Float?,
+    onRouteExitCameraSnapshotCaptured: (RouteExitCameraSnapshot?) -> Unit
+) {
+    if ((uiState.usesLiveNavigation && !uiState.routeCompleted) || currentLocation != null) {
+        onRouteExitCameraSnapshotCaptured(map?.cameraPosition?.toRouteExitCameraSnapshot())
+    }
+
+    if (uiState.usesLiveNavigation && !uiState.routeCompleted) {
+        viewModel.resumeNavigationCameraTracking()
+        enableNavigationCameraTracking(
+            mapView = mapView,
+            currentLocation = currentLocation,
+            headingDegrees = navigationHeadingDegrees?.toDouble(),
+            applyZoom = true
+        )
+    } else {
+        activateLocationComponent(
+            mapView = mapView,
+            initialLocation = currentLocation
+        )
+    }
+}
+
 private fun recenterOnCurrentLocation(
     uiState: MapUiState,
     viewModel: MapViewModel,
@@ -2082,65 +2267,35 @@ private fun recenterOnCurrentLocation(
     val currentLocation = uiState.ultimaUbicacion
 
     if (uiState.modoRuta) {
-        if ((uiState.usesLiveNavigation && !uiState.routeCompleted) || currentLocation != null) {
-            onRouteExitCameraSnapshotCaptured(map?.cameraPosition?.toRouteExitCameraSnapshot())
-        }
-
-        if (uiState.usesLiveNavigation && !uiState.routeCompleted) {
-            viewModel.resumeNavigationCameraTracking()
-            enableNavigationCameraTracking(
-                mapView = mapView,
-                currentLocation = currentLocation,
-                headingDegrees = navigationHeadingDegrees?.toDouble(),
-                applyZoom = true
-            )
-        } else {
-            activateLocationComponent(
-                mapView = mapView,
-                initialLocation = currentLocation
-            )
-        }
+        handleRouteModeRecenter(
+            uiState = uiState,
+            viewModel = viewModel,
+            mapView = mapView,
+            map = map,
+            currentLocation = currentLocation,
+            navigationHeadingDegrees = navigationHeadingDegrees,
+            onRouteExitCameraSnapshotCaptured = onRouteExitCameraSnapshotCaptured
+        )
 
         if (currentLocation == null) {
-            ScreenNotificationManager.showNotification(
-                notificationName = notificationTitle,
-                text = searchingGpsSignalMessage
-            )
+            handleMissingLocation(notificationTitle, searchingGpsSignalMessage)
         } else if (!uiState.usesLiveNavigation || uiState.routeCompleted) {
             centerMapOnLocation(mapView, currentLocation)
         }
         return
     }
 
-    if (uiState.origenSeleccionado != null) {
-        activateLocationComponent(
-            mapView = mapView,
-            initialLocation = currentLocation
-        )
-
-        if (currentLocation == null) {
-            ScreenNotificationManager.showNotification(
-                notificationName = notificationTitle,
-                text = searchingGpsSignalMessage
-            )
-            return
-        }
-
-        centerMapOnLocation(mapView, currentLocation)
-        return
+    if (uiState.origenSeleccionado == null) {
+        viewModel.limpiarOrigen()
     }
 
-    viewModel.limpiarOrigen()
     activateLocationComponent(
         mapView = mapView,
         initialLocation = currentLocation
     )
 
     if (currentLocation == null) {
-        ScreenNotificationManager.showNotification(
-            notificationName = notificationTitle,
-            text = searchingGpsSignalMessage
-        )
+        handleMissingLocation(notificationTitle, searchingGpsSignalMessage)
         return
     }
 

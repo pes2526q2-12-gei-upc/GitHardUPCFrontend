@@ -174,7 +174,6 @@ class ChatConversationViewModel(
                 }
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
-                Log.e("CHAT_CONV", "Error enviant: ${e.message}")
                 _uiState.update { state ->
                     state.copy(
                         messages = state.messages.filterNot { it.localId == localId },
@@ -195,13 +194,11 @@ class ChatConversationViewModel(
                 val profile = withContext(ioDispatcher) { cargarPerfilDeUsuario(googleId) }
                 val url = profile?.pictureUrl?.trim()
                 if (!url.isNullOrBlank()) {
-                    Log.d("AVATAR", "cargarPerfil($googleId) → $url")
                     _avatars.update { it + (googleId to url) }
                     return@launch
                 }
                 val amics = withContext(ioDispatcher) { cargarAmigosUsuario(myGoogleId) }
                 val urlAmics = amics.firstOrNull { it.googleId == googleId }?.photoUrl?.trim()
-                Log.d("AVATAR", "amics($googleId) → $urlAmics")
                 if (!urlAmics.isNullOrBlank()) {
                     _avatars.update { it + (googleId to urlAmics) }
                 } else {
