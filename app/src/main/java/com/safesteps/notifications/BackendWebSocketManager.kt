@@ -3,7 +3,10 @@ package com.safesteps.notifications
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.safesteps.R
 import com.safesteps.chat.ChatEventBus
+import com.safesteps.ui.notifications.ScreenNotificationManager
+import com.safesteps.ui.notifications.ScreenNotificationManager.showNotification
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -319,21 +322,27 @@ object BackendWebSocketManager {
                     else -> ChatEventBus.onNewMessage(chatId)
                 }
                 if (settings.messagesEnabled) {
-                    val title = payload.resolveTitle(MessageTitleKey)
-                    val body = payload.resolveBody(MessageBodyKey)
-                    val normalizedTitle = normalizeNotificationText(
-                        rawValue = title,
-                        knownKey = MessageTitleKey
-                    )
-                    val normalizedBody = normalizeNotificationText(
-                        rawValue = body,
-                        knownKey = MessageBodyKey
-                    )
-                    showIncomingMessageNotification(
-                        context = context,
-                        title = normalizedTitle,
-                        body = normalizedBody
-                    )
+                    val sender = payload.resolveSenderUsername()
+                    val content = payload.resolveMessageContent()
+                    val senderGoogleId = payload.resolveSenderGoogleId()
+                    val isActiveChat = chatId != null && chatId == ChatEventBus.ActiveChatTracker.activeChatId
+
+                    if (!content.isNullOrBlank() && !isActiveChat) {
+                        chatId?.let { com.safesteps.chat.UnreadMessagesStore.increment(it) }
+
+                        scope.launch {
+                            val info = resolveMessageChatInfo(context, chatId, senderGoogleId, sender, payload.extractGroupName())
+                            val name = info.displayName.ifBlank {
+                                sender ?: context.getString(R.string.message_notification_received_title)
+                            }
+                            showNotification(
+                                notificationName = name,
+                                text = if (info.isGroup && !sender.isNullOrBlank()) "$sender: $content" else content,
+                                avatarUrl = if (info.isGroup) null else info.friendAvatarUrl,
+                                isGroup = info.isGroup
+                            )
+                        }
+                    }
                 }
             }
 
@@ -602,6 +611,14 @@ object BackendWebSocketManager {
         private val dataObject: JSONObject?
             get() = root?.optJSONObject("data")
 
+        fun resolveSenderUsername(): String? = firstStringOf("senderUsername", "sender_username", "senderName")
+        fun resolveMessageContent(): String? = firstStringOf("messageContent", "message_content", "content")
+        fun resolveSenderGoogleId(): String? = firstStringOf("senderGoogleId", "sender_google_id", "googleId")
+
+        private fun firstStringOf(vararg keys: String): String? =
+            sequenceOf(dataObject, dataObject?.optJSONObject("payload"), root, root?.optJSONObject("payload"))
+                .flatMap { node -> keys.asSequence().mapNotNull { k -> node?.optString(k)?.takeIf { it.isMeaningfulPayloadText() } } }
+                .firstOrNull()
         fun resolveTitleKey(): String? {
             return root?.optString("titleKey")
                 ?.takeIf { it.isMeaningfulPayloadText() }
@@ -770,9 +787,10 @@ object BackendWebSocketManager {
 
         fun extractChatId(): Long? {
             val candidates = listOfNotNull(dataObject, root)
-            for (candidate in candidates) {
-                if (!candidate.has("chatId")) continue
-                val chatId = candidate.optLong("chatId", -1L)
+            val keys = listOf("chatId", "chat_id")
+            for (candidate in candidates) for (k in keys) {
+                if (!candidate.has(k)) continue
+                val chatId = candidate.optLong(k, -1L)
                 if (chatId > 0L) return chatId
             }
             return null
@@ -801,7 +819,9 @@ object BackendWebSocketManager {
         fun extractGroupName(): String? {
             val candidates = listOfNotNull(dataObject, root)
             for (c in candidates) {
-                val v = c.optString("groupName", "").trim().ifBlank { c.optString("name", "").trim() }
+                val v = c.optString("groupName", "").trim()
+                    .ifBlank { c.optString("group_name", "").trim() }
+                    .ifBlank { c.optString("name", "").trim() }
                 if (v.isNotBlank()) return v
             }
             return null

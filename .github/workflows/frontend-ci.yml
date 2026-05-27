@@ -41,6 +41,8 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Verificación de Código, Tests y Cobertura (Lint & JaCoCo)
+        env:
+          API_KEY: "clau_ficticia_per_a_tests_de_ci" # Clave ficticia para evitar errores de CI, no se utiliza en el análisis
         run: ./gradlew lint jacocoTestReport --no-daemon --parallel --build-cache
 
       - name: Análisis Estático con SonarQube CLI

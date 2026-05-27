@@ -48,6 +48,7 @@ data class MapUiState(
     val destinoSeleccionado: LatLng? = null,
     val textoOrigen: String = "",
     val textoDestino: String = "",
+    val resolvedOriginAddress: String? = null,
     val mapaListo: Boolean = false,
     val locationGranted: Boolean = false,
     val estiloSatelite: Boolean = false,

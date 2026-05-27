@@ -7,6 +7,7 @@ internal val sharedOkHttpClient by lazy {
                 .addHeader("X-API-KEY", com.safesteps.BuildConfig.API_KEY)
                 .build()
             chain.proceed(request)
+
         }
         .build()
 }

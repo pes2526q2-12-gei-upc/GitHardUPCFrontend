@@ -677,7 +677,16 @@ class MapViewModel(
         val routeType = routeTypeFor(prioridad)
         Log.d("PRUEBA_RUTA", "Llamando a calcularRuta. Prioridad actual: $prioridad")
 
-        _uiState.update { it.copy(calculantRuta = true) }
+        _uiState.update {
+            it.copy(
+                calculantRuta = true,
+                destinoSeleccionado = it.destinoSeleccionado ?: LatLng(destiLat, destiLong),
+                origenSeleccionado = it.origenSeleccionado ?: LatLng(origenLat, origenLong)
+            )
+        }
+
+        val resolvedOrigin = getTextoDestino(LatLng(origenLat, origenLong))
+        _uiState.update { it.copy(resolvedOriginAddress = resolvedOrigin) }
 
         return try {
             val infoRuta = obtenirCoordenadesRuta(

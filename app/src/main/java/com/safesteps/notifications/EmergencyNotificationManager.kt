@@ -10,19 +10,32 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.Person
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.IconCompat
+import androidx.core.graphics.drawable.toBitmap
+import coil.ImageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
 import com.google.firebase.messaging.FirebaseMessaging
 import com.safesteps.MainActivity
 import com.safesteps.R
 import com.safesteps.auth.UserInfo
+import com.safesteps.data.obtenirXatsUsuari
+import com.safesteps.data.cargarPerfilDeUsuario
+import com.safesteps.chat.ChatEventBus
 import com.safesteps.data.sincronizarTokenFcmUsuario
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 
 private const val EmergencyChannelId = "emergency_alerts"
 private const val ActivityChannelId = "activity_alerts"
@@ -187,6 +200,23 @@ private enum class IncomingEmergencyState {
     UNKNOWN
 }
 
+private fun initialAvatarBitmap(name: String, sizePx: Int = 128): Bitmap {
+    val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bmp)
+    val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF6DD29A.toInt() }
+    canvas.drawCircle(sizePx / 2f, sizePx / 2f, sizePx / 2f, bg)
+    val letter = name.trim().take(1).uppercase().ifBlank { "?" }
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
+        textSize = sizePx * 0.5f
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
+    val y = sizePx / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
+    canvas.drawText(letter, sizePx / 2f, y, textPaint)
+    return bmp
+}
+
 private fun resolveIncomingEmergencyState(
     title: String?,
     body: String?,
@@ -236,23 +266,168 @@ private fun isEmergencyTemplateKey(value: String): Boolean {
         value.equals(EmergencyEndedBodyKey, ignoreCase = true)
 }
 
-fun showIncomingMessageNotification(
+data class MessageChatInfo(
+    val isGroup: Boolean,
+    val displayName: String,       // nom del grup (grup) o de l'amic (privat)
+    val friendAvatarUrl: String?,  // avatar de l'amic (privat); null en grup
+    val senderAvatarUrl: String?   // avatar de qui escriu
+)
+
+suspend fun resolveMessageChatInfo(
     context: Context,
-    title: String?,
-    body: String?
-) {
-    val localizedContext = notificationLocalizedContext(context)
-    showActivityNotification(
-        context = context,
-        notificationId = MessageNotificationId,
-        title = title?.takeIf(String::isNotBlank)
-            ?: localizedContext.getString(R.string.message_notification_received_title),
-        body = body?.takeIf(String::isNotBlank)
-            ?: localizedContext.getString(R.string.message_notification_received_body),
-        category = NotificationCompat.CATEGORY_MESSAGE,
-        color = 0xFF1F6F78.toInt()
+    chatId: Long?,
+    senderGoogleId: String?,
+    senderName: String?,
+    fallbackChatName: String?
+): MessageChatInfo {
+    val myGoogleId = context.applicationContext
+        .getSharedPreferences(EmergencyNotificationsPrefs, Context.MODE_PRIVATE)
+        .getString(CurrentGoogleIdKey, null).orEmpty()
+
+    if (chatId != null && chatId > 0L && myGoogleId.isNotBlank()) {
+        runCatching {
+            val chat = obtenirXatsUsuari(myGoogleId).firstOrNull { it.id == chatId }
+            if (chat != null) {
+                val senderAvatar = senderGoogleId?.takeIf { it.isNotBlank() }
+                    ?.let { gid -> runCatching { cargarPerfilDeUsuario(gid)?.pictureUrl?.trim() }.getOrNull() }
+
+                return if (chat.type == "GROUP") {
+                    MessageChatInfo(
+                        isGroup = true,
+                        displayName = chat.name?.takeIf { it.isNotBlank() } ?: fallbackChatName.orEmpty(),
+                        friendAvatarUrl = null,
+                        senderAvatarUrl = senderAvatar
+                    )
+                } else {
+                    val otherGid = chat.participantGoogleIds.firstOrNull { it != myGoogleId && it.isNotBlank() }
+                    val otherAvatar = otherGid?.let { gid ->
+                        runCatching { cargarPerfilDeUsuario(gid)?.pictureUrl?.trim() }.getOrNull()
+                    }
+                    MessageChatInfo(
+                        isGroup = false,
+                        displayName = senderName?.takeIf { it.isNotBlank() } ?: fallbackChatName.orEmpty(),
+                        friendAvatarUrl = otherAvatar ?: senderAvatar,
+                        senderAvatarUrl = otherAvatar ?: senderAvatar
+                    )
+                }
+            }
+        }
+    }
+    return MessageChatInfo(
+        isGroup = false,
+        displayName = (senderName ?: fallbackChatName).orEmpty(),
+        friendAvatarUrl = null,
+        senderAvatarUrl = null
     )
 }
+
+fun showIncomingMessageNotification(
+    context: Context,
+    chatId: Long?,
+    chatName: String?,
+    senderName: String?,
+    messageContent: String?,
+    isGroup: Boolean,
+    avatarUrl: String?,
+    senderGoogleId: String? = null
+) {
+    if (chatId != null && chatId == ChatEventBus.ActiveChatTracker.activeChatId) return
+
+    val content = messageContent?.trim().orEmpty()
+    if (content.isBlank()) return
+
+    emergencyNotificationScope.launch {
+        val ctx = notificationLocalizedContext(context)
+        val info = resolveMessageChatInfo(ctx, chatId, senderGoogleId, senderName, chatName)
+
+        val finalIsGroup = info.isGroup || isGroup
+        val displayName = info.displayName.ifBlank {
+            chatName?.takeIf { it.isNotBlank() } ?: ctx.getString(R.string.message_notification_received_title)
+        }
+        val senderLabel = senderName?.takeIf { it.isNotBlank() } ?: displayName
+
+        // Avatar del remitent: foto real (resolta o del payload) i, si no n'hi ha, inicial
+        val senderPhoto = info.senderAvatarUrl ?: avatarUrl
+        val senderAvatar = loadAvatarBitmap(ctx, senderPhoto)
+            ?: initialAvatarBitmap(if (finalIsGroup) senderLabel else displayName)
+
+        // Icona gran: grup -> imatge de grup; privat -> avatar de l'amic
+        val largeIcon = if (finalIsGroup) {
+            drawableToBitmap(ctx, R.drawable.ic_group_notification) ?: initialAvatarBitmap(displayName)
+        } else {
+            loadAvatarBitmap(ctx, info.friendAvatarUrl ?: avatarUrl) ?: senderAvatar
+        }
+
+        postMessageNotification(ctx, chatId, displayName, senderLabel, content, finalIsGroup, senderAvatar, largeIcon)
+    }
+}
+
+@SuppressLint("MissingPermission", "RestrictedApi")
+private fun postMessageNotification(
+    context: Context,
+    chatId: Long?,
+    chatName: String,
+    senderLabel: String,
+    content: String,
+    isGroup: Boolean,
+    senderAvatar: Bitmap?,
+    largeIcon: Bitmap?
+) {
+    ensureActivityNotificationChannel(context)
+    if (!hasNotificationPermission(context)) return
+
+    val me = Person.Builder().setName(context.getString(R.string.app_name)).build()
+
+    val senderPerson = Person.Builder()
+        .setName(senderLabel)
+        .apply { senderAvatar?.let { setIcon(IconCompat.createWithBitmap(it)) } }
+        .build()
+
+    val style = NotificationCompat.MessagingStyle(me)
+    if (isGroup) {
+        style.isGroupConversation = true
+        style.conversationTitle = chatName
+    }
+    style.addMessage(content, System.currentTimeMillis(), senderPerson)
+
+    val contentIntent = PendingIntent.getActivity(
+        context, (chatId ?: 0L).toInt(),
+        Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+        },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    val notification = NotificationCompat.Builder(context, ActivityChannelId)
+        .setSmallIcon(R.drawable.ic_emergency_notification)
+        .setStyle(style)
+        .setLargeIcon(largeIcon)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+        .setColor(0xFF1F6F78.toInt())
+        .setContentIntent(contentIntent)
+        .setAutoCancel(true)
+        .build()
+
+    val notificationId = MessageNotificationId + ((chatId ?: 0L) % 1000).toInt()
+    NotificationManagerCompat.from(context).notify(notificationId, notification)
+}
+
+private suspend fun loadAvatarBitmap(context: Context, url: String?): Bitmap? {
+    if (url.isNullOrBlank()) return null
+    return try {
+        val loader = ImageLoader(context)
+        val request = ImageRequest.Builder(context)
+            .data(url).allowHardware(false).build()
+        val result = loader.execute(request)
+        (result as? SuccessResult)?.drawable?.toBitmap()
+    } catch (_: Exception) { null }
+}
+
+private fun drawableToBitmap(context: Context, resId: Int): Bitmap? = try {
+    AppCompatResources.getDrawable(context, resId)?.toBitmap()
+} catch (_: Exception) { null }
 
 fun showIncomingFriendRequestNotification(
     context: Context,

@@ -27,7 +27,9 @@ data class ChatDto(
     val name: String? = null,
     val createdAt: String? = null,
     val participantUsernames: List<String> = emptyList(),
-    val participantGoogleIds: List<String> = emptyList()
+    val participantGoogleIds: List<String> = emptyList(),
+    val creatorGoogleId: String? = null,
+    val adminGoogleIds: List<String> = emptyList()
 )
 
 fun obtenirDataActual(): String {

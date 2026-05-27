@@ -54,6 +54,8 @@ import com.safesteps.R
 import com.safesteps.auth.UserInfo
 import com.safesteps.i18n.appString
 import com.safesteps.chat.ChatConversationViewModel
+import com.safesteps.profile.FriendListItemUiState
+import com.safesteps.profile.FriendProfileScreen
 
 
 private const val SAFESTEPS_ROUTE_PREFIX = "safesteps_route:"
@@ -123,6 +125,7 @@ fun ChatListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val avatars by viewModel.avatars.collectAsState()
+    val unreadCounts by UnreadMessagesStore.counts.collectAsState()
     var exitConfirmChatId by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(user.googleId) {
@@ -178,7 +181,11 @@ fun ChatListScreen(
                         ChatListItemCard(
                             chat = chat,
                             avatarUrl = chat.otherParticipantGoogleId?.let { avatars[it] },
-                            onClick = { onChatSelected(chat.chatId, chat.otherParticipantName) },
+                            unreadCount = unreadCounts[chat.chatId] ?: 0,
+                            onClick = {
+                                UnreadMessagesStore.clear(chat.chatId)
+                                onChatSelected(chat.chatId, chat.otherParticipantName)
+                            },
                             onExitClick = { exitConfirmChatId = chat.chatId }
                         )
                     }
@@ -220,6 +227,7 @@ fun ChatListScreen(
 private fun ChatListItemCard(
     chat: ChatListItemUiState,
     avatarUrl: String?,
+    unreadCount: Int = 0,
     onClick: () -> Unit,
     onExitClick: () -> Unit
 ) {
@@ -259,6 +267,24 @@ private fun ChatListItemCard(
                     color = Color(0xFF9AA7A0),
                     style = MaterialTheme.typography.bodySmall
                 )
+            }
+            if (unreadCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .defaultMinSize(minWidth = 22.dp, minHeight = 22.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFD32F2F)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (unreadCount > 99) "99+" else unreadCount.toString(),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+                }
             }
 
             if (isGroup) {
@@ -757,6 +783,7 @@ fun ConversationScreen(
     var showDetails by remember { mutableStateOf(false) }
     var showExitConfirm by remember { mutableStateOf(false) }
     var notAdminMsg by remember { mutableStateOf<String?>(null) }
+    var showProfile by remember { mutableStateOf(false) }
 
     ConversationSideEffects(viewModel, chatId, user, otherParticipantName, snackbarHostState) { notAdminMsg = it }
 
@@ -791,8 +818,8 @@ fun ConversationScreen(
             confirmText = appString(R.string.chat_exit_action), confirmColor = Color(0xFFD32F2F),
             icon = Icons.AutoMirrored.Filled.ExitToApp, iconTint = Color(0xFFD32F2F),
             cancelText = appString(R.string.cancel_action),
-            onConfirm = { showExitConfirm = false; onBack() }, onDismiss = { showExitConfirm = false }
-        )
+            onConfirm = { showExitConfirm = false; viewModel.exitChat { onBack() } },
+            onDismiss = { showExitConfirm = false }        )
     }
 
     val isSwitchingChat = uiState.otherParticipantName != otherParticipantName
@@ -812,11 +839,25 @@ fun ConversationScreen(
                     onBack = onBack, onOptions = { showDetails = true },
                     onInputChanged = viewModel::onInputChanged, onSendMessage = viewModel::sendMessage,
                     onRetryLoad = viewModel::onScreenVisible, onLoadAvatar = viewModel::carregarAvatarSiCal,
-                    onViewRoute = onViewRoute
+                    onViewRoute = onViewRoute,
+                    onOpenProfile = { if (uiState.otherParticipantGoogleId != null) showProfile = true },
                 )
 
                 if (showFullLoader) {
                     ConversationLoadingOverlay()
+                }
+
+                if (showProfile && !uiState.isGroup) {
+                    FriendProfileScreen(
+                        friend = FriendListItemUiState(
+                            googleId = uiState.otherParticipantGoogleId.orEmpty(),
+                            username = otherParticipantName,
+                            email = "",
+                            photoUrl = uiState.otherParticipantGoogleId?.let { avatars[it] }
+                        ),
+                        onBack = { showProfile = false },
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }
@@ -858,15 +899,19 @@ private fun ConversationSideEffects(
 private fun ConversationContent(
     uiState: ConversationUiState, avatars: Map<String, String>, listState: LazyListState,
     otherParticipantName: String, onBack: () -> Unit, onOptions: () -> Unit,
+    onOpenProfile: () -> Unit,
     onInputChanged: (String) -> Unit, onSendMessage: () -> Unit,
     onRetryLoad: () -> Unit, onLoadAvatar: (String) -> Unit,
     onViewRoute: (Double, Double, Double, Double) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF4F7F5)).statusBarsPadding().imePadding()) {
         ConversationTopBar(
-            title = otherParticipantName, isGroup = uiState.isGroup,
+            title = otherParticipantName,
+            isGroup = uiState.isGroup,
             avatarUrl = uiState.otherParticipantGoogleId?.let { avatars[it] },
-            onBack = onBack, onOptions = onOptions
+            onBack = onBack,
+            onOptions = onOptions,
+            onOpenProfile = onOpenProfile
         )
         if (uiState.loadFailed) {
             ChatErrorState(modifier = Modifier.weight(1f), message = appString(R.string.chat_messages_load_failed), onRetry = onRetryLoad)
@@ -950,7 +995,7 @@ private fun ChatTopBarSimple(title: String, onBack: () -> Unit) {
 @Composable
 private fun ConversationTopBar(
     title: String, isGroup: Boolean = false, avatarUrl: String? = null,
-    onBack: () -> Unit, onOptions: () -> Unit
+    onBack: () -> Unit, onOptions: () -> Unit, onOpenProfile: () -> Unit
 ) {
     Surface(color = Color.White, shadowElevation = 4.dp) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 0.dp, vertical = 4.dp),
@@ -958,7 +1003,7 @@ private fun ConversationTopBar(
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, appString(R.string.back), tint = Color(0xFF33413B))
             }
-            Row(modifier = Modifier.weight(1f).clickable(onClick = onOptions),
+            Row(modifier = Modifier.weight(1f).clickable(onClick = if (isGroup) onOptions else onOpenProfile),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center) {
                 if (isGroup) GroupAvatar(size = 30) else UserAvatarSmall(username = title, photoUrl = avatarUrl, size = 30)
@@ -967,13 +1012,7 @@ private fun ConversationTopBar(
                     fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(max = 180.dp))
             }
-            IconButton(onClick = onOptions) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription =  appString(R.string.chat_details_action),
-                    tint = Color(0xFF33413B)
-                )
-            }
+            Spacer(Modifier.width(48.dp))
         }
     }
 }
